@@ -1,322 +1,203 @@
 # Next Actions
 
 > **Priority Action Queue for RMGaaS**  
-> **Last Updated:** 2025-12-06T00:00:00Z
+> **Last Updated:** 2025-12-15  
+> **Status:** DAY 9 READY
 
 ---
 
-## How This Works
+## Development Progress
 
-1. Tasks are prioritized P0 (critical) → P3 (low)
-2. Within priority, lower action IDs go first
-3. Before starting, claim with: `ctx-claim -Id A001`
-4. When done: `ctx-release -Id A001 -Complete`
-5. Add new actions with: `ctx-action -Add`
+| Day | Focus | Status |
+|-----|-------|--------|
+| 1 | Foundation & Infrastructure | ✅ Complete |
+| 2 | Multi-Tenant & Auth | ✅ Complete |
+| 3 | Resource Management | ✅ Complete |
+| 4 | Client & Project | ✅ Complete |
+| 5 | Allocation Management | ✅ Complete |
+| 6 | Dashboard & Reports | ✅ Complete |
+| 7 | Contract Management | ✅ Complete |
+| 8 | Timesheet Management | ✅ Complete |
+| **9** | **Skill Matching & Search** | 🟡 **NEXT** |
+| 10 | Intelligence Layer | 🔴 Pending |
+| 11 | Advanced Dashboards | 🔴 Pending |
+| 12 | Reporting Engine | 🔴 Pending |
+| 13 | Admin Features | 🔴 Pending |
+| 14 | Polish & Security | 🔴 Pending |
 
 ---
 
-## 🔴 P0 - Critical (Do Immediately)
+## 🚀 Day 9 Actions (Start Here)
 
-### A001: Initialize Project Structure
+### D9-001: Skill Matching Algorithm
 ```
-Status: 🟡 Unclaimed
-Type: Setup
+Status: 🟡 Ready to Start
+Type: Feature
+Effort: 3h
+Dependencies: Resources, Skills, Projects
+```
+**Tasks:**
+- [ ] Create matching service (`apps/api/src/modules/matching/`)
+- [ ] Implement skill matching algorithm
+- [ ] Score resources based on skill match percentage
+- [ ] Factor in availability and utilization
+- [ ] Weight skills by importance (required vs nice-to-have)
+- [ ] Return top N candidates with scores
+
+**Acceptance Criteria:**
+- Given a project's skill requirements, returns ranked candidates
+- Each candidate has a match score with explanation
+
+---
+
+### D9-002: Resource Recommendation API
+```
+Status: 🟡 Ready to Start
+Type: API
 Effort: 2h
-Dependencies: None
+Dependencies: D9-001
 ```
 **Tasks:**
-- [ ] Run `npm init` with correct metadata
-- [ ] Set up TypeScript configuration
-- [ ] Configure ESLint + Prettier
-- [ ] Set up Husky for pre-commit hooks
-- [ ] Create folder structure (src/client, src/server, etc.)
-- [ ] Initialize Git repository
+- [ ] GET /api/v1/matching/recommendations/:projectId
+- [ ] GET /api/v1/matching/find-resources (skill query)
+- [ ] Include availability window in results
+- [ ] Include current utilization in results
+- [ ] Support filtering by practice/location
 
 **Acceptance Criteria:**
-- Project runs `npm run dev` without errors
-- TypeScript compiles without errors
-- Lint passes with no warnings
+- API returns scored recommendations
+- Response includes reasoning for each match
 
 ---
 
-### A002: Set Up Database Schema
+### D9-003: Skill Gap Detection
 ```
-Status: 🟡 Unclaimed
-Type: Database
-Effort: 4h
-Dependencies: A001
+Status: 🟡 Ready to Start
+Type: Feature
+Effort: 2h
+Dependencies: D9-001
 ```
 **Tasks:**
-- [ ] Initialize Prisma with PostgreSQL
-- [ ] Create core schemas:
-  - [ ] Tenant (organization)
-  - [ ] User
-  - [ ] Resource (employee)
-  - [ ] Project
-  - [ ] Allocation
-  - [ ] Skill
-- [ ] Set up multi-tenant RLS policies
-- [ ] Create seed data script
+- [ ] Compare project requirements vs. team skills
+- [ ] Identify missing skills
+- [ ] Suggest internal resources with missing skills
+- [ ] Calculate team coverage percentage
 
 **Acceptance Criteria:**
-- `prisma migrate dev` runs successfully
-- Seed data populates correctly
-- RLS prevents cross-tenant access
+- Dashboard shows skill gaps for projects
+- Recommendations for filling gaps
 
 ---
 
-### A003: Implement Authentication
+### D9-004: Resource Search UI Enhancement
 ```
-Status: 🟡 Unclaimed
-Type: Backend
-Effort: 6h
-Dependencies: A002
+Status: 🟡 Ready to Start
+Type: Frontend
+Effort: 2h
+Dependencies: D9-002
 ```
 **Tasks:**
-- [ ] Create auth service with JWT
-- [ ] Implement password hashing (argon2)
-- [ ] Build login endpoint
-- [ ] Build logout endpoint
-- [ ] Build refresh token endpoint
-- [ ] Create auth middleware
-- [ ] Add rate limiting
+- [ ] Add skill-based search to Resources page
+- [ ] Show match scores in results
+- [ ] Filter by availability dates
+- [ ] Filter by utilization threshold
+- [ ] Show why each resource matches
 
 **Acceptance Criteria:**
-- Login returns valid JWT
-- Refresh works correctly
-- Protected routes reject invalid tokens
-- Rate limiting prevents brute force
+- Can find resources by skill combination
+- Results show match quality
 
 ---
 
-## 🟠 P1 - High Priority (This Sprint)
-
-### A004: Resource CRUD API
+### D9-005: Project Staffing Recommendations UI
 ```
-Status: 🟡 Unclaimed
-Type: Backend
-Effort: 4h
-Dependencies: A002, A003
-```
-**Tasks:**
-- [ ] GET /resources (list with filters)
-- [ ] GET /resources/:id
-- [ ] POST /resources
-- [ ] PUT /resources/:id
-- [ ] DELETE /resources/:id
-- [ ] Input validation
-- [ ] Unit tests
-
----
-
-### A005: GraphQL Query Layer
-```
-Status: 🟡 Unclaimed
-Type: Backend
-Effort: 4h
-Dependencies: A004
-```
-**Tasks:**
-- [ ] Set up Apollo Server
-- [ ] Define GraphQL schema
-- [ ] Implement resolvers for:
-  - [ ] Resources query
-  - [ ] Projects query
-  - [ ] Allocations query
-- [ ] Add authentication to context
-- [ ] DataLoader for N+1 prevention
-
----
-
-### A006: Frontend Foundation
-```
-Status: 🟡 Unclaimed
+Status: 🟡 Ready to Start
 Type: Frontend
-Effort: 3h
-Dependencies: A001
+Effort: 2h
+Dependencies: D9-002
 ```
 **Tasks:**
-- [ ] Vite + React setup
-- [ ] TailwindCSS configuration
-- [ ] shadcn/ui component setup
-- [ ] React Router configuration
-- [ ] Layout components (sidebar, header)
-- [ ] Theme support (light/dark)
+- [ ] Add "Find Resources" button to Project Detail
+- [ ] Show recommended resources modal
+- [ ] Display match scores and reasons
+- [ ] One-click to create allocation
+
+**Acceptance Criteria:**
+- From project view, can find and allocate matching resources
 
 ---
 
-### A007: Login UI
-```
-Status: 🟡 Unclaimed
-Type: Frontend
-Effort: 3h
-Dependencies: A003, A006
-```
-**Tasks:**
-- [ ] Login page design
-- [ ] Form validation
-- [ ] API integration
-- [ ] Token storage
-- [ ] Auth context/provider
-- [ ] Protected route wrapper
+## Day 10+ Summary
+
+| Day | Focus | Key Deliverables |
+|-----|-------|------------------|
+| 10 | Intelligence Layer | Optimal utilization targets, bench predictions |
+| 11 | Advanced Dashboards | Practice, financial, skill inventory views |
+| 12 | Reporting Engine | Report builder, exports, scheduling |
+| 13 | Admin Features | Settings, user management, integrations |
+| 14 | Polish & Security | Testing, performance, security audit |
 
 ---
 
-## 🟡 P2 - Medium Priority (Next Sprint)
+## Environment Quick Reference
 
-### A008: Resource List UI
+### Running Services
+```bash
+# Check status
+curl http://localhost:4000/health
+curl http://localhost:3000
+
+# Restart if needed
+cd apps/api && npm run dev &
+cd apps/frontend && npm run dev &
 ```
-Status: 🟡 Unclaimed
-Type: Frontend
-Effort: 4h
-Dependencies: A004, A007
-```
-**Tasks:**
-- [ ] Data table component
-- [ ] Filters (skill, availability, band)
-- [ ] Search functionality
-- [ ] Pagination
-- [ ] Export to CSV
+
+### Login Credentials
+- **URL:** http://localhost:3000
+- **Email:** admin@newvision.in
+- **Password:** Password123!@#
+
+### Database
+- **Host:** localhost:5432
+- **Database:** rmgaas
+- **User:** rmgaas
+- **Password:** rmgaas_dev
 
 ---
 
-### A009: Resource Detail/Edit UI
-```
-Status: 🟡 Unclaimed
-Type: Frontend
-Effort: 4h
-Dependencies: A008
-```
-**Tasks:**
-- [ ] Detail view layout
-- [ ] Edit form with validation
-- [ ] Skill management
-- [ ] Allocation timeline
-- [ ] Activity history
+## Completed Actions (Days 1-8)
+
+| Day | Deliverables |
+|-----|--------------|
+| 1 | Monorepo, Docker, Prisma, CI/CD |
+| 2 | JWT auth, RBAC, Redis sessions |
+| 3 | Resource CRUD, skills, Excel import |
+| 4 | Client CRUD, contract CRUD, project CRUD |
+| 5 | Allocation CRUD, conflicts, rolloffs |
+| 6 | Dashboard analytics, charts, bench analysis |
+| 7 | Contract workflows (activate, renew, terminate) |
+| 8 | Timesheet weekly grid, save, submit, approve |
+
+**Additional Fixes (Session 003):**
+- UI overhaul with brand styling
+- CSV import fixed (1504 resources, 1574 allocations)
+- Dev/Prod environment toggle
 
 ---
 
-### A010: Dashboard MVP
-```
-Status: 🟡 Unclaimed
-Type: Frontend
-Effort: 6h
-Dependencies: A005, A007
-```
-**Tasks:**
-- [ ] Dashboard layout
-- [ ] KPI cards (bench, utilization, etc.)
-- [ ] Utilization chart
-- [ ] Availability timeline
-- [ ] Quick actions
+## Key Documents
+
+| Document | Use For |
+|----------|---------|
+| [CURRENT_STATE.md](./CURRENT_STATE.md) | Current implementation status |
+| [FEATURE_SCOPE.md](./FEATURE_SCOPE.md) | Daily task details |
+| [TECH_STACK.md](./TECH_STACK.md) | Technology choices |
+| [SECURITY_REQUIREMENTS.md](./SECURITY_REQUIREMENTS.md) | Security checklist |
+| [BRAND_GUIDELINES.md](./BRAND_GUIDELINES.md) | UI/UX standards |
+| [DATA_MODEL.md](./DATA_MODEL.md) | Entity definitions |
+| [API_CONTRACTS.md](./API_CONTRACTS.md) | API specifications |
+| [SESSION_LOG.md](./SESSION_LOG.md) | Session history |
 
 ---
 
-### A011: Allocation Management API
-```
-Status: 🟡 Unclaimed
-Type: Backend
-Effort: 6h
-Dependencies: A004
-```
-**Tasks:**
-- [ ] Allocation CRUD endpoints
-- [ ] Conflict detection
-- [ ] Capacity calculation
-- [ ] Timeline queries
-- [ ] Bulk operations
-
----
-
-## 🟢 P3 - Low Priority (Backlog)
-
-### A012: CSV Import
-```
-Status: 🟡 Unclaimed
-Type: Backend
-Effort: 4h
-Dependencies: A004
-```
-
-### A013: Notification System
-```
-Status: 🟡 Unclaimed
-Type: Backend
-Effort: 6h
-Dependencies: A003
-```
-
-### A014: Audit Logging
-```
-Status: 🟡 Unclaimed
-Type: Backend
-Effort: 3h
-Dependencies: A003
-```
-
-### A015: Docker Setup
-```
-Status: 🟡 Unclaimed
-Type: DevOps
-Effort: 3h
-Dependencies: A001
-```
-
-### A016: CI/CD Pipeline
-```
-Status: 🟡 Unclaimed
-Type: DevOps
-Effort: 4h
-Dependencies: A015
-```
-
----
-
-## Completed Actions
-
-| ID | Title | Completed | By |
-|----|-------|-----------|-----|
-| - | - | - | - |
-
----
-
-## Blocked Actions
-
-| ID | Title | Blocked By | Notes |
-|----|-------|------------|-------|
-| - | - | - | - |
-
----
-
-## Action ID Reference
-
-| Range | Category |
-|-------|----------|
-| A001-A050 | Setup & Infrastructure |
-| A051-A100 | Authentication & Security |
-| A101-A200 | Resource Management |
-| A201-A300 | Allocation & Scheduling |
-| A301-A400 | Reporting & Analytics |
-| A401-A500 | Integrations |
-| A501+ | Enhancements |
-
----
-
-## Commands
-
-```powershell
-# List all actions
-.\ctx-action.ps1 -List
-
-# Add new action
-.\ctx-action.ps1 -Add -Title "New task" -Priority P1 -Effort 2
-
-# Claim an action
-.\ctx-claim.ps1 -Id A001
-
-# Complete an action
-.\ctx-release.ps1 -Id A001 -Complete
-
-# See what's claimed
-.\ctx-who.ps1
-```
+*Ready to start Day 9 when approved by Product Owner.*

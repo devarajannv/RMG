@@ -1,7 +1,7 @@
 # Data Model & Entity Specifications
 
-> **Version:** 1.0  
-> **Last Updated:** 2025-12-06T00:00:00Z  
+> **Version:** 2.0  
+> **Last Updated:** 2025-12-15  
 > **Status:** APPROVED  
 > **Owner:** Tech Lead
 
@@ -28,14 +28,28 @@ This document defines all data entities, their relationships, field specificatio
 │  RESOURCE   │◄──────┤ ALLOCATION  │──┤  PROJECT    │
 │ (Employee)  │       │ (Assignment)│  │  (Work)     │
 └──────┬──────┘       └─────────────┘  └──────┬──────┘
-       │                                      │
-       │    ┌─────────────────────────────────┘
-       │    │
-       ▼    ▼
-┌─────────────┐       ┌─────────────┐
-│   SKILL     │       │   CLIENT    │
-│ (Competency)│       │ (Customer)  │
-└─────────────┘       └─────────────┘
+       │                    │                 │
+       │    ┌───────────────┘                 │
+       │    │                                 │
+       ▼    ▼                                 ▼
+┌─────────────┐       ┌─────────────┐  ┌─────────────┐
+│  TIMESHEET  │       │  CONTRACT   │──┤   CLIENT    │
+│  (Hours)    │       │  (SOW/MSA)  │  │ (Customer)  │
+└─────────────┘       └─────────────┘  └─────────────┘
+       
+┌─────────────┐
+│   SKILL     │
+│ (Competency)│
+└─────────────┘
+```
+
+### Key Hierarchy
+```
+CLIENT (Customer)
+  └── CONTRACT (MSA/SOW - legal agreement)
+        └── PROJECT (work engagement)
+              └── ALLOCATION (resource assignment)
+                    └── TIMESHEET_ENTRY (hours logged)
 ```
 
 ---
@@ -380,9 +394,93 @@ INDEXES:
 
 ---
 
-### 7. PROJECT
+### 7. CONTRACT (SOW/MSA)
 
-Work engagements that resources are allocated to.
+Legal agreements with clients that govern projects.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ CONTRACT                                                               │
+├────────────────────────────────────────────────────────────────────────┤
+│ PK  id            UUID        NOT NULL                                 │
+│ FK  tenantId      UUID        NOT NULL  → TENANT.id                    │
+│ FK  clientId      UUID        NOT NULL  → CLIENT.id                    │
+│ FK  accountMgrId  UUID        NULL      → RESOURCE.id (Account Mgr)    │
+│                                                                        │
+│ -- Identity --                                                         │
+│     contractNumber VARCHAR(50) NOT NULL  Contract ID (unique/tenant)   │
+│     name          VARCHAR(200) NOT NULL  Contract name                 │
+│     type          ENUM        NOT NULL  'msa','sow','amendment',       │
+│                                         'nda','other'                  │
+│     description   TEXT        NULL                                     │
+│                                                                        │
+│ -- Timeline --                                                         │
+│     startDate     DATE        NOT NULL  Contract start                 │
+│     endDate       DATE        NULL      Contract end (NULL = ongoing)  │
+│     signedDate    DATE        NULL      When signed                    │
+│                                                                        │
+│ -- Financials --                                                       │
+│     value         DECIMAL(15,2) NULL    Total contract value           │
+│     currency      VARCHAR(3)  NOT NULL  Default: tenant currency       │
+│     billingType   ENUM        NOT NULL  'tm','fixed','retainer',       │
+│                                         'milestone','hybrid'           │
+│     paymentTerms  VARCHAR(50) NULL      e.g., "Net 30"                 │
+│                                                                        │
+│ -- Status --                                                           │
+│     status        ENUM        NOT NULL  'draft','pending_approval',    │
+│                                         'active','expired',            │
+│                                         'terminated','renewed'         │
+│     renewalDate   DATE        NULL      When up for renewal            │
+│     autoRenew     BOOLEAN     NOT NULL  Default: false                 │
+│                                                                        │
+│ -- Documents --                                                        │
+│     documentUrl   VARCHAR(500) NULL     Link to signed document        │
+│     attachments   JSONB       NULL      Array of attachment refs       │
+│                                                                        │
+│ -- Metadata --                                                         │
+│     notes         TEXT        NULL                                     │
+│     customFields  JSONB       NULL                                     │
+│     externalRefs  JSONB       NULL      HubSpot deal ID, etc.          │
+│     createdAt     TIMESTAMP   NOT NULL                                 │
+│     updatedAt     TIMESTAMP   NOT NULL                                 │
+│     deletedAt     TIMESTAMP   NULL                                     │
+└────────────────────────────────────────────────────────────────────────┘
+
+INDEXES:
+  - UNIQUE (tenantId, contractNumber)
+  - INDEX (tenantId, clientId)
+  - INDEX (tenantId, status)
+  - INDEX (tenantId, endDate) WHERE status = 'active'  -- For renewal alerts
+  - INDEX (tenantId, renewalDate)
+```
+
+**Contract Status Flow:**
+```
+draft → pending_approval → active → expired
+    ↓                        ↓         ↓
+    └────────────────────────┴─→ terminated
+                             ↓
+                          renewed → active (new contract)
+```
+
+**External Refs JSONB:**
+```json
+{
+  "hubspot": {
+    "dealId": "12345",
+    "url": "https://app.hubspot.com/deals/12345"
+  },
+  "docusign": {
+    "envelopeId": "abc123"
+  }
+}
+```
+
+---
+
+### 8. PROJECT
+
+Work engagements that resources are allocated to. **Projects belong to Contracts.**
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -391,6 +489,7 @@ Work engagements that resources are allocated to.
 │ PK  id            UUID        NOT NULL                                 │
 │ FK  tenantId      UUID        NOT NULL  → TENANT.id                    │
 │ FK  clientId      UUID        NULL      → CLIENT.id (NULL = internal)  │
+│ FK  contractId    UUID        NULL      → CONTRACT.id (NULL = internal)│
 │ FK  managerId     UUID        NULL      → RESOURCE.id (Project Manager)│
 │ FK  practiceId    UUID        NULL      → PRACTICE.id                  │
 │                                                                        │
@@ -614,6 +713,182 @@ PARTITIONING:
   "status": { "old": "active", "new": "completed" },
   "endDate": { "old": "2025-03-31", "new": "2025-02-28" }
 }
+```
+
+---
+
+### 13. TIMESHEET_ENTRY
+
+Time logged by resources against projects/allocations.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ TIMESHEET_ENTRY                                                        │
+├────────────────────────────────────────────────────────────────────────┤
+│ PK  id            UUID        NOT NULL                                 │
+│ FK  tenantId      UUID        NOT NULL  → TENANT.id                    │
+│ FK  resourceId    UUID        NOT NULL  → RESOURCE.id                  │
+│ FK  projectId     UUID        NOT NULL  → PROJECT.id                   │
+│ FK  allocationId  UUID        NULL      → ALLOCATION.id                │
+│ FK  approvedBy    UUID        NULL      → USER.id                      │
+│                                                                        │
+│ -- Time Entry --                                                       │
+│     date          DATE        NOT NULL  Date of work                   │
+│     hours         DECIMAL(4,2) NOT NULL Hours worked (0.25-24)         │
+│     taskType      VARCHAR(100) NULL     Category of work               │
+│     description   TEXT        NULL      What was done                  │
+│                                                                        │
+│ -- Classification --                                                   │
+│     isBillable    BOOLEAN     NOT NULL  Default: true                  │
+│     isOvertime    BOOLEAN     NOT NULL  Default: false                 │
+│     billRate      DECIMAL(10,2) NULL    Rate for this entry            │
+│                                                                        │
+│ -- Status --                                                           │
+│     status        ENUM        NOT NULL  'draft','submitted',           │
+│                                         'approved','rejected',         │
+│                                         'invoiced'                     │
+│     submittedAt   TIMESTAMP   NULL                                     │
+│     approvedAt    TIMESTAMP   NULL                                     │
+│     rejectedAt    TIMESTAMP   NULL                                     │
+│     rejectionReason VARCHAR(500) NULL                                  │
+│                                                                        │
+│ -- Metadata --                                                         │
+│     tags          TEXT[]      NULL                                     │
+│     customFields  JSONB       NULL                                     │
+│     createdAt     TIMESTAMP   NOT NULL                                 │
+│     updatedAt     TIMESTAMP   NOT NULL                                 │
+│     deletedAt     TIMESTAMP   NULL                                     │
+└────────────────────────────────────────────────────────────────────────┘
+
+INDEXES:
+  - INDEX (tenantId, resourceId, date)
+  - INDEX (tenantId, projectId, date)
+  - INDEX (tenantId, status, date)
+  - INDEX (tenantId, date) WHERE status = 'submitted'  -- For approval queue
+  - UNIQUE (tenantId, resourceId, projectId, date, taskType)  -- Prevent duplicates
+
+CONSTRAINTS:
+  - hours BETWEEN 0.25 AND 24
+  - date cannot be more than 7 days in future
+  - Total hours per resource per day <= 24
+```
+
+**Timesheet Status Flow:**
+```
+draft → submitted → approved → invoiced
+           ↓
+        rejected → draft (can resubmit)
+```
+
+---
+
+### 14. TIMESHEET_PERIOD
+
+Aggregation of timesheet entries for approval periods.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ TIMESHEET_PERIOD                                                       │
+├────────────────────────────────────────────────────────────────────────┤
+│ PK  id            UUID        NOT NULL                                 │
+│ FK  tenantId      UUID        NOT NULL  → TENANT.id                    │
+│ FK  resourceId    UUID        NOT NULL  → RESOURCE.id                  │
+│ FK  approvedBy    UUID        NULL      → USER.id                      │
+│                                                                        │
+│ -- Period --                                                           │
+│     periodStart   DATE        NOT NULL  Period start (e.g., Monday)    │
+│     periodEnd     DATE        NOT NULL  Period end (e.g., Sunday)      │
+│     periodType    ENUM        NOT NULL  'weekly','biweekly','monthly'  │
+│                                                                        │
+│ -- Aggregates --                                                       │
+│     totalHours    DECIMAL(5,2) NOT NULL Calculated from entries        │
+│     billableHours DECIMAL(5,2) NOT NULL Billable portion               │
+│     overtimeHours DECIMAL(5,2) NOT NULL Overtime portion               │
+│                                                                        │
+│ -- Status --                                                           │
+│     status        ENUM        NOT NULL  'open','submitted',            │
+│                                         'approved','rejected'          │
+│     submittedAt   TIMESTAMP   NULL                                     │
+│     approvedAt    TIMESTAMP   NULL                                     │
+│     rejectedAt    TIMESTAMP   NULL                                     │
+│     comments      TEXT        NULL                                     │
+│                                                                        │
+│     createdAt     TIMESTAMP   NOT NULL                                 │
+│     updatedAt     TIMESTAMP   NOT NULL                                 │
+└────────────────────────────────────────────────────────────────────────┘
+
+INDEXES:
+  - UNIQUE (tenantId, resourceId, periodStart, periodEnd)
+  - INDEX (tenantId, status)
+  - INDEX (tenantId, periodEnd)
+```
+
+---
+
+### 15. OPPORTUNITY (Pipeline/Deals)
+
+Sales opportunities synced from CRM (HubSpot) for demand forecasting.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ OPPORTUNITY                                                            │
+├────────────────────────────────────────────────────────────────────────┤
+│ PK  id            UUID        NOT NULL                                 │
+│ FK  tenantId      UUID        NOT NULL  → TENANT.id                    │
+│ FK  clientId      UUID        NULL      → CLIENT.id                    │
+│ FK  ownerId       UUID        NULL      → RESOURCE.id (Sales owner)    │
+│                                                                        │
+│ -- Identity --                                                         │
+│     externalId    VARCHAR(100) NOT NULL  CRM ID (unique/tenant)        │
+│     name          VARCHAR(200) NOT NULL  Opportunity name              │
+│     description   TEXT        NULL                                     │
+│                                                                        │
+│ -- Pipeline --                                                         │
+│     stage         VARCHAR(50) NOT NULL  Pipeline stage                 │
+│     probability   INT         NULL      Win probability % (0-100)      │
+│     expectedCloseDate DATE    NULL                                     │
+│                                                                        │
+│ -- Value --                                                            │
+│     dealValue     DECIMAL(15,2) NULL    Total deal value               │
+│     currency      VARCHAR(3)  NOT NULL  Default: tenant currency       │
+│                                                                        │
+│ -- Resource Needs --                                                   │
+│     estimatedHeadcount INT    NULL      Resources needed               │
+│     requiredSkills JSONB      NULL      Skills needed for this deal    │
+│     estimatedStart DATE       NULL      When work would start          │
+│     estimatedDuration INT     NULL      Duration in months             │
+│                                                                        │
+│ -- Status --                                                           │
+│     status        ENUM        NOT NULL  'open','won','lost','stalled'  │
+│     wonDate       DATE        NULL                                     │
+│     lostDate      DATE        NULL                                     │
+│     lostReason    VARCHAR(200) NULL                                    │
+│                                                                        │
+│ -- Sync --                                                             │
+│     source        VARCHAR(50) NOT NULL  'hubspot','salesforce','manual'│
+│     lastSyncedAt  TIMESTAMP   NULL                                     │
+│     externalUrl   VARCHAR(500) NULL     Link to CRM record             │
+│                                                                        │
+│     createdAt     TIMESTAMP   NOT NULL                                 │
+│     updatedAt     TIMESTAMP   NOT NULL                                 │
+│     deletedAt     TIMESTAMP   NULL                                     │
+└────────────────────────────────────────────────────────────────────────┘
+
+INDEXES:
+  - UNIQUE (tenantId, externalId, source)
+  - INDEX (tenantId, status)
+  - INDEX (tenantId, stage)
+  - INDEX (tenantId, expectedCloseDate)
+  - GIN INDEX (requiredSkills)
+```
+
+**Required Skills JSONB:**
+```json
+[
+  { "skill": "React", "proficiency": "advanced", "count": 2 },
+  { "skill": "Node.js", "proficiency": "intermediate", "count": 3 },
+  { "skill": "AWS", "proficiency": "expert", "count": 1 }
+]
 ```
 
 ---

@@ -1,0 +1,843 @@
+// RMGaaS Prisma Schema
+// Resource Management & Governance as a Service
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// TENANT (Organization)
+// =============================================================================
+model Tenant {
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String    @db.VarChar(200)
+  slug            String    @unique @db.VarChar(100)
+  tier            TenantTier @default(FREE)
+  status          TenantStatus @default(TRIAL)
+  settings        Json?
+  logoUrl         String?   @db.VarChar(500)
+  primaryColor    String?   @db.VarChar(7)
+  timezone        String    @default("Asia/Kolkata") @db.VarChar(50)
+  currency        String    @default("INR") @db.VarChar(3)
+  fiscalYearStart Int       @default(4)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  users           User[]
+  resources       Resource[]
+  projects        Project[]
+  clients         Client[]
+  contracts       Contract[]
+  allocations     Allocation[]
+  practices       Practice[]
+  locations       Location[]
+  skills          Skill[]
+  skillCategories SkillCategory[]
+  roles           Role[]
+  auditLogs       AuditLog[]
+  timesheetEntries TimesheetEntry[]
+  timesheetPeriods TimesheetPeriod[]
+  opportunities    Opportunity[]
+
+  @@index([status])
+  @@index([tier])
+}
+
+enum TenantTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+}
+
+// =============================================================================
+// USER (System User)
+// =============================================================================
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  resourceId      String?   @db.Uuid
+  resource        Resource? @relation(fields: [resourceId], references: [id])
+  email           String    @db.VarChar(255)
+  passwordHash    String    @db.VarChar(255)
+  firstName       String    @db.VarChar(100)
+  lastName        String    @db.VarChar(100)
+  status          UserStatus @default(ACTIVE)
+  emailVerified   Boolean   @default(false)
+  lastLoginAt     DateTime?
+  failedLogins    Int       @default(0)
+  lockedUntil     DateTime?
+  mfaEnabled      Boolean   @default(false)
+  mfaSecret       String?   @db.VarChar(100)
+  preferences     Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  roles               UserRole[]
+  allocationsRequested Allocation[] @relation("AllocationRequestedBy")
+  allocationsApproved  Allocation[] @relation("AllocationApprovedBy")
+  timesheetsApproved   TimesheetEntry[] @relation("TimesheetApprovedBy")
+  periodsApproved      TimesheetPeriod[] @relation("PeriodApprovedBy")
+  skillsVerified       ResourceSkill[] @relation("SkillVerifiedBy")
+  auditLogs            AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+// =============================================================================
+// ROLE & PERMISSIONS
+// =============================================================================
+model Role {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  name        String    @db.VarChar(100)
+  description String?   @db.VarChar(500)
+  isSystem    Boolean   @default(false)
+  permissions Json      // Array of permission strings
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  users       UserRole[]
+
+  @@unique([tenantId, name])
+}
+
+model UserRole {
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id])
+  roleId      String   @db.Uuid
+  role        Role     @relation(fields: [roleId], references: [id])
+  assignedAt  DateTime @default(now())
+  assignedBy  String   @db.Uuid
+
+  @@id([userId, roleId])
+}
+
+// =============================================================================
+// RESOURCE (Employee/Contractor)
+// =============================================================================
+model Resource {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  practiceId      String?   @db.Uuid
+  practice        Practice? @relation(fields: [practiceId], references: [id])
+  managerId       String?   @db.Uuid
+  manager         Resource? @relation("ResourceManager", fields: [managerId], references: [id])
+  locationId      String?   @db.Uuid
+  location        Location? @relation(fields: [locationId], references: [id])
+  
+  // Identity
+  employeeId      String    @db.VarChar(50)
+  firstName       String    @db.VarChar(100)
+  lastName        String    @db.VarChar(100)
+  preferredName   String?   @db.VarChar(100)
+  email           String    @db.VarChar(255)
+  phone           String?   @db.VarChar(20)
+  photoUrl        String?   @db.VarChar(500)
+  
+  // Employment
+  employmentType  EmploymentType
+  band            String    @db.VarChar(10)
+  designation     String    @db.VarChar(100)
+  department      String?   @db.VarChar(100)
+  dateOfJoining   DateTime  @db.Date
+  dateOfExit      DateTime? @db.Date
+  exitReason      String?   @db.VarChar(200)
+  
+  // Capacity
+  capacity        Int       @default(100)
+  costPerHour     Decimal?  @db.Decimal(10, 2)
+  billRateDefault Decimal?  @db.Decimal(10, 2)
+  
+  // Status
+  status          ResourceStatus @default(ACTIVE)
+  benchSince      DateTime? @db.Date
+  lastAllocatedAt DateTime? @db.Date
+  
+  // Metadata
+  tags            String[]
+  customFields    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  user              User[]
+  directReports     Resource[] @relation("ResourceManager")
+  skills            ResourceSkill[]
+  allocations       Allocation[]
+  projectsManaged   Project[] @relation("ProjectManager")
+  contractsManaged  Contract[] @relation("ContractAccountManager")
+  opportunitiesOwned Opportunity[] @relation("OpportunityOwner")
+  timesheetEntries  TimesheetEntry[]
+  timesheetPeriods  TimesheetPeriod[]
+  practicesHead     Practice[] @relation("PracticeHead")
+
+  @@unique([tenantId, employeeId])
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@index([tenantId, practiceId])
+  @@index([tenantId, band])
+  @@index([tenantId, benchSince])
+}
+
+enum EmploymentType {
+  FTE
+  CONTRACTOR
+  INTERN
+}
+
+enum ResourceStatus {
+  ACTIVE
+  INACTIVE
+  NOTICE
+}
+
+// =============================================================================
+// SKILL & RESOURCE_SKILL
+// =============================================================================
+model SkillCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String   @db.VarChar(100)
+  color     String?  @db.VarChar(7)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  skills    Skill[]
+
+  @@unique([tenantId, name])
+}
+
+model Skill {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  categoryId   String?   @db.Uuid
+  category     SkillCategory? @relation(fields: [categoryId], references: [id])
+  name         String    @db.VarChar(100)
+  description  String?   @db.VarChar(500)
+  isVerifiable Boolean   @default(false)
+  status       SkillStatus @default(ACTIVE)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  resources    ResourceSkill[]
+
+  @@unique([tenantId, name])
+}
+
+enum SkillStatus {
+  ACTIVE
+  DEPRECATED
+}
+
+model ResourceSkill {
+  resourceId   String   @db.Uuid
+  resource     Resource @relation(fields: [resourceId], references: [id])
+  skillId      String   @db.Uuid
+  skill        Skill    @relation(fields: [skillId], references: [id])
+  proficiency  Proficiency
+  yearsExp     Decimal? @db.Decimal(3, 1)
+  lastUsed     DateTime? @db.Date
+  certified    Boolean  @default(false)
+  certExpiry   DateTime? @db.Date
+  verifiedBy   String?  @db.Uuid
+  verifiedByUser User?  @relation("SkillVerifiedBy", fields: [verifiedBy], references: [id])
+  verifiedAt   DateTime?
+  notes        String?  @db.VarChar(500)
+  updatedAt    DateTime @updatedAt
+
+  @@id([resourceId, skillId])
+  @@index([skillId])
+}
+
+enum Proficiency {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+// =============================================================================
+// CLIENT
+// =============================================================================
+model Client {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @db.Uuid
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  name           String    @db.VarChar(200)
+  code           String    @db.VarChar(20)
+  industry       String?   @db.VarChar(100)
+  website        String?   @db.VarChar(255)
+  logoUrl        String?   @db.VarChar(500)
+  status         ClientStatus @default(ACTIVE)
+  tier           ClientTier?
+  billingAddress Json?
+  contacts       Json?
+  notes          String?
+  customFields   Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  // Relations
+  contracts      Contract[]
+  projects       Project[]
+  opportunities  Opportunity[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, tier])
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+}
+
+enum ClientTier {
+  STRATEGIC
+  KEY
+  STANDARD
+}
+
+// =============================================================================
+// CONTRACT
+// =============================================================================
+model Contract {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  clientId        String    @db.Uuid
+  client          Client    @relation(fields: [clientId], references: [id])
+  accountMgrId    String?   @db.Uuid
+  accountManager  Resource? @relation("ContractAccountManager", fields: [accountMgrId], references: [id])
+  
+  // Identity
+  contractNumber  String    @db.VarChar(50)
+  name            String    @db.VarChar(200)
+  type            ContractType
+  description     String?
+  
+  // Timeline
+  startDate       DateTime  @db.Date
+  endDate         DateTime? @db.Date
+  signedDate      DateTime? @db.Date
+  
+  // Financials
+  value           Decimal?  @db.Decimal(15, 2)
+  currency        String    @default("INR") @db.VarChar(3)
+  billingType     BillingType
+  paymentTerms    String?   @db.VarChar(50)
+  
+  // Status
+  status          ContractStatus @default(DRAFT)
+  renewalDate     DateTime? @db.Date
+  autoRenew       Boolean   @default(false)
+  
+  // Documents
+  documentUrl     String?   @db.VarChar(500)
+  attachments     Json?
+  
+  // Metadata
+  notes           String?
+  customFields    Json?
+  externalRefs    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  projects        Project[]
+
+  @@unique([tenantId, contractNumber])
+  @@index([tenantId, clientId])
+  @@index([tenantId, status])
+  @@index([tenantId, endDate])
+  @@index([tenantId, renewalDate])
+}
+
+enum ContractType {
+  MSA
+  SOW
+  AMENDMENT
+  NDA
+  OTHER
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+}
+
+enum BillingType {
+  TM
+  FIXED
+  RETAINER
+  MILESTONE
+  HYBRID
+}
+
+// =============================================================================
+// PROJECT
+// =============================================================================
+model Project {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  clientId        String?   @db.Uuid
+  client          Client?   @relation(fields: [clientId], references: [id])
+  contractId      String?   @db.Uuid
+  contract        Contract? @relation(fields: [contractId], references: [id])
+  managerId       String?   @db.Uuid
+  manager         Resource? @relation("ProjectManager", fields: [managerId], references: [id])
+  practiceId      String?   @db.Uuid
+  practice        Practice? @relation(fields: [practiceId], references: [id])
+  
+  // Identity
+  code            String    @db.VarChar(50)
+  name            String    @db.VarChar(200)
+  description     String?
+  
+  // Classification
+  type            ProjectType
+  category        String?   @db.VarChar(100)
+  deliveryModel   DeliveryModel?
+  
+  // Timeline
+  startDate       DateTime  @db.Date
+  endDate         DateTime? @db.Date
+  actualEndDate   DateTime? @db.Date
+  
+  // Financials
+  budgetHours     Int?
+  budgetAmount    Decimal?  @db.Decimal(15, 2)
+  billingType     BillingType?
+  defaultRate     Decimal?  @db.Decimal(10, 2)
+  
+  // Status
+  status          ProjectStatus @default(PIPELINE)
+  healthStatus    HealthStatus?
+  priority        Priority    @default(MEDIUM)
+  
+  // Metadata
+  tags            String[]
+  customFields    Json?
+  externalRefs    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  allocations     Allocation[]
+  timesheetEntries TimesheetEntry[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, clientId])
+  @@index([tenantId, type])
+  @@index([tenantId, startDate, endDate])
+}
+
+enum ProjectType {
+  BILLABLE
+  INTERNAL
+  PRESALES
+  SUPPORT
+}
+
+enum ProjectStatus {
+  PIPELINE
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum DeliveryModel {
+  ONSITE
+  OFFSHORE
+  HYBRID
+}
+
+enum HealthStatus {
+  GREEN
+  AMBER
+  RED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// =============================================================================
+// ALLOCATION
+// =============================================================================
+model Allocation {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  resourceId      String    @db.Uuid
+  resource        Resource  @relation(fields: [resourceId], references: [id])
+  projectId       String    @db.Uuid
+  project         Project   @relation(fields: [projectId], references: [id])
+  requestedById   String?   @db.Uuid
+  requestedBy     User?     @relation("AllocationRequestedBy", fields: [requestedById], references: [id])
+  approvedById    String?   @db.Uuid
+  approvedBy      User?     @relation("AllocationApprovedBy", fields: [approvedById], references: [id])
+  
+  // Assignment
+  role            String    @db.VarChar(100)
+  percentage      Int
+  startDate       DateTime  @db.Date
+  endDate         DateTime  @db.Date
+  actualEndDate   DateTime? @db.Date
+  
+  // Status
+  status          AllocationStatus @default(PROPOSED)
+  isBillable      Boolean   @default(true)
+  billRate        Decimal?  @db.Decimal(10, 2)
+  
+  // Lifecycle
+  confirmedAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?   @db.VarChar(500)
+  
+  // Metadata
+  notes           String?
+  customFields    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  timesheetEntries TimesheetEntry[]
+
+  @@index([tenantId, resourceId, startDate, endDate])
+  @@index([tenantId, projectId, startDate, endDate])
+  @@index([tenantId, status])
+  @@index([tenantId, endDate])
+}
+
+enum AllocationStatus {
+  PROPOSED
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// =============================================================================
+// PRACTICE (Business Unit)
+// =============================================================================
+model Practice {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @db.Uuid
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  headId            String?   @db.Uuid
+  head              Resource? @relation("PracticeHead", fields: [headId], references: [id])
+  parentId          String?   @db.Uuid
+  parent            Practice? @relation("PracticeHierarchy", fields: [parentId], references: [id])
+  name              String    @db.VarChar(100)
+  code              String    @db.VarChar(20)
+  description       String?   @db.VarChar(500)
+  targetUtilization Int?
+  costCenter        String?   @db.VarChar(50)
+  status            PracticeStatus @default(ACTIVE)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  children          Practice[] @relation("PracticeHierarchy")
+  resources         Resource[]
+  projects          Project[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, parentId])
+}
+
+enum PracticeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// =============================================================================
+// LOCATION
+// =============================================================================
+model Location {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  name      String    @db.VarChar(100)
+  code      String    @db.VarChar(20)
+  type      LocationType
+  address   Json?
+  timezone  String    @db.VarChar(50)
+  country   String    @db.VarChar(2)
+  isOnshore Boolean   @default(false)
+  status    LocationStatus @default(ACTIVE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  resources Resource[]
+
+  @@unique([tenantId, code])
+}
+
+enum LocationType {
+  OFFICE
+  REMOTE
+  CLIENT_SITE
+}
+
+enum LocationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// =============================================================================
+// TIMESHEET_ENTRY
+// =============================================================================
+model TimesheetEntry {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  resourceId      String    @db.Uuid
+  resource        Resource  @relation(fields: [resourceId], references: [id])
+  projectId       String    @db.Uuid
+  project         Project   @relation(fields: [projectId], references: [id])
+  allocationId    String?   @db.Uuid
+  allocation      Allocation? @relation(fields: [allocationId], references: [id])
+  approvedById    String?   @db.Uuid
+  approvedBy      User?     @relation("TimesheetApprovedBy", fields: [approvedById], references: [id])
+  
+  // Time Entry
+  date            DateTime  @db.Date
+  hours           Decimal   @db.Decimal(4, 2)
+  taskType        String?   @db.VarChar(100)
+  description     String?
+  
+  // Classification
+  isBillable      Boolean   @default(true)
+  isOvertime      Boolean   @default(false)
+  billRate        Decimal?  @db.Decimal(10, 2)
+  
+  // Status
+  status          TimesheetStatus @default(DRAFT)
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?   @db.VarChar(500)
+  
+  // Metadata
+  tags            String[]
+  customFields    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@index([tenantId, resourceId, date])
+  @@index([tenantId, projectId, date])
+  @@index([tenantId, status, date])
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  INVOICED
+}
+
+// =============================================================================
+// TIMESHEET_PERIOD
+// =============================================================================
+model TimesheetPeriod {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  resourceId      String    @db.Uuid
+  resource        Resource  @relation(fields: [resourceId], references: [id])
+  approvedById    String?   @db.Uuid
+  approvedBy      User?     @relation("PeriodApprovedBy", fields: [approvedById], references: [id])
+  
+  // Period
+  periodStart     DateTime  @db.Date
+  periodEnd       DateTime  @db.Date
+  periodType      PeriodType
+  
+  // Aggregates
+  totalHours      Decimal   @db.Decimal(5, 2)
+  billableHours   Decimal   @db.Decimal(5, 2)
+  overtimeHours   Decimal   @db.Decimal(5, 2)
+  
+  // Status
+  status          PeriodStatus @default(OPEN)
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  comments        String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([tenantId, resourceId, periodStart, periodEnd])
+  @@index([tenantId, status])
+  @@index([tenantId, periodEnd])
+}
+
+enum PeriodType {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum PeriodStatus {
+  OPEN
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+// =============================================================================
+// OPPORTUNITY (Pipeline/Deals from CRM)
+// =============================================================================
+model Opportunity {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @db.Uuid
+  tenant             Tenant    @relation(fields: [tenantId], references: [id])
+  clientId           String?   @db.Uuid
+  client             Client?   @relation(fields: [clientId], references: [id])
+  ownerId            String?   @db.Uuid
+  owner              Resource? @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  
+  // Identity
+  externalId         String    @db.VarChar(100)
+  name               String    @db.VarChar(200)
+  description        String?
+  
+  // Pipeline
+  stage              String    @db.VarChar(50)
+  probability        Int?
+  expectedCloseDate  DateTime? @db.Date
+  
+  // Value
+  dealValue          Decimal?  @db.Decimal(15, 2)
+  currency           String    @default("INR") @db.VarChar(3)
+  
+  // Resource Needs
+  estimatedHeadcount Int?
+  requiredSkills     Json?
+  estimatedStart     DateTime? @db.Date
+  estimatedDuration  Int?
+  
+  // Status
+  status             OpportunityStatus @default(OPEN)
+  wonDate            DateTime? @db.Date
+  lostDate           DateTime? @db.Date
+  lostReason         String?   @db.VarChar(200)
+  
+  // Sync
+  source             String    @db.VarChar(50)
+  lastSyncedAt       DateTime?
+  externalUrl        String?   @db.VarChar(500)
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  @@unique([tenantId, externalId, source])
+  @@index([tenantId, status])
+  @@index([tenantId, stage])
+  @@index([tenantId, expectedCloseDate])
+}
+
+enum OpportunityStatus {
+  OPEN
+  WON
+  LOST
+  STALLED
+}
+
+// =============================================================================
+// AUDIT_LOG
+// =============================================================================
+model AuditLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  userId      String?   @db.Uuid
+  user        User?     @relation(fields: [userId], references: [id])
+  entityType  String    @db.VarChar(50)
+  entityId    String    @db.Uuid
+  action      AuditAction
+  changes     Json?
+  metadata    Json?
+  timestamp   DateTime  @default(now())
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, userId])
+  @@index([tenantId, timestamp])
+  @@index([tenantId, action])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  RENEW
+  ACTIVATE
+  TERMINATE
+  LINK_CONTRACT
+  UNLINK_CONTRACT
+  APPROVE
+  REJECT
+  SUBMIT
+}
+
+

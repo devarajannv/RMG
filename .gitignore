@@ -1,26 +1,31 @@
-# RMGaaS - Ignore Patterns
-
 # Dependencies
 node_modules/
+.pnp/
+.pnp.js
 
 # Build outputs
 dist/
 build/
 .next/
+out/
 
-# Environment files (contain secrets)
+# Turbo
+.turbo/
+
+# Environment files
 .env
 .env.local
 .env.*.local
-.env.staging
-.env.production
+!.env.example
 
 # IDE
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
-.vscode/settings.json
-.vscode/launch.json
+*~
 
 # OS
 .DS_Store
@@ -33,15 +38,17 @@ npm-debug.log*
 
 # Testing
 coverage/
-
-# Temporary
-tmp/
-temp/
-*.tmp
-
-# Session tracking (contains runtime data)
-.context/sessions/.current_session
+.nyc_output/
 
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+# Docker
+docker-data/
+
+# Misc
+*.tgz
+.cache/
+tmp/
+temp/

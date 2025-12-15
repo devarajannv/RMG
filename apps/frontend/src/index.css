@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* NewVision Brand Colors */
+    --brand-navy: 210 52% 24%;      /* #1B3A5F - Deep Navy */
+    --brand-orange: 32 94% 54%;      /* #F7941D - Vibrant Orange */
+    --brand-sky: 197 100% 44%;       /* #00A3E0 - Sky Blue */
+    --brand-charcoal: 0 0% 29%;      /* #4A4A4A */
+    
+    /* Theme Variables */
+    --background: 210 20% 98%;       /* Slightly warm white */
+    --foreground: 210 52% 24%;       /* Navy text */
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 52% 24%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 52% 24%;
+
+    --primary: 210 52% 24%;          /* Navy */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 32 94% 54%;         /* Orange */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 197 100% 44%;          /* Sky Blue */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 32 94% 54%;              /* Orange ring */
+
+    --radius: 0.75rem;
+
+    /* Chart colors from brand palette */
+    --chart-1: 210 52% 24%;          /* Navy */
+    --chart-2: 32 94% 54%;           /* Orange */
+    --chart-3: 197 100% 44%;         /* Sky Blue */
+    --chart-4: 152 69% 47%;          /* Emerald */
+    --chart-5: 215 16% 47%;          /* Gray */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full hover:bg-gray-400 transition-colors;
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-[#F7941D] ring-offset-2;
+  }
+}
+
+@layer components {
+  /* Brand button styles */
+  .btn-primary {
+    @apply bg-gradient-to-r from-[#1B3A5F] to-[#2A4A6F] text-white font-semibold 
+           shadow-lg hover:shadow-xl hover:from-[#2A4A6F] hover:to-[#1B3A5F] 
+           transition-all duration-300 rounded-xl;
+  }
+
+  .btn-secondary {
+    @apply bg-gradient-to-r from-[#F7941D] to-[#FF6B00] text-white font-semibold 
+           shadow-lg hover:shadow-xl hover:from-[#FF6B00] hover:to-[#F7941D] 
+           transition-all duration-300 rounded-xl;
+  }
+
+  /* Card styles */
+  .card-elevated {
+    @apply bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 border-0;
+  }
+
+  .card-interactive {
+    @apply bg-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 
+           transition-all duration-300 cursor-pointer border-0;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-[#1B3A5F] to-[#00A3E0] bg-clip-text text-transparent;
+  }
+
+  /* Status badges */
+  .badge-success {
+    @apply bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-warning {
+    @apply bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-info {
+    @apply bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Glassmorphism */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md;
+  }
+
+  .glass-dark {
+    @apply bg-[#1B3A5F]/80 backdrop-blur-md;
+  }
+
+  /* Animations */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 5s ease infinite;
+  }
+}
