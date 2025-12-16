@@ -10,6 +10,7 @@ const envSchema = z.object({
   APP_NAME: z.string().default('RMGaaS'),
   APP_URL: z.string().default('http://localhost:3000'),
   API_URL: z.string().default('http://localhost:4000'),
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
 
   // Database
   DATABASE_URL: z.string(),
@@ -21,6 +22,15 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+
+  // Microsoft 365 SSO (Optional)
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  MICROSOFT_TENANT_ID: z.string().default('common'), // 'common' for multi-tenant, or specific tenant ID
+  MICROSOFT_REDIRECT_URI: z.string().optional(),
+
+  // Default Tenant (for SSO user provisioning)
+  DEFAULT_TENANT_ID: z.string().uuid().optional(),
 
   // Security
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
@@ -59,6 +69,7 @@ export const config = {
   appName: env.APP_NAME,
   appUrl: env.APP_URL,
   apiUrl: env.API_URL,
+  frontendUrl: env.FRONTEND_URL,
 
   // Database
   databaseUrl: env.DATABASE_URL,
@@ -70,6 +81,17 @@ export const config = {
   jwtSecret: env.JWT_SECRET,
   jwtAccessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
   jwtRefreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
+
+  // Microsoft 365 SSO
+  microsoft: {
+    clientId: env.MICROSOFT_CLIENT_ID || '',
+    clientSecret: env.MICROSOFT_CLIENT_SECRET || '',
+    tenantId: env.MICROSOFT_TENANT_ID,
+    redirectUri: env.MICROSOFT_REDIRECT_URI,
+  },
+
+  // Default tenant for SSO
+  defaultTenantId: env.DEFAULT_TENANT_ID || '',
 
   // Security
   corsOrigins: env.CORS_ORIGINS.split(',').map((origin) => origin.trim()),

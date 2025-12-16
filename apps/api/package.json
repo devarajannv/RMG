@@ -22,6 +22,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "@azure/msal-node": "^3.8.4",
     "@prisma/client": "^6.1.0",
     "@rmgaas/shared": "*",
     "@types/swagger-jsdoc": "^6.0.4",

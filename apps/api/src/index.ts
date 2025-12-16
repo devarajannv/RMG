@@ -12,6 +12,7 @@ import { swaggerSpec } from './config/swagger';
 
 // Route imports
 import authRoutes from './modules/auth/auth.controller';
+import microsoftAuthRoutes from './modules/auth/microsoft.controller';
 import { resourceRoutes, skillRoutes, importRoutes } from './modules/resources';
 import { clientRoutes, contractRoutes } from './modules/clients';
 import { projectRoutes } from './modules/projects';
@@ -100,6 +101,7 @@ app.get('/api-docs.json', (_req, res) => {
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth/microsoft', microsoftAuthRoutes);
 app.use('/api/v1/resources', resourceRoutes);
 app.use('/api/v1/resources/import', importRoutes);
 app.use('/api/v1/skills', skillRoutes);

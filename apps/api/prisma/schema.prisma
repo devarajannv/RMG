@@ -82,6 +82,8 @@ model User {
   lockedUntil     DateTime?
   mfaEnabled      Boolean   @default(false)
   mfaSecret       String?   @db.VarChar(100)
+  microsoftId     String?   @db.VarChar(100)  // Azure AD Object ID for SSO
+  googleId        String?   @db.VarChar(100)  // Google ID for future SSO
   preferences     Json?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
