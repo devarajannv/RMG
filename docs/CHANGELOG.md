@@ -7,16 +7,63 @@
 ## [Unreleased]
 
 ### Planned
-- RBAC enhancements with hierarchical access
-- Role management UI
-- CTC access control workflow
+- RBAC enhancements: hierarchical data isolation in queries
+- CTC access control approval workflow
 - HubSpot integration
 - PeopleStrong integration
 - Invoicing module
-- Document management with e-signatures
-- Multi-currency support
-- AI Agent
+- E-signature integrations (DocuSign/Adobe Sign)
+- AI Agent Phase 2: LLM integration + write operations
 - AI-powered migration tool
+
+---
+
+## [1.2.0] - 2025-12-16 (Evening)
+
+### Added
+- **Multi-Currency Support**
+  - Currency table with 6 defaults (USD, INR, EUR, GBP, AUD, SGD)
+  - Exchange rate management API
+  - Rate conversion (current and historical)
+  - Settings → Currency tab UI
+
+- **Enhanced Role Management**
+  - Role hierarchy (5 levels: org → delivery → practice → team → individual)
+  - 30+ granular permissions (module/action/scope)
+  - Permission, RolePermission tables
+  - RoleAssignmentAudit for change tracking
+  - Settings → Roles tab UI
+
+- **Document Storage**
+  - Document table with versioning
+  - DocumentVersion for edit history
+  - DocumentAccess for role/user/practice permissions
+  - DocumentAccessLog for audit trail
+  - 4 classification levels (public/internal/restricted/confidential)
+  - Time-bound access support
+
+- **AI Agent (Phase 1 - Query Only)**
+  - AgentConversation and AgentMessage tables
+  - Query classification and routing (T1/T2/T3 tiers)
+  - Natural language query processing
+  - Rich response formatting (text/table/cards/gauge)
+  - Floating widget UI (bottom-right)
+  - Command palette (Cmd+K / Ctrl+K)
+  - Context-aware suggestions
+  - Feedback system
+
+### Changed
+- Backend now has 17 modules (up from 13)
+- Settings page now has 7 tabs (added Currency, Roles)
+- App.tsx includes global Agent components
+
+### Database
+- Added 10 new tables:
+  - Currency, ExchangeRate
+  - Permission, RolePermission, RoleAssignmentAudit
+  - Document, DocumentVersion, DocumentAccess, DocumentAccessLog
+  - AgentConversation, AgentMessage
+- Updated Role table with level and parentRoleId fields
 
 ---
 
@@ -176,6 +223,7 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.2.0 | 2025-12-16 (Evening) | Multi-currency, roles, documents, AI agent |
 | 1.1.0 | 2025-12-16 | Microsoft SSO, UI audit fixes, new pages |
 | 1.0.0 | 2025-12-16 | Initial release, 14-day sprint complete |
 

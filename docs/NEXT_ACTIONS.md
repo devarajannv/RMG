@@ -1,39 +1,84 @@
 # RMGaaS Next Actions
 
 > Prioritized roadmap for upcoming development
+> 
+> Last Updated: December 16, 2025 (Evening)
+
+---
+
+## ✅ Recently Completed (Dec 16 Evening)
+
+### Multi-Currency Support
+**Status:** ✅ Completed
+
+- [x] Currency schema (Currency, ExchangeRate tables)
+- [x] Currency CRUD API (6 default currencies)
+- [x] Exchange rate management API
+- [x] Rate conversion API (current & historical)
+- [x] Currency Settings UI tab
+- [ ] Currency display toggle on financial views
+
+### Enhanced Role Management
+**Status:** ✅ Schema & Core Complete
+
+- [x] Role hierarchy (org → delivery → practice → team)
+- [x] 30+ granular permissions defined
+- [x] Permission model (module/action/scope)
+- [x] Role assignment audit trail
+- [x] Role management UI in Settings
+- [x] Custom role creation API
+- [ ] Permission builder UI
+- [ ] Delegation/proxy permissions
+
+### Document Storage
+**Status:** ✅ Core Complete
+
+- [x] Document schema with versioning
+- [x] File upload/download API
+- [x] Version control on every edit
+- [x] Access control (role/user/practice)
+- [x] Access logging and audit trail
+- [x] Document classification levels
+- [ ] S3/Azure Blob integration
+- [ ] E-signature integration (DocuSign/Adobe Sign)
+
+### AI Agent (Phase 1)
+**Status:** ✅ Query-Only Complete
+
+- [x] Query routing architecture
+- [x] Natural language query processing
+- [x] Conversation tracking
+- [x] Rich response formatting
+- [x] Floating widget UI
+- [x] Command palette (Cmd+K)
+- [x] Context-aware suggestions
+- [ ] Session memory expansion
+- [ ] LLM API integration (currently simulated)
 
 ---
 
 ## Priority 1: Critical Enhancements
 
-### 1.1 RBAC Enhancements
-**Status:** 🔜 Planned  
-**Effort:** 3-4 days
+### 1.1 RBAC Enhancements (Remaining)
+**Status:** 🟡 Partially Complete  
+**Effort:** 1-2 days
 
-- [ ] Hierarchical data isolation
-  - Practice level access
-  - Delivery level access
-  - Organization level access
-- [ ] Granular action permissions
-  - Separate create/edit/approve/delete
-  - Resource-specific permissions
-- [ ] Settings access levels
-  - View-only vs. modify
-  - Section-specific access
+- [x] Granular action permissions (30+ defined)
+- [x] Audit trail for permission changes
+- [ ] Hierarchical data isolation in queries
+- [ ] Settings access levels (view vs. modify)
 - [ ] Delegation/proxy permissions
-  - Temporary role assignment
-  - Approval delegation
-- [ ] Audit trail for permission changes
 
-### 1.2 Role Management
-**Status:** 🔜 Planned  
-**Effort:** 2-3 days
+### 1.2 Role Management (Remaining)
+**Status:** 🟡 Partially Complete  
+**Effort:** 1 day
 
-- [ ] Role management UI in Settings
-- [ ] Custom role creation with permission builder
-- [ ] Decouple designation from role
+- [x] Role management UI in Settings
+- [x] Custom role creation API
+- [x] Decouple designation from role
+- [ ] Permission builder UI (visual)
 - [ ] Role assignment workflow for new employees
-- [ ] Optional auto-assignment rules (admin-configurable)
+- [ ] Optional auto-assignment rules
 
 ### 1.3 CTC Access Control
 **Status:** 🔜 Planned  
@@ -121,21 +166,22 @@
 - [ ] Zoho Books integration
 - [ ] GST/E-invoice compliance (India)
 
-### 3.2 Document Management
-**Status:** 🔜 Planned  
-**Effort:** 4-5 days
+### 3.2 Document Management (Remaining)
+**Status:** 🟡 Core Complete  
+**Effort:** 2-3 days remaining
 
 **Storage:**
-- [ ] S3/Azure Blob backend
-- [ ] File upload/download API
-- [ ] File type validation
-- [ ] Size limits
+- [x] Local file storage (abstracted for cloud)
+- [x] File upload/download API
+- [x] File type validation (via mimetype)
+- [x] Size limits (50MB default)
+- [ ] S3/Azure Blob backend integration
 
 **Version Control:**
-- [ ] Version on every edit
-- [ ] Version history view
+- [x] Version on every edit
+- [x] Version history API
 - [ ] Rollback capability
-- [ ] Audit trail per document
+- [x] Audit trail per document
 
 **E-Signatures:**
 - [ ] DocuSign integration
@@ -144,49 +190,57 @@
 - [ ] Signed document storage
 
 **Access Control:**
-- [ ] Document classification levels
-- [ ] Role-based access matrix
-- [ ] Configurable permissions
-- [ ] Time-bound access for sensitive docs
+- [x] Document classification levels (4)
+- [x] Role-based access matrix
+- [x] User/practice permissions
+- [x] Time-bound access support
 
 ---
 
-## Priority 4: Multi-Currency
+## Priority 4: Multi-Currency (Remaining)
 
 ### 4.1 Currency Management
-**Status:** 🔜 Planned  
-**Effort:** 2-3 days
+**Status:** 🟡 Core Complete  
+**Effort:** 1 day remaining
 
-- [ ] Currency settings in organization config
-- [ ] Base currency (USD default)
-- [ ] Billing currency per client
-- [ ] Employee home currency
-- [ ] Manual exchange rate management
-- [ ] Historical rate storage
-- [ ] Toggle: historical vs. current rate view
+- [x] Currency settings API
+- [x] Base currency (USD default)
+- [x] 6 default currencies (USD, INR, EUR, GBP, AUD, SGD)
+- [x] Manual exchange rate management
+- [x] Historical rate storage
+- [x] Conversion API (current & historical)
+- [ ] Billing currency per client field
+- [ ] Employee home currency field
+- [ ] Toggle: historical vs. current rate view UI
 
 ### 4.2 Financial Reports Currency
 **Status:** 🔜 Planned  
 **Effort:** 1-2 days
 
 - [ ] Currency switch on all financial views
-- [ ] Store exchangeRateAtTransaction
+- [ ] Store exchangeRateAtTransaction on records
 - [ ] Consistent currency display
 
 ---
 
-## Priority 5: AI Capabilities
+## Priority 5: AI Capabilities (Remaining)
 
 ### 5.1 AI Agent
-**Status:** 🔜 Planned  
-**Effort:** 10-15 days
+**Status:** 🟡 Phase 1 Complete  
+**Effort:** 5-7 days for Phase 2
 
-- [ ] Natural language command interface
-- [ ] Intent recognition
-- [ ] Action execution for all product functions
-- [ ] Context awareness
-- [ ] Conversational memory
-- [ ] Approval workflows for sensitive actions
+**Phase 1 (Complete):**
+- [x] Natural language query interface
+- [x] Query classification and routing
+- [x] Rich response formatting
+- [x] Conversation tracking
+- [x] Floating widget + Cmd+K UI
+
+**Phase 2 (Pending):**
+- [ ] Real LLM API integration (Gemini/OpenAI)
+- [ ] Write operations (with approval)
+- [ ] Full context awareness
+- [ ] Extended session memory
 
 ### 5.2 AI Migration Tool
 **Status:** 🔜 Planned  
@@ -235,17 +289,17 @@
 
 ---
 
-## Timeline Estimate
+## Timeline Estimate (Updated)
 
-| Priority | Items | Estimated Days |
-|----------|-------|----------------|
-| P1 | RBAC, Roles, CTC | 7-9 days |
-| P2 | HubSpot, PeopleStrong | 7-9 days |
-| P3 | Invoicing, Documents | 9-12 days |
-| P4 | Multi-Currency | 3-5 days |
-| P5 | AI Agent, Migration | 15-22 days |
-| P6 | Additional | 5-7 days |
-| **Total** | | **46-64 days** |
+| Priority | Items | Original Est. | Completed | Remaining |
+|----------|-------|---------------|-----------|-----------|
+| P1 | RBAC, Roles, CTC | 7-9 days | 5 days | 2-3 days |
+| P2 | HubSpot, PeopleStrong | 7-9 days | - | 7-9 days |
+| P3 | Invoicing, Documents | 9-12 days | 3 days | 6-9 days |
+| P4 | Multi-Currency | 3-5 days | 2 days | 1-2 days |
+| P5 | AI Agent, Migration | 15-22 days | 4 days | 10-15 days |
+| P6 | Additional | 5-7 days | - | 5-7 days |
+| **Total** | | **46-64 days** | **14 days** | **32-45 days** |
 
 ---
 

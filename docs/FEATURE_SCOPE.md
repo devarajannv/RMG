@@ -208,14 +208,15 @@
 | Tenant Isolation | ✅ | Multi-tenant data separation |
 | Permission System | ✅ | Basic permissions |
 
-### 9.3 Authorization (Planned)
+### 9.3 Enhanced Authorization
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Hierarchical Access | 🔜 | Practice → Delivery → Org |
-| Granular Permissions | 🔜 | create/edit/approve/delete |
-| CTC Access Control | 🔜 | Approval workflow |
+| Role Hierarchy | ✅ | Org → Delivery → Practice → Team → Individual (5 levels) |
+| Granular Permissions | ✅ | 30+ permissions (module/action/scope) |
+| Permission API | ✅ | Check, assign, revoke permissions |
+| CTC Access Control | ⏳ | Schema ready, workflow pending |
 | Delegation | 🔜 | Proxy permissions |
-| Audit Trail | 🔜 | Permission change log |
+| Audit Trail | ✅ | RoleAssignmentAudit table |
 
 ---
 
@@ -271,69 +272,86 @@
 
 ---
 
-## 12. Document Management (Planned)
+## 12. Document Management
 
 ### 12.1 Storage
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Cloud Storage | 🔜 | S3/Azure Blob |
-| File Upload | 🔜 | API with validation |
-| Versioning | 🔜 | Every edit = new version |
-| Audit Trail | 🔜 | Access and change log |
+| Local Storage | ✅ | Abstracted for cloud migration |
+| Cloud Storage | 🔜 | S3/Azure Blob integration |
+| File Upload | ✅ | API with size/type validation |
+| Versioning | ✅ | Every edit = new version |
+| Audit Trail | ✅ | DocumentAccessLog table |
 
 ### 12.2 E-Signatures
 | Feature | Status | Description |
 |---------|--------|-------------|
 | DocuSign | 🔜 | Integration |
 | Adobe Sign | 🔜 | Integration |
-| Signature Flow | 🔜 | Multi-party signing |
+| Signature Status | ⏳ | Schema ready (signatureStatus field) |
 
 ### 12.3 Access Control
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Classification | 🔜 | Public/Internal/Restricted/Confidential |
-| Role-Based | 🔜 | Per-doc-type rules |
-| Time-Bound | 🔜 | Expiring access |
+| Classification | ✅ | Public/Internal/Restricted/Confidential |
+| Role-Based | ✅ | DocumentAccess by role/user/practice |
+| Time-Bound | ✅ | expiresAt field with auto-revocation |
+| Access Logging | ✅ | View/Download/Edit/Delete tracked |
 
 ---
 
-## 13. Multi-Currency (Planned)
+## 13. Multi-Currency
 
 ### 13.1 Currency Configuration
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Base Currency | 🔜 | USD default |
-| Billing Currency | 🔜 | Per-client |
-| Employee Currency | 🔜 | Home country |
-| Exchange Rates | 🔜 | Manual management |
+| Currency Table | ✅ | 6 defaults (USD, INR, EUR, GBP, AUD, SGD) |
+| Base Currency | ✅ | USD default, configurable |
+| Exchange Rates | ✅ | Manual rate management API |
+| Rate History | ✅ | Historical rates with effectiveFrom/To |
+| Conversion API | ✅ | Current and historical conversion |
+| Billing Currency | 🔜 | Per-client field |
+| Employee Currency | 🔜 | Per-resource field |
 
 ### 13.2 Financial Views
 | Feature | Status | Description |
 |---------|--------|-------------|
+| Currency Settings UI | ✅ | Settings → Currency tab |
 | Currency Switch | 🔜 | Toggle on reports |
-| Historical Rate | 🔜 | Rate at transaction |
-| Current Rate | 🔜 | Latest rate view |
+| Rate at Transaction | 🔜 | Store on financial records |
 
 ---
 
-## 14. AI Capabilities (Planned)
+## 14. AI Capabilities
 
-### 14.1 AI Agent
+### 14.1 AI Agent (Phase 1 - Query Only)
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Natural Language | 🔜 | Command interface |
-| Intent Recognition | 🔜 | Understand requests |
-| Action Execution | 🔜 | All product functions |
-| Context Awareness | 🔜 | Session memory |
-| Approval Hooks | 🔜 | Sensitive actions |
+| Natural Language Query | ✅ | Text-based queries |
+| Query Classification | ✅ | T1/T2/T3 tier routing |
+| Intent Recognition | ✅ | Search/count/metric/identify |
+| Conversation Tracking | ✅ | AgentConversation table |
+| Message History | ✅ | AgentMessage with metadata |
+| Floating Widget UI | ✅ | Chat bubble on all pages |
+| Command Palette | ✅ | Cmd+K shortcut |
+| Suggestions | ✅ | Context-aware prompts |
+| Rich Responses | ✅ | Text/Table/Cards/Gauge |
+| Feedback System | ✅ | Thumbs up/down |
 
-### 14.2 AI Migration
+### 14.2 AI Agent (Phase 2 - Pending)
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Multi-Format | 🔜 | CSV, Excel, JSON, etc. |
+| LLM Integration | 🔜 | Gemini/OpenAI API calls |
+| Write Operations | 🔜 | Create/update with approval |
+| Extended Memory | 🔜 | Full session context |
+
+### 14.3 AI Migration
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Multi-Format | 🔜 | CSV, Excel, JSON, PDF, Images |
 | Data Scrubbing | 🔜 | AI-powered cleanup |
 | Field Mapping | 🔜 | Automatic detection |
-| Validation | 🔜 | Error detection |
+| Validation | 🔜 | Confidence-based review |
 | Conflict Resolution | 🔜 | UI for duplicates |
 
 ---
