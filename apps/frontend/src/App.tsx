@@ -15,6 +15,9 @@ import ReportsPage from '@/pages/ReportsPage';
 import ContractsPage from '@/pages/ContractsPage';
 import ContractDetailPage from '@/pages/ContractDetailPage';
 import TimesheetsPage from '@/pages/TimesheetsPage';
+import SmartSearchPage from '@/pages/SmartSearchPage';
+import AnalyticsPage from '@/pages/AnalyticsPage';
+import ExportImportPage from '@/pages/ExportImportPage';
 
 // Auth guard component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -156,6 +159,30 @@ function App() {
           element={
             <ProtectedRoute>
               <TimesheetsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/smart-search"
+          element={
+            <ProtectedRoute>
+              <SmartSearchPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <AnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/data-management"
+          element={
+            <ProtectedRoute>
+              <ExportImportPage />
             </ProtectedRoute>
           }
         />

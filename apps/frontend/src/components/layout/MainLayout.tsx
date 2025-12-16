@@ -14,6 +14,9 @@ import {
   Building2,
   Armchair,
   ChevronRight,
+  Brain,
+  PieChart,
+  Database,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -31,8 +34,11 @@ const navItems = [
   { icon: Building2, label: 'Clients', href: '/clients' },
   { icon: FileText, label: 'Contracts', href: '/contracts' },
   { icon: Armchair, label: 'Bench Analysis', href: '/bench' },
+  { icon: Brain, label: 'Smart Search', href: '/smart-search' },
   { icon: BarChart3, label: 'Reports', href: '/reports' },
   { icon: Clock, label: 'Timesheets', href: '/timesheets' },
+  { icon: PieChart, label: 'Analytics', href: '/analytics' },
+  { icon: Database, label: 'Data Management', href: '/data-management' },
   { icon: Settings, label: 'Settings', href: '/settings' },
 ];
 

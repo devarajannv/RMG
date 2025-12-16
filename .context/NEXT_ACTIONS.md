@@ -1,8 +1,8 @@
 # Next Actions
 
 > **Priority Action Queue for RMGaaS**  
-> **Last Updated:** 2025-12-15  
-> **Status:** DAY 9 READY
+> **Last Updated:** 2025-12-16  
+> **Status:** DAY 13 READY
 
 ---
 
@@ -18,186 +18,196 @@
 | 6 | Dashboard & Reports | ✅ Complete |
 | 7 | Contract Management | ✅ Complete |
 | 8 | Timesheet Management | ✅ Complete |
-| **9** | **Skill Matching & Search** | 🟡 **NEXT** |
-| 10 | Intelligence Layer | 🔴 Pending |
-| 11 | Advanced Dashboards | 🔴 Pending |
-| 12 | Reporting Engine | 🔴 Pending |
-| 13 | Admin Features | 🔴 Pending |
-| 14 | Polish & Security | 🔴 Pending |
+| 9 | Bench Management | ✅ Complete |
+| 10 | Intelligence Layer | ✅ Complete |
+| 11 | Advanced Dashboards | ✅ Complete |
+| 12 | Export/Import/Webhooks | ✅ Complete |
+| **13** | **Testing & Documentation** | 🟡 **NEXT** |
+| 14 | Production Deployment | 🔴 Pending |
 
 ---
 
-## 🚀 Day 9 Actions (Start Here)
+## 🚀 Day 13 Actions (Start Here)
 
-### D9-001: Skill Matching Algorithm
+### D13-001: Unit Tests for Backend Services
 ```
 Status: 🟡 Ready to Start
-Type: Feature
+Type: Testing
+Effort: 4h
+Dependencies: All backend services
+```
+**Tasks:**
+- [ ] Set up Jest configuration for API
+- [ ] Write tests for auth service (login, logout, refresh)
+- [ ] Write tests for resource service (CRUD)
+- [ ] Write tests for allocation service
+- [ ] Write tests for intelligence service (matching algorithm)
+- [ ] Write tests for export service
+
+**Acceptance Criteria:**
+- 80%+ coverage on critical services
+- All tests pass
+
+---
+
+### D13-002: API Integration Tests
+```
+Status: 🟡 Ready to Start
+Type: Testing
 Effort: 3h
-Dependencies: Resources, Skills, Projects
+Dependencies: D13-001
 ```
 **Tasks:**
-- [ ] Create matching service (`apps/api/src/modules/matching/`)
-- [ ] Implement skill matching algorithm
-- [ ] Score resources based on skill match percentage
-- [ ] Factor in availability and utilization
-- [ ] Weight skills by importance (required vs nice-to-have)
-- [ ] Return top N candidates with scores
+- [ ] Set up Supertest for API testing
+- [ ] Test authentication flow end-to-end
+- [ ] Test resource CRUD endpoints
+- [ ] Test allocation endpoints
+- [ ] Test export/import endpoints
+- [ ] Test webhook endpoints
 
 **Acceptance Criteria:**
-- Given a project's skill requirements, returns ranked candidates
-- Each candidate has a match score with explanation
+- All API endpoints have integration tests
+- Error cases tested
 
 ---
 
-### D9-002: Resource Recommendation API
+### D13-003: Frontend Component Tests
 ```
 Status: 🟡 Ready to Start
-Type: API
+Type: Testing
 Effort: 2h
-Dependencies: D9-001
+Dependencies: None
 ```
 **Tasks:**
-- [ ] GET /api/v1/matching/recommendations/:projectId
-- [ ] GET /api/v1/matching/find-resources (skill query)
-- [ ] Include availability window in results
-- [ ] Include current utilization in results
-- [ ] Support filtering by practice/location
+- [ ] Set up React Testing Library
+- [ ] Test LoginPage component
+- [ ] Test DashboardPage component
+- [ ] Test data table components
+- [ ] Test form components
 
 **Acceptance Criteria:**
-- API returns scored recommendations
-- Response includes reasoning for each match
+- Key components have tests
+- User interactions tested
 
 ---
 
-### D9-003: Skill Gap Detection
+### D13-004: API Documentation (OpenAPI/Swagger)
 ```
 Status: 🟡 Ready to Start
-Type: Feature
-Effort: 2h
-Dependencies: D9-001
+Type: Documentation
+Effort: 3h
+Dependencies: None
 ```
 **Tasks:**
-- [ ] Compare project requirements vs. team skills
-- [ ] Identify missing skills
-- [ ] Suggest internal resources with missing skills
-- [ ] Calculate team coverage percentage
+- [ ] Install swagger-jsdoc and swagger-ui-express
+- [ ] Add JSDoc comments to all controllers
+- [ ] Generate OpenAPI spec
+- [ ] Serve Swagger UI at /api-docs
+- [ ] Document all request/response schemas
 
 **Acceptance Criteria:**
-- Dashboard shows skill gaps for projects
-- Recommendations for filling gaps
+- Interactive API documentation at /api-docs
+- All endpoints documented
 
 ---
 
-### D9-004: Resource Search UI Enhancement
+### D13-005: User Documentation
 ```
 Status: 🟡 Ready to Start
-Type: Frontend
+Type: Documentation
 Effort: 2h
-Dependencies: D9-002
+Dependencies: None
 ```
 **Tasks:**
-- [ ] Add skill-based search to Resources page
-- [ ] Show match scores in results
-- [ ] Filter by availability dates
-- [ ] Filter by utilization threshold
-- [ ] Show why each resource matches
+- [ ] Create user guide (docs/USER_GUIDE.md)
+- [ ] Document all features with screenshots
+- [ ] Create quick start guide
+- [ ] Document common workflows
+- [ ] Create FAQ section
 
 **Acceptance Criteria:**
-- Can find resources by skill combination
-- Results show match quality
+- End users can onboard independently
+- All features documented
 
 ---
 
-### D9-005: Project Staffing Recommendations UI
-```
-Status: 🟡 Ready to Start
-Type: Frontend
-Effort: 2h
-Dependencies: D9-002
-```
-**Tasks:**
-- [ ] Add "Find Resources" button to Project Detail
-- [ ] Show recommended resources modal
-- [ ] Display match scores and reasons
-- [ ] One-click to create allocation
+## Day 14 Preview (Production Deployment)
 
-**Acceptance Criteria:**
-- From project view, can find and allocate matching resources
+### D14-001: Docker Production Build
+- [ ] Create optimized Dockerfiles
+- [ ] Multi-stage builds for smaller images
+- [ ] Production docker-compose.yml
+
+### D14-002: Environment Configuration
+- [ ] Production environment variables
+- [ ] Secrets management
+- [ ] SSL/TLS configuration
+
+### D14-003: Database Setup
+- [ ] Production database configuration
+- [ ] Backup and restore procedures
+- [ ] Migration scripts
+
+### D14-004: Monitoring & Logging
+- [ ] Health check endpoints
+- [ ] Structured logging
+- [ ] Error tracking setup
+
+### D14-005: Security Hardening
+- [ ] Security headers review
+- [ ] Rate limiting configuration
+- [ ] Input validation audit
 
 ---
 
-## Day 10+ Summary
+## ✅ Recently Completed
 
-| Day | Focus | Key Deliverables |
-|-----|-------|------------------|
-| 10 | Intelligence Layer | Optimal utilization targets, bench predictions |
-| 11 | Advanced Dashboards | Practice, financial, skill inventory views |
-| 12 | Reporting Engine | Report builder, exports, scheduling |
-| 13 | Admin Features | Settings, user management, integrations |
-| 14 | Polish & Security | Testing, performance, security audit |
+### Day 12 (Completed)
+- ✅ CSV/JSON export (7 types)
+- ✅ Bulk CSV import with validation
+- ✅ Import templates
+- ✅ Webhook system (15 events)
+- ✅ ExportImportPage UI
+
+### Day 11 (Completed)
+- ✅ Executive Dashboard
+- ✅ Practice Dashboard
+- ✅ Financial Dashboard
+- ✅ Project Health Dashboard
+- ✅ AnalyticsPage UI
+
+### Day 10 (Completed)
+- ✅ Smart resource matching
+- ✅ Skill gap analysis
+- ✅ Utilization insights
+- ✅ Skill inventory
+- ✅ SmartSearchPage UI
+
+---
+
+## Known Technical Debt
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Webhook in-memory storage | High | Move to database |
+| Settings page placeholder | Low | Day 13 if time |
+| No unit tests | High | Day 13 priority |
+| Historical bench data | Low | Future enhancement |
 
 ---
 
 ## Environment Quick Reference
 
-### Running Services
-```bash
-# Check status
-curl http://localhost:4000/health
-curl http://localhost:3000
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:4000 |
+| Health | http://localhost:4000/health |
 
-# Restart if needed
-cd apps/api && npm run dev &
-cd apps/frontend && npm run dev &
-```
-
-### Login Credentials
-- **URL:** http://localhost:3000
-- **Email:** admin@newvision.in
-- **Password:** Password123!@#
-
-### Database
-- **Host:** localhost:5432
-- **Database:** rmgaas
-- **User:** rmgaas
-- **Password:** rmgaas_dev
+**Login:**
+- Email: `admin@newvision.in`
+- Password: `Password123!@#`
 
 ---
 
-## Completed Actions (Days 1-8)
-
-| Day | Deliverables |
-|-----|--------------|
-| 1 | Monorepo, Docker, Prisma, CI/CD |
-| 2 | JWT auth, RBAC, Redis sessions |
-| 3 | Resource CRUD, skills, Excel import |
-| 4 | Client CRUD, contract CRUD, project CRUD |
-| 5 | Allocation CRUD, conflicts, rolloffs |
-| 6 | Dashboard analytics, charts, bench analysis |
-| 7 | Contract workflows (activate, renew, terminate) |
-| 8 | Timesheet weekly grid, save, submit, approve |
-
-**Additional Fixes (Session 003):**
-- UI overhaul with brand styling
-- CSV import fixed (1504 resources, 1574 allocations)
-- Dev/Prod environment toggle
-
----
-
-## Key Documents
-
-| Document | Use For |
-|----------|---------|
-| [CURRENT_STATE.md](./CURRENT_STATE.md) | Current implementation status |
-| [FEATURE_SCOPE.md](./FEATURE_SCOPE.md) | Daily task details |
-| [TECH_STACK.md](./TECH_STACK.md) | Technology choices |
-| [SECURITY_REQUIREMENTS.md](./SECURITY_REQUIREMENTS.md) | Security checklist |
-| [BRAND_GUIDELINES.md](./BRAND_GUIDELINES.md) | UI/UX standards |
-| [DATA_MODEL.md](./DATA_MODEL.md) | Entity definitions |
-| [API_CONTRACTS.md](./API_CONTRACTS.md) | API specifications |
-| [SESSION_LOG.md](./SESSION_LOG.md) | Session history |
-
----
-
-*Ready to start Day 9 when approved by Product Owner.*
+*Updated after Day 12 completion. Ready for Day 13.*

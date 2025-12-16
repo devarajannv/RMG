@@ -56,6 +56,10 @@ const listResourcesSchema = z.object({
   tags: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
+const idParamSchema = z.object({
+  id: z.string().uuid('Invalid resource ID format'),
+});
+
 // Helper to normalize array params
 function normalizeArray(value: string | string[] | undefined): string[] | undefined {
   if (!value) return undefined;
@@ -153,9 +157,10 @@ router.get(
   authorize('resource:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const { id } = idParamSchema.parse(req.params);
       const resource = await resourceService.getResourceById(
         req.tenantId!,
-        req.params.id
+        id
       );
       res.json({ data: resource });
     } catch (error) {
@@ -195,10 +200,11 @@ router.put(
   authorize('resource:write'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const { id } = idParamSchema.parse(req.params);
       const input = updateResourceSchema.parse(req.body);
       const resource = await resourceService.updateResource(
         req.tenantId!,
-        req.params.id,
+        id,
         input,
         req.user!.id
       );
@@ -218,10 +224,11 @@ router.patch(
   authorize('resource:write'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const { id } = idParamSchema.parse(req.params);
       const input = updateResourceSchema.parse(req.body);
       const resource = await resourceService.updateResource(
         req.tenantId!,
-        req.params.id,
+        id,
         input,
         req.user!.id
       );
@@ -241,9 +248,10 @@ router.delete(
   authorize('resource:write'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const { id } = idParamSchema.parse(req.params);
       await resourceService.deleteResource(
         req.tenantId!,
-        req.params.id,
+        id,
         req.user!.id
       );
       res.status(204).send();

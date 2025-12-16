@@ -3,10 +3,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
 import { config } from './config/env';
 import { logger } from './lib/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
+import { swaggerSpec } from './config/swagger';
 
 // Route imports
 import authRoutes from './modules/auth/auth.controller';
@@ -16,6 +18,12 @@ import { projectRoutes } from './modules/projects';
 import { allocationRoutes } from './modules/allocations';
 import { dashboardRoutes } from './modules/dashboard';
 import { timesheetRouter } from './modules/timesheets';
+import { benchRoutes } from './modules/bench';
+import { intelligenceRoutes } from './modules/intelligence';
+import { analyticsRoutes } from './modules/analytics';
+import { exportRoutes } from './modules/export';
+import { importRoutes as bulkImportRoutes } from './modules/import';
+import { webhookRoutes } from './modules/webhooks';
 
 const app = express();
 
@@ -74,8 +82,20 @@ app.get('/api/v1', (_req, res) => {
   res.json({
     name: 'RMGaaS API',
     version: '0.1.0',
-    docs: '/api/docs',
+    docs: '/api-docs',
   });
+});
+
+// Swagger API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'RMGaaS API Documentation',
+}));
+
+// OpenAPI spec endpoint
+app.get('/api-docs.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
 });
 
 // API Routes
@@ -89,6 +109,12 @@ app.use('/api/v1/projects', projectRoutes);
 app.use('/api/v1/allocations', allocationRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/timesheets', timesheetRouter);
+app.use('/api/v1/bench', benchRoutes);
+app.use('/api/v1/intelligence', intelligenceRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/export', exportRoutes);
+app.use('/api/v1/import', bulkImportRoutes);
+app.use('/api/v1/webhooks', webhookRoutes);
 
 // Error handling
 app.use(errorHandler);

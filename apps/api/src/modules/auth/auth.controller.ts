@@ -60,8 +60,45 @@ function clearTokenCookies(res: Response) {
 // ============================================================================
 
 /**
- * POST /api/v1/auth/register
- * Register a new user
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - firstName
+ *               - lastName
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 12
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               tenantSlug:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Registration successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         description: Validation error
  */
 router.post(
   '/register',
@@ -89,8 +126,34 @@ router.post(
 );
 
 /**
- * POST /api/v1/auth/login
- * Login user
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login user
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *           example:
+ *             email: admin@newvision.in
+ *             password: Password123!@#
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.post(
   '/login',
@@ -117,8 +180,25 @@ router.post(
 );
 
 /**
- * POST /api/v1/auth/refresh
- * Refresh access token
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Tokens refreshed
+ *       401:
+ *         description: Invalid refresh token
  */
 router.post(
   '/refresh',
@@ -156,8 +236,16 @@ router.post(
 );
 
 /**
- * POST /api/v1/auth/logout
- * Logout current session
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout current session
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *       401:
+ *         description: Unauthorized
  */
 router.post(
   '/logout',
@@ -180,8 +268,16 @@ router.post(
 );
 
 /**
- * POST /api/v1/auth/logout-all
- * Logout from all devices
+ * @swagger
+ * /auth/logout-all:
+ *   post:
+ *     summary: Logout from all devices
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Logged out from all devices
+ *       401:
+ *         description: Unauthorized
  */
 router.post(
   '/logout-all',
@@ -200,8 +296,38 @@ router.post(
 );
 
 /**
- * GET /api/v1/auth/me
- * Get current user
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get current user
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Current user info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     tenantId:
+ *                       type: string
+ *                     roles:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     permissions:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *       401:
+ *         description: Unauthorized
  */
 router.get(
   '/me',
@@ -220,4 +346,3 @@ router.get(
 );
 
 export default router;
-
