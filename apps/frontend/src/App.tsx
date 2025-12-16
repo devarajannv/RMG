@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { Toaster } from '@/components/ui/toaster';
+import { AgentWidget, CommandPalette } from '@/components/agent';
 
 // Pages
 import LoginPage from '@/pages/LoginPage';
@@ -218,6 +219,9 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster />
+      {/* AI Agent components - only show when authenticated */}
+      <AgentWidget />
+      <CommandPalette />
     </>
   );
 }

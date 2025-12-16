@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAuthStore } from '@/stores/authStore';
+import { api } from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Trash2, Edit2, Shield, DollarSign, Users } from 'lucide-react';
 
 // ============================================================================
 // Types
@@ -30,7 +33,34 @@ interface DisplaySettings {
   currency: 'INR' | 'USD';
 }
 
-type TabType = 'profile' | 'notifications' | 'display' | 'security' | 'organization';
+interface Currency {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  isBase: boolean;
+  isActive: boolean;
+}
+
+interface ExchangeRate {
+  id: string;
+  fromCurrency: Currency;
+  toCurrency: Currency;
+  rate: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+}
+
+interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  isSystem: boolean;
+  level: number;
+  _count?: { users: number };
+}
+
+type TabType = 'profile' | 'notifications' | 'display' | 'security' | 'organization' | 'currency' | 'roles';
 
 // ============================================================================
 // Main Component
@@ -39,6 +69,7 @@ type TabType = 'profile' | 'notifications' | 'display' | 'security' | 'organizat
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
 
   const [profile, setProfile] = useState<UserProfile>({
     firstName: user?.firstName || '',
@@ -63,9 +94,48 @@ export default function SettingsPage() {
 
   const [saving, setSaving] = useState(false);
 
+  // Currency queries
+  const { data: currencies = [] } = useQuery<Currency[]>({
+    queryKey: ['currencies'],
+    queryFn: async () => {
+      const res = await api.get<Currency[]>('/currency/currencies');
+      return res as unknown as Currency[];
+    },
+    enabled: activeTab === 'currency',
+  });
+
+  const { data: exchangeRates = [] } = useQuery<ExchangeRate[]>({
+    queryKey: ['exchangeRates'],
+    queryFn: async () => {
+      const res = await api.get<ExchangeRate[]>('/currency/exchange-rates');
+      return res as unknown as ExchangeRate[];
+    },
+    enabled: activeTab === 'currency',
+  });
+
+  // Role queries
+  const { data: roles = [] } = useQuery<Role[]>({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const res = await api.get<Role[]>('/roles');
+      return res as unknown as Role[];
+    },
+    enabled: activeTab === 'roles',
+  });
+
+  // Seed currencies mutation
+  const seedCurrenciesMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/currency/currencies/seed');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currencies'] });
+      queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+    },
+  });
+
   async function handleSave() {
     setSaving(true);
-    // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setSaving(false);
     alert('Settings saved successfully!');
@@ -76,6 +146,8 @@ export default function SettingsPage() {
     { id: 'notifications', label: 'Notifications', icon: '🔔' },
     { id: 'display', label: 'Display', icon: '🎨' },
     { id: 'security', label: 'Security', icon: '🔒' },
+    { id: 'currency', label: 'Currency', icon: '💰' },
+    { id: 'roles', label: 'Roles', icon: '🛡️' },
     { id: 'organization', label: 'Organization', icon: '🏢' },
   ];
 
@@ -269,14 +341,14 @@ export default function SettingsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Display Currency</label>
                       <select
                         value={display.currency}
                         onChange={(e) => setDisplay({ ...display, currency: e.target.value as DisplaySettings['currency'] })}
                         className="w-full border rounded-lg px-3 py-2"
                       >
-                        <option value="INR">Indian Rupee (₹)</option>
                         <option value="USD">US Dollar ($)</option>
+                        <option value="INR">Indian Rupee (₹)</option>
                       </select>
                     </div>
                   </div>
@@ -322,30 +394,209 @@ export default function SettingsPage() {
                     </p>
                     <Button variant="outline">Enable 2FA</Button>
                   </div>
-
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <h3 className="font-medium text-gray-900 mb-2">Active Sessions</h3>
-                    <p className="text-sm text-gray-500 mb-3">
-                      Manage devices where you're logged in
-                    </p>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between p-3 bg-white rounded border">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xl">💻</span>
-                          <div>
-                            <p className="text-sm font-medium">Current Session</p>
-                            <p className="text-xs text-gray-500">Chrome on Linux • Last active: Now</p>
-                          </div>
-                        </div>
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Active</span>
-                      </div>
-                    </div>
-                    <Button variant="outline" className="mt-3 text-red-600 border-red-200 hover:bg-red-50">
-                      Sign Out All Other Sessions
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
+            )}
+
+            {activeTab === 'currency' && (
+              <div className="space-y-6">
+                <Card className="shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <DollarSign className="w-5 h-5" />
+                      Currency Management
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => seedCurrenciesMutation.mutate()}
+                      disabled={seedCurrenciesMutation.isPending}
+                    >
+                      {seedCurrenciesMutation.isPending ? 'Seeding...' : 'Seed Defaults'}
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {currencies.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <DollarSign className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No currencies configured</p>
+                        <p className="text-sm">Click "Seed Defaults" to add standard currencies</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {currencies.map((currency: Currency) => (
+                          <div
+                            key={currency.id}
+                            className={`flex items-center justify-between p-3 rounded-lg ${
+                              currency.isBase ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{currency.symbol}</span>
+                              <div>
+                                <p className="font-medium">
+                                  {currency.code} - {currency.name}
+                                  {currency.isBase && (
+                                    <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-0.5 rounded">
+                                      Base
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {currency.isActive ? 'Active' : 'Inactive'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm">
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Exchange Rates</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {exchangeRates.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No exchange rates configured</p>
+                        <p className="text-sm">Exchange rates will be available after seeding currencies</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="text-left p-3 text-sm font-medium">From</th>
+                              <th className="text-left p-3 text-sm font-medium">To</th>
+                              <th className="text-right p-3 text-sm font-medium">Rate</th>
+                              <th className="text-left p-3 text-sm font-medium">Effective</th>
+                              <th className="text-right p-3 text-sm font-medium">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {exchangeRates.map((rate: ExchangeRate) => (
+                              <tr key={rate.id}>
+                                <td className="p-3">{rate.fromCurrency?.code}</td>
+                                <td className="p-3">{rate.toCurrency?.code}</td>
+                                <td className="p-3 text-right font-mono">{Number(rate.rate).toFixed(4)}</td>
+                                <td className="p-3 text-sm text-gray-500">
+                                  {new Date(rate.effectiveFrom).toLocaleDateString()}
+                                </td>
+                                <td className="p-3 text-right">
+                                  <Button variant="ghost" size="sm">
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {activeTab === 'roles' && (
+              <div className="space-y-6">
+                <Card className="shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Shield className="w-5 h-5" />
+                      Role Management
+                    </CardTitle>
+                    <Button size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Role
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {roles.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No roles configured</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {roles.map((role: Role) => (
+                          <div
+                            key={role.id}
+                            className={`flex items-center justify-between p-4 rounded-lg ${
+                              role.isSystem ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{role.name}</p>
+                                {role.isSystem && (
+                                  <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">
+                                    System
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-500">{role.description || 'No description'}</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Level {role.level} • {role._count?.users || 0} users
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm">
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              {!role.isSystem && (
+                                <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Permission Reference</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[
+                        { module: 'Resources', permissions: ['Create', 'Read', 'Update', 'Delete'] },
+                        { module: 'Projects', permissions: ['Create', 'Read', 'Update', 'Delete'] },
+                        { module: 'Allocations', permissions: ['Create', 'Read', 'Update', 'Approve'] },
+                        { module: 'Timesheets', permissions: ['Create', 'Read', 'Update', 'Approve'] },
+                        { module: 'Contracts', permissions: ['Create', 'Read', 'Update', 'Approve'] },
+                        { module: 'Reports', permissions: ['Read', 'Export'] },
+                      ].map((item) => (
+                        <div key={item.module} className="p-3 bg-gray-50 rounded-lg">
+                          <p className="font-medium text-sm mb-2">{item.module}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {item.permissions.map((perm) => (
+                              <span
+                                key={perm}
+                                className="text-xs bg-white border px-2 py-0.5 rounded"
+                              >
+                                {perm}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
 
             {activeTab === 'organization' && (
@@ -398,4 +649,3 @@ export default function SettingsPage() {
     </MainLayout>
   );
 }
-
