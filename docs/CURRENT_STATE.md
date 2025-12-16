@@ -1,10 +1,10 @@
 # RMGaaS Current State
 
-> Last Updated: December 16, 2025
+> Last Updated: December 16, 2025 (Evening)
 
 ## Product Overview
 
-RMGaaS (Resource Management as a Service) is a comprehensive resource management platform for NewVision Software Pvt. Ltd. The product has completed its initial 14-day development sprint and is now in active feature expansion phase.
+RMGaaS (Resource Management as a Service) is a comprehensive resource management platform for NewVision Software Pvt. Ltd. The product has completed its initial 14-day development sprint and has now implemented the first 10 features from the feature expansion discussions.
 
 ---
 
@@ -58,13 +58,46 @@ RMGaaS (Resource Management as a Service) is a comprehensive resource management
 - Functional search bar
 - Consistent layout across application
 
+### ✅ Feature Expansion: First 10 Items Completed
+
+#### Multi-Currency Support
+- Currency CRUD API (6 default currencies)
+- Exchange rate management (manual rates)
+- Rate conversion API (current and historical)
+- Settings UI for currency management
+
+#### Enhanced Role Management
+- Decoupled role from designation
+- Permission-based access control (30+ permissions)
+- Role hierarchy (org → delivery → practice → team → individual)
+- Role assignment audit trail
+- Custom role creation with permission builder
+- Settings UI for role management
+
+#### Document Storage
+- Document upload with version control
+- Access control (role/user/practice-based)
+- Document classification (public/internal/restricted/confidential)
+- Access logging and audit trail
+- Download with version history
+- Storage abstraction (local, ready for S3/Azure)
+
+#### AI Agent (Query-Only Phase 1)
+- Self-routing LLM architecture (tier-based)
+- Natural language queries for resources, projects, metrics
+- Rich response formatting (text, tables, cards, gauges)
+- Conversation tracking and history
+- Feedback mechanism
+- Floating widget UI (accessible from all pages)
+- Command palette (Cmd+K shortcut)
+
 ---
 
 ## Current Architecture
 
 ### Backend (`apps/api`)
 ```
-13 modules, 43+ files
+17 modules, 60+ files
 ├── auth (including Microsoft SSO)
 ├── resources
 ├── projects
@@ -77,7 +110,11 @@ RMGaaS (Resource Management as a Service) is a comprehensive resource management
 ├── analytics
 ├── export
 ├── import
-└── webhooks
+├── webhooks
+├── currency (NEW)
+├── roles (NEW)
+├── documents (NEW)
+└── agent (NEW)
 ```
 
 ### Frontend (`apps/frontend`)
