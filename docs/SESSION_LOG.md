@@ -178,5 +178,44 @@ Comprehensive invoicing module to be built:
 
 ---
 
+---
+
+## Discussion Paused - To Resume Later
+
+### Topics Completed ✅
+1. **AI Agent Architecture**
+   - Self-routing model selection (Gemini Flash → GPT-4o-mini → Gemini Pro → GPT-4o)
+   - Phase 1: Query-only (read operations)
+   - Permission-aware responses
+   - Session memory (last 5-10 messages)
+   - Hybrid UI (Cmd+K + floating widget)
+   - Context-aware response formatting
+
+2. **Migration Tool**
+   - Multi-format support (CSV, Excel, JSON, PDF, Images)
+   - Vision AI for image/PDF extraction
+   - Confidence-based exception handling
+   - Batch review for medium confidence
+   - Individual review for low confidence
+   - ~1 hour for 500 employees vs 2-3 days manual
+
+### Topics Pending 🔜
+1. **Approval Workflow Engine**
+   - Configurable multi-level approvals
+   - CTC access workflow
+   - Contract approvals
+   - Allocation approvals
+
+2. **Notification System**
+   - Alerts and reminders
+   - Escalation rules
+   - Email/in-app/push channels
+
+3. **Mobile Responsiveness**
+   - UI adaptation for mobile
+   - Priority screens for mobile
+
+---
+
 *Log maintained by AI development assistant*
 

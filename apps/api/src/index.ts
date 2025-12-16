@@ -25,6 +25,10 @@ import { analyticsRoutes } from './modules/analytics';
 import { exportRoutes } from './modules/export';
 import { importRoutes as bulkImportRoutes } from './modules/import';
 import { webhookRoutes } from './modules/webhooks';
+import { currencyRoutes } from './modules/currency';
+import { roleRoutes } from './modules/roles';
+import { documentRoutes } from './modules/documents';
+import { agentRoutes } from './modules/agent';
 
 const app = express();
 
@@ -117,6 +121,10 @@ app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/export', exportRoutes);
 app.use('/api/v1/import', bulkImportRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
+app.use('/api/v1/currency', currencyRoutes);
+app.use('/api/v1/roles', roleRoutes);
+app.use('/api/v1/documents', documentRoutes);
+app.use('/api/v1/agent', agentRoutes);
 
 // Error handling
 app.use(errorHandler);

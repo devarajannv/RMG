@@ -45,6 +45,8 @@ model Tenant {
   timesheetEntries TimesheetEntry[]
   timesheetPeriods TimesheetPeriod[]
   opportunities    Opportunity[]
+  currencies       Currency[]
+  documents        Document[]
 
   @@index([status])
   @@index([tier])
@@ -118,12 +120,17 @@ model Role {
   name        String    @db.VarChar(100)
   description String?   @db.VarChar(500)
   isSystem    Boolean   @default(false)
-  permissions Json      // Array of permission strings
+  permissions Json      // Legacy: Array of permission strings
+  level       Int       @default(0)  // Hierarchy level: 0=org, 1=delivery, 2=practice, 3=team
+  parentRoleId String?  @db.Uuid
+  parentRole   Role?    @relation("RoleHierarchy", fields: [parentRoleId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   // Relations
-  users       UserRole[]
+  users           UserRole[]
+  childRoles      Role[] @relation("RoleHierarchy")
+  rolePermissions RolePermission[]
 
   @@unique([tenantId, name])
 }
@@ -840,6 +847,290 @@ enum AuditAction {
   APPROVE
   REJECT
   SUBMIT
+}
+
+// =============================================================================
+// CURRENCY & EXCHANGE RATES
+// =============================================================================
+model Currency {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  code        String    @db.VarChar(3)   // ISO 4217: USD, INR, EUR
+  name        String    @db.VarChar(100)
+  symbol      String    @db.VarChar(10)
+  isBase      Boolean   @default(false)  // Organization's base currency
+  isActive    Boolean   @default(true)
+  decimalPlaces Int     @default(2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  exchangeRatesFrom ExchangeRate[] @relation("FromCurrency")
+  exchangeRatesTo   ExchangeRate[] @relation("ToCurrency")
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isBase])
+  @@index([tenantId, isActive])
+}
+
+model ExchangeRate {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  fromCurrencyId  String    @db.Uuid
+  fromCurrency    Currency  @relation("FromCurrency", fields: [fromCurrencyId], references: [id])
+  toCurrencyId    String    @db.Uuid
+  toCurrency      Currency  @relation("ToCurrency", fields: [toCurrencyId], references: [id])
+  rate            Decimal   @db.Decimal(18, 8)  // High precision for currency conversion
+  effectiveFrom   DateTime  @db.Date
+  effectiveTo     DateTime? @db.Date
+  source          String    @default("MANUAL") @db.VarChar(50)  // MANUAL, API, IMPORT
+  createdById     String?   @db.Uuid
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([tenantId, fromCurrencyId, toCurrencyId, effectiveFrom])
+  @@index([tenantId, effectiveFrom])
+  @@index([tenantId, fromCurrencyId, toCurrencyId])
+}
+
+// =============================================================================
+// ENHANCED ROLE MANAGEMENT
+// =============================================================================
+model Permission {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  module      String    @db.VarChar(50)   // resources, projects, contracts, etc.
+  action      String    @db.VarChar(50)   // create, read, update, delete, approve, export
+  scope       String    @default("ALL") @db.VarChar(50)  // ALL, OWN, TEAM, PRACTICE
+  description String?   @db.VarChar(200)
+  isSystem    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, module, action, scope])
+  @@index([tenantId, module])
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String     @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granted      Boolean    @default(true)
+  conditions   Json?      // Additional conditions for fine-grained access
+  createdAt    DateTime   @default(now())
+
+  @@id([roleId, permissionId])
+}
+
+model RoleAssignmentAudit {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  userId      String    @db.Uuid
+  roleId      String    @db.Uuid
+  action      String    @db.VarChar(20)   // ASSIGNED, REVOKED
+  assignedBy  String    @db.Uuid
+  reason      String?   @db.VarChar(500)
+  timestamp   DateTime  @default(now())
+
+  @@index([tenantId, userId])
+  @@index([tenantId, timestamp])
+}
+
+// =============================================================================
+// DOCUMENT MANAGEMENT
+// =============================================================================
+model Document {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @db.Uuid
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  
+  // Identity
+  name              String    @db.VarChar(255)
+  description       String?
+  mimeType          String    @db.VarChar(100)
+  fileSize          Int       // Size in bytes
+  
+  // Classification
+  classification    DocumentClassification @default(INTERNAL)
+  category          String?   @db.VarChar(100)  // MSA, SOW, CR, INVOICE, TIMESHEET, etc.
+  tags              String[]
+  
+  // Storage
+  storageProvider   String    @default("LOCAL") @db.VarChar(50)  // LOCAL, S3, AZURE
+  storagePath       String    @db.VarChar(500)
+  checksum          String?   @db.VarChar(64)  // SHA-256 hash for integrity
+  
+  // Relationships
+  entityType        String?   @db.VarChar(50)   // contract, project, resource, etc.
+  entityId          String?   @db.Uuid
+  
+  // E-Signature
+  signatureStatus   SignatureStatus?
+  signatureProvider String?   @db.VarChar(50)  // DOCUSIGN, ADOBE_SIGN
+  signatureRef      String?   @db.VarChar(200) // External signature ID
+  
+  // Current version tracking
+  currentVersionId  String?   @db.Uuid
+  versionCount      Int       @default(1)
+  
+  // Ownership
+  uploadedById      String    @db.Uuid
+  
+  // Status
+  status            DocumentStatus @default(ACTIVE)
+  expiresAt         DateTime?
+  
+  // Metadata
+  customFields      Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  versions          DocumentVersion[]
+  accessRules       DocumentAccess[]
+  accessLogs        DocumentAccessLog[]
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, classification])
+  @@index([tenantId, category])
+  @@index([tenantId, status])
+}
+
+enum DocumentClassification {
+  PUBLIC
+  INTERNAL
+  RESTRICTED
+  CONFIDENTIAL
+}
+
+enum DocumentStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum SignatureStatus {
+  PENDING
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  VOIDED
+}
+
+model DocumentVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  documentId    String    @db.Uuid
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  
+  // Storage
+  storagePath   String    @db.VarChar(500)
+  fileSize      Int
+  checksum      String?   @db.VarChar(64)
+  
+  // Metadata
+  changeNotes   String?   @db.VarChar(500)
+  createdById   String    @db.Uuid
+  createdAt     DateTime  @default(now())
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+}
+
+model DocumentAccess {
+  id            String    @id @default(uuid()) @db.Uuid
+  documentId    String    @db.Uuid
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  // Access target (one of these should be set)
+  roleId        String?   @db.Uuid
+  userId        String?   @db.Uuid
+  practiceId    String?   @db.Uuid
+  
+  // Permissions
+  canView       Boolean   @default(true)
+  canDownload   Boolean   @default(false)
+  canEdit       Boolean   @default(false)
+  canDelete     Boolean   @default(false)
+  canShare      Boolean   @default(false)
+  
+  // Time-bound access
+  expiresAt     DateTime?
+  
+  // Audit
+  grantedById   String    @db.Uuid
+  grantedAt     DateTime  @default(now())
+  revokedAt     DateTime?
+
+  @@index([documentId])
+  @@index([roleId])
+  @@index([userId])
+}
+
+model DocumentAccessLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  documentId  String    @db.Uuid
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId      String    @db.Uuid
+  action      String    @db.VarChar(50)  // VIEW, DOWNLOAD, EDIT, DELETE, SHARE
+  ipAddress   String?   @db.VarChar(45)
+  userAgent   String?   @db.VarChar(500)
+  timestamp   DateTime  @default(now())
+
+  @@index([documentId, timestamp])
+  @@index([userId, timestamp])
+}
+
+// =============================================================================
+// AI AGENT CONVERSATIONS
+// =============================================================================
+model AgentConversation {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  userId      String    @db.Uuid
+  title       String?   @db.VarChar(200)
+  context     Json?     // Current context (page, selected entity, etc.)
+  status      String    @default("ACTIVE") @db.VarChar(20)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  messages    AgentMessage[]
+
+  @@index([tenantId, userId])
+  @@index([tenantId, updatedAt])
+}
+
+model AgentMessage {
+  id              String    @id @default(uuid()) @db.Uuid
+  conversationId  String    @db.Uuid
+  conversation    AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role            String    @db.VarChar(20)  // user, assistant, system
+  content         String
+  
+  // AI Metadata
+  model           String?   @db.VarChar(50)   // gemini-flash, gpt-4o-mini, etc.
+  tokens          Json?     // { input: X, output: Y }
+  confidence      Decimal?  @db.Decimal(3, 2)
+  routingTier     String?   @db.VarChar(20)   // T1, T2, T3, T4
+  
+  // Response rendering
+  responseType    String?   @db.VarChar(50)   // text, table, chart, cards
+  responseData    Json?     // Structured data for rich rendering
+  
+  // Feedback
+  feedback        String?   @db.VarChar(20)   // positive, negative
+  feedbackNote    String?   @db.VarChar(500)
+  
+  timestamp       DateTime  @default(now())
+
+  @@index([conversationId, timestamp])
 }
 
 

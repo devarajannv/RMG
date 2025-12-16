@@ -210,7 +210,7 @@ async function main() {
     },
   });
 
-  const rolePM = await prisma.role.create({
+  const _rolePM = await prisma.role.create({
     data: {
       tenantId: tenant.id,
       name: 'Project Manager',
@@ -227,7 +227,7 @@ async function main() {
     },
   });
 
-  const roleEmployee = await prisma.role.create({
+  const _roleEmployee = await prisma.role.create({
     data: {
       tenantId: tenant.id,
       name: 'Employee',
@@ -398,7 +398,7 @@ async function main() {
     },
   });
 
-  const clientBeta = await prisma.client.create({
+  const _clientBeta = await prisma.client.create({
     data: {
       tenantId: tenant.id,
       name: 'Beta Financial Services',
@@ -449,7 +449,7 @@ async function main() {
     },
   });
 
-  const projectInternal = await prisma.project.create({
+  const _projectInternal = await prisma.project.create({
     data: {
       tenantId: tenant.id,
       practiceId: practiceTech.id,
