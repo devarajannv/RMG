@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { isMicrosoftSSOConfigured } from '@/config/msal';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),

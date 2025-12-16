@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import MainLayout from '@/components/layout/MainLayout';
 
 // ============================================================================
 // Types
@@ -36,6 +37,7 @@ export default function ExportImportPage() {
   const [activeTab, setActiveTab] = useState<TabType>('export');
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -69,6 +71,7 @@ export default function ExportImportPage() {
       {activeTab === 'import' && <ImportTab />}
       {activeTab === 'webhooks' && <WebhooksTab />}
     </div>
+    </MainLayout>
   );
 }
 
@@ -134,12 +137,10 @@ function ExportTab() {
   async function handleExport(option: typeof exportOptions[0], format: 'csv' | 'json') {
     setLoading(`${option.id}-${format}`);
     try {
-      const response = await api.get(`${option.endpoint}?format=${format}`, {
-        responseType: 'blob',
-      });
+      const response = await api.get<unknown>(`${option.endpoint}?format=${format}`);
 
       // Create download link
-      const blob = new Blob([response as unknown as BlobPart], {
+      const blob = new Blob([JSON.stringify(response)], {
         type: format === 'csv' ? 'text/csv' : 'application/json',
       });
       const url = window.URL.createObjectURL(blob);
@@ -282,11 +283,9 @@ function ImportTab() {
 
   async function downloadTemplate() {
     try {
-      const response = await api.get(`/import/template/${importType}`, {
-        responseType: 'blob',
-      });
+      const response = await api.get<unknown>(`/import/template/${importType}`);
       
-      const blob = new Blob([response as unknown as BlobPart], { type: 'text/csv' });
+      const blob = new Blob([JSON.stringify(response)], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -559,9 +558,9 @@ function WebhooksTab() {
   }
 
   // Load webhooks on mount
-  useState(() => {
+  useEffect(() => {
     loadWebhooks();
-  });
+  }, []);
 
   return (
     <div className="space-y-6">

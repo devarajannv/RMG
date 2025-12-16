@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
@@ -43,6 +44,7 @@ interface ClientsResponse {
 }
 
 export default function ClientsPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
@@ -133,7 +135,11 @@ export default function ClientsPage() {
             </div>
           ) : (
             clients.map((client) => (
-              <Card key={client.id} className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card 
+                key={client.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/clients/${client.id}`)}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">

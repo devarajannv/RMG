@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   Plus,
 } from 'lucide-react';
-import { format, addWeeks, subWeeks, startOfWeek, addDays, parseISO } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,7 +82,7 @@ export default function TimesheetsPage() {
 
   // Get weekly timesheet data
   const weekStartStr = format(currentWeek, 'yyyy-MM-dd');
-  const { data: timesheetData, isLoading, refetch } = useQuery({
+  const { data: timesheetData, isLoading } = useQuery({
     queryKey: ['weekly-timesheet', selectedResourceId, weekStartStr],
     queryFn: () =>
       api.get<{ data: WeeklyTimesheetData }>(

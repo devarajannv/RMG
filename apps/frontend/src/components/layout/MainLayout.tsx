@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,6 +18,7 @@ import {
   Brain,
   PieChart,
   Database,
+  X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -38,7 +40,7 @@ const navItems = [
   { icon: BarChart3, label: 'Reports', href: '/reports' },
   { icon: Clock, label: 'Timesheets', href: '/timesheets' },
   { icon: PieChart, label: 'Analytics', href: '/analytics' },
-  { icon: Database, label: 'Data Management', href: '/data-management' },
+  { icon: Database, label: 'Data Management', href: '/export-import' },
   { icon: Settings, label: 'Settings', href: '/settings' },
 ];
 
@@ -51,6 +53,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation();
   const { user, clearAuth } = useAuthStore();
   const envBadge = getEnvironmentBadge();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -62,6 +66,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
       navigate('/login');
     }
   };
+
+  const handleSearch = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/smart-search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  }, [searchQuery, navigate]);
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch(e);
+    }
+  }, [handleSearch]);
+
+  // Get user role from user object (roles is an array of role names)
+  const userRole = user?.roles?.[0] || 'User';
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -136,22 +156,79 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <div className="ml-64 flex-1">
         {/* Top bar */}
         <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-gray-200/80 bg-white/80 backdrop-blur-md px-8 shadow-sm">
-          <div className="relative flex-1 max-w-lg">
+          <form onSubmit={handleSearch} className="relative flex-1 max-w-lg">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
-              placeholder="Search resources, projects, clients..."
+              placeholder="Search resources, projects, clients... (Enter to search)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               className="pl-11 h-10 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F7941D]/20 focus:border-[#F7941D] transition-all"
             />
-          </div>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </form>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="relative rounded-xl hover:bg-gray-100">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#F7941D] ring-2 ring-white" />
-            </Button>
+            <div className="relative">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative rounded-xl hover:bg-gray-100"
+                onClick={() => setShowNotifications(!showNotifications)}
+              >
+                <Bell className="h-5 w-5 text-gray-600" />
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#F7941D] ring-2 ring-white" />
+              </Button>
+              {showNotifications && (
+                <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                  <div className="p-4 border-b border-gray-100">
+                    <h3 className="font-semibold text-gray-900">Notifications</h3>
+                  </div>
+                  <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
+                    <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg">
+                      <div className="w-2 h-2 mt-2 rounded-full bg-[#F7941D]" />
+                      <div>
+                        <p className="text-sm font-medium">New rolloff alert</p>
+                        <p className="text-xs text-gray-500">3 resources rolling off next week</p>
+                        <p className="text-xs text-gray-400 mt-1">2 hours ago</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg">
+                      <div className="w-2 h-2 mt-2 rounded-full bg-green-500" />
+                      <div>
+                        <p className="text-sm font-medium">Utilization target met</p>
+                        <p className="text-xs text-gray-500">Engineering practice achieved 85%</p>
+                        <p className="text-xs text-gray-400 mt-1">5 hours ago</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg opacity-60">
+                      <div className="w-2 h-2 mt-2 rounded-full bg-gray-300" />
+                      <div>
+                        <p className="text-sm">Timesheet reminder</p>
+                        <p className="text-xs text-gray-500">Week ending Dec 15 due</p>
+                        <p className="text-xs text-gray-400 mt-1">1 day ago</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-3 border-t border-gray-100">
+                    <Button variant="ghost" size="sm" className="w-full text-primary">
+                      View all notifications
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="h-8 w-px bg-gray-200"></div>
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
-              <p className="text-xs text-gray-500">Administrator</p>
+              <p className="text-xs text-gray-500">{userRole}</p>
             </div>
           </div>
         </header>

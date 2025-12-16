@@ -18,6 +18,9 @@ import TimesheetsPage from '@/pages/TimesheetsPage';
 import SmartSearchPage from '@/pages/SmartSearchPage';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import ExportImportPage from '@/pages/ExportImportPage';
+import SettingsPage from '@/pages/SettingsPage';
+import ProjectDetailPage from '@/pages/ProjectDetailPage';
+import ClientDetailPage from '@/pages/ClientDetailPage';
 
 // Auth guard component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -107,6 +110,14 @@ function App() {
           }
         />
         <Route
+          path="/projects/:id"
+          element={
+            <ProtectedRoute>
+              <ProjectDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/allocations"
           element={
             <ProtectedRoute>
@@ -119,6 +130,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ClientsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/clients/:id"
+          element={
+            <ProtectedRoute>
+              <ClientDetailPage />
             </ProtectedRoute>
           }
         />
@@ -190,7 +209,7 @@ function App() {
           path="/settings"
           element={
             <ProtectedRoute>
-              <PlaceholderPage title="Settings" />
+              <SettingsPage />
             </ProtectedRoute>
           }
         />
@@ -203,19 +222,5 @@ function App() {
   );
 }
 
-// Placeholder for pages not yet implemented
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-brand-charcoal">{title}</h1>
-        <p className="mt-2 text-muted-foreground">Coming soon...</p>
-        <a href="/" className="mt-4 inline-block text-primary hover:underline">
-          ← Back to Dashboard
-        </a>
-      </div>
-    </div>
-  );
-}
 
 export default App;

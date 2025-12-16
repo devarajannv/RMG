@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import MainLayout from '@/components/layout/MainLayout';
 import {
   BarChart,
   Bar,
@@ -11,11 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
   Legend,
 } from 'recharts';
 
@@ -220,6 +216,7 @@ export default function SmartSearchPage() {
   }
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -290,6 +287,7 @@ export default function SmartSearchPage() {
         />
       )}
     </div>
+    </MainLayout>
   );
 }
 
@@ -656,11 +654,6 @@ function InsightsTab({
     );
   }
 
-  const gaugeData = [
-    { name: 'Current', value: insights.currentUtilization, fill: '#1B3A5F' },
-    { name: 'Target', value: insights.targetUtilization, fill: '#F7941D' },
-    { name: 'Optimal', value: insights.optimalUtilization, fill: '#22C55E' },
-  ];
 
   return (
     <div className="space-y-6">

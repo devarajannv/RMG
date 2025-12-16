@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import MainLayout from '@/components/layout/MainLayout';
 import {
   AreaChart,
   Area,
@@ -194,6 +195,7 @@ export default function AnalyticsPage() {
   }
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -254,6 +256,7 @@ export default function AnalyticsPage() {
         <ProjectsTab data={projects} />
       )}
     </div>
+    </MainLayout>
   );
 }
 
@@ -262,7 +265,8 @@ export default function AnalyticsPage() {
 // ============================================================================
 
 function ExecutiveTab({ data, formatCurrency }: { data: ExecutiveMetrics; formatCurrency: (v: number) => string }) {
-  const COLORS = ['#1B3A5F', '#F7941D', '#22C55E', '#EF4444'];
+  const _COLORS = ['#1B3A5F', '#F7941D', '#22C55E', '#EF4444'];
+  void _COLORS; // To suppress unused variable warning
 
   return (
     <div className="space-y-6">

@@ -168,7 +168,7 @@ export const authApi = {
 
   me: () =>
     api.get<{
-      user: { id: string; email: string; tenantId: string; roles: string[]; permissions: string[] };
+      user: { id: string; email: string; firstName: string; lastName: string; tenantId: string; roles: string[]; permissions: string[] };
     }>('/auth/me'),
 };
 

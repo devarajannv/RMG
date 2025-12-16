@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
@@ -48,6 +49,7 @@ interface ProjectsResponse {
 }
 
 export default function ProjectsPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string[]>(['ACTIVE', 'PIPELINE']);
@@ -204,7 +206,11 @@ export default function ProjectsPage() {
             </div>
           ) : (
             projects.map((project) => (
-              <Card key={project.id} className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card 
+                key={project.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/projects/${project.id}`)}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
                     <div>

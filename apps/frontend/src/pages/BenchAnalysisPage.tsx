@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import MainLayout from '@/components/layout/MainLayout';
 import {
   AreaChart,
   Area,
@@ -137,10 +138,10 @@ export default function BenchAnalysisPage() {
     try {
       const [summaryRes, resourcesRes, rolloffsRes, alertsRes, forecastRes] = await Promise.all([
         api.get<{ data: BenchSummary }>('/bench/summary'),
-        api.get<{ data: BenchResource[] }>('/bench/resources', { params: { limit: 100 } }),
-        api.get<{ data: UpcomingRolloff[] }>('/bench/rolloffs', { params: { days: rolloffDays, includeWithNextAllocation: true } }),
-        api.get<{ data: UpcomingRolloff[] }>('/bench/alerts', { params: { days: 30 } }),
-        api.get<{ data: BenchForecast[] }>('/bench/forecast', { params: { days: 90, granularity: 'weekly' } }),
+        api.get<{ data: BenchResource[] }>(`/bench/resources?limit=100`),
+        api.get<{ data: UpcomingRolloff[] }>(`/bench/rolloffs?days=${rolloffDays}&includeWithNextAllocation=true`),
+        api.get<{ data: UpcomingRolloff[] }>(`/bench/alerts?days=30`),
+        api.get<{ data: BenchForecast[] }>(`/bench/forecast?days=90&granularity=weekly`),
       ]);
 
       setSummary(summaryRes.data);
@@ -226,15 +227,6 @@ export default function BenchAnalysisPage() {
     }
   }
 
-  function getAgingLabel(category: string): string {
-    switch (category) {
-      case 'fresh': return '0-7 days';
-      case 'moderate': return '8-30 days';
-      case 'critical': return '31-60 days';
-      case 'severe': return '60+ days';
-      default: return category;
-    }
-  }
 
   const AGING_COLORS = {
     fresh: '#22C55E',
@@ -245,22 +237,27 @@ export default function BenchAnalysisPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <MainLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </MainLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <p className="text-red-600 mb-4">{error}</p>
-        <Button onClick={loadData}>Retry</Button>
-      </div>
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center h-full">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={loadData}>Retry</Button>
+        </div>
+      </MainLayout>
     );
   }
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -373,6 +370,7 @@ export default function BenchAnalysisPage() {
         />
       )}
     </div>
+    </MainLayout>
   );
 }
 

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { api } from '@/lib/api';
+import MainLayout from '@/components/layout/MainLayout';
 
 // ============================================================================
 // Types
@@ -109,9 +111,19 @@ const REPORTS: ReportDefinition[] = [
 // Main Component
 // ============================================================================
 
+interface RecentReport {
+  id: string;
+  name: string;
+  type: string;
+  format: string;
+  generatedAt: string;
+  downloadUrl?: string;
+}
+
 export default function ReportsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [generating, setGenerating] = useState<string | null>(null);
+  const [recentReports, setRecentReports] = useState<RecentReport[]>([]);
 
   const categories = [
     { id: 'all', name: 'All Reports', icon: '📁' },
@@ -126,17 +138,107 @@ export default function ReportsPage() {
       ? REPORTS
       : REPORTS.filter((r) => r.category === selectedCategory);
 
-  async function generateReport(reportId: string) {
-    setGenerating(reportId);
-    // Simulate report generation
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setGenerating(null);
+  // Load recent reports on mount
+  useEffect(() => {
+    // Use localStorage to track recent reports (in real app, this would be from API)
+    const stored = localStorage.getItem('recentReports');
+    if (stored) {
+      setRecentReports(JSON.parse(stored));
+    }
+  }, []);
 
-    // In a real implementation, this would call the API and trigger a download
-    alert(`Report "${reportId}" would be generated and downloaded.`);
+  async function generateReport(reportId: string, format: 'pdf' | 'xlsx') {
+    setGenerating(`${reportId}-${format}`);
+    
+    try {
+      // Map report ID to export endpoint
+      const endpointMap: Record<string, string> = {
+        'utilization-summary': '/export/utilization-report',
+        'practice-utilization': '/analytics/practice',
+        'bench-report': '/export/bench-report',
+        'skill-matrix': '/export/skills-inventory',
+        'resource-allocation': '/export/allocations',
+        'bench-cost': '/export/bench-report',
+        'revenue-potential': '/analytics/financial',
+        'project-health': '/analytics/projects',
+        'project-staffing': '/export/projects',
+        'capacity-forecast': '/bench/forecast',
+        'roll-off-report': '/bench/rolloffs',
+        'billable-vs-nonbillable': '/analytics/executive',
+      };
+
+      const endpoint = endpointMap[reportId] || `/export/${reportId.replace('-', '_')}`;
+      
+      // For CSV/JSON exports
+      if (endpoint.startsWith('/export')) {
+        const response = await api.get<unknown>(`${endpoint}?format=${format === 'xlsx' ? 'csv' : 'json'}`);
+
+        // Create download link
+        const blob = new Blob([JSON.stringify(response)], {
+          type: format === 'xlsx' ? 'text/csv' : 'application/json',
+        });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${reportId}_${new Date().toISOString().split('T')[0]}.${format === 'xlsx' ? 'csv' : 'json'}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        // Add to recent reports
+        const report = REPORTS.find(r => r.id === reportId);
+        const newRecentReport: RecentReport = {
+          id: `${reportId}-${Date.now()}`,
+          name: report?.name || reportId,
+          type: reportId,
+          format: format === 'xlsx' ? 'Excel' : 'PDF',
+          generatedAt: new Date().toISOString(),
+        };
+        const updated = [newRecentReport, ...recentReports.slice(0, 9)];
+        setRecentReports(updated);
+        localStorage.setItem('recentReports', JSON.stringify(updated));
+
+        console.log(`Report ${report?.name} downloaded successfully.`);
+      } else {
+        // For analytics endpoints, get JSON data
+        const response = await api.get<{ data: unknown }>(endpoint);
+        const blob = new Blob([JSON.stringify(response.data, null, 2)], {
+          type: 'application/json',
+        });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${reportId}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        const report = REPORTS.find(r => r.id === reportId);
+        console.log(`Report ${report?.name} downloaded successfully.`);
+      }
+    } catch (err) {
+      console.error('Failed to generate report:', err);
+      alert('Failed to generate report. Please try again.');
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  function formatDate(dateString: string) {
+    return new Date(dateString).toLocaleString('en-IN', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   }
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -154,7 +256,7 @@ export default function ReportsPage() {
             onClick={() => setSelectedCategory(cat.id)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               selectedCategory === cat.id
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -180,25 +282,31 @@ export default function ReportsPage() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => generateReport(report.id)}
-                  disabled={generating === report.id}
+                  onClick={() => generateReport(report.id, 'pdf')}
+                  disabled={generating !== null}
                 >
-                  {generating === report.id ? (
+                  {generating === `${report.id}-pdf` ? (
                     <span className="flex items-center gap-2">
                       <span className="animate-spin">↻</span> Generating...
                     </span>
                   ) : (
-                    '📄 PDF'
+                    '📄 JSON'
                   )}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => generateReport(report.id)}
-                  disabled={generating === report.id}
+                  onClick={() => generateReport(report.id, 'xlsx')}
+                  disabled={generating !== null}
                 >
-                  📊 Excel
+                  {generating === `${report.id}-xlsx` ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin">↻</span> Generating...
+                    </span>
+                  ) : (
+                    '📊 CSV'
+                  )}
                 </Button>
               </div>
             </CardContent>
@@ -231,47 +339,37 @@ export default function ReportsPage() {
           <CardTitle className="text-lg">Recent Reports</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📊</span>
-                <div>
-                  <p className="font-medium text-gray-900">Utilization Summary</p>
-                  <p className="text-sm text-gray-500">Generated Dec 15, 2025 at 10:30 AM</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm">
-                ↓ Download
-              </Button>
+          {recentReports.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-4xl mb-2">📋</p>
+              <p>No reports generated yet</p>
+              <p className="text-sm">Generated reports will appear here</p>
             </div>
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🪑</span>
-                <div>
-                  <p className="font-medium text-gray-900">Bench Report</p>
-                  <p className="text-sm text-gray-500">Generated Dec 14, 2025 at 3:00 PM</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm">
-                ↓ Download
-              </Button>
+          ) : (
+            <div className="space-y-2">
+              {recentReports.map((report) => {
+                const reportDef = REPORTS.find(r => r.id === report.type);
+                return (
+                  <div key={report.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{reportDef?.icon || '📄'}</span>
+                      <div>
+                        <p className="font-medium text-gray-900">{report.name}</p>
+                        <p className="text-sm text-gray-500">Generated {formatDate(report.generatedAt)} • {report.format}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {report.format}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📅</span>
-                <div>
-                  <p className="font-medium text-gray-900">Roll-off Report</p>
-                  <p className="text-sm text-gray-500">Generated Dec 13, 2025 at 9:00 AM</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm">
-                ↓ Download
-              </Button>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
+    </MainLayout>
   );
 }
 
