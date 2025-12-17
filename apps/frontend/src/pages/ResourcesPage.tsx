@@ -67,27 +67,49 @@ function getSkillNames(skills: SkillItem[] | undefined | null): string[] {
 interface Resource {
   id: string;
   employeeId: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  role: string;
-  department: string;
+  designation?: string;
+  department?: string;
   skills: SkillItem[];
-  availability: string;
-  costRate: number;
-  billRate: number;
-  location: string;
-  startDate: string;
+  capacity?: number;
+  currentUtilization?: number;
+  isOnBench?: boolean;
+  costPerHour?: number;
+  billRateDefault?: number;
+  location?: { id: string; name: string; code: string };
+  practice?: { id: string; name: string; code: string };
+  dateOfJoining?: string;
   status: string;
-  manager?: string;
+  manager?: { id: string; firstName: string; lastName: string };
   phone?: string;
-  certifications?: string[];
-  yearsOfExperience?: number;
+  band?: string;
+  tags?: string[];
 }
 
 interface Skill {
   id: string;
   name: string;
   category: string;
+}
+
+// Form data interface (for the modal form)
+interface ResourceFormData {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  designation: string;
+  department: string;
+  phone: string;
+  band: string;
+  capacity: number;
+  costPerHour: number;
+  billRateDefault: number;
+  dateOfJoining: string;
+  status: string;
+  skills: string[];
 }
 
 // Resource Form Modal Component
@@ -102,61 +124,61 @@ function ResourceFormModal({
   isOpen: boolean;
   onClose: () => void;
   resource?: Resource | null;
-  onSubmit: (data: Partial<Resource>) => void;
+  onSubmit: (data: Partial<ResourceFormData>) => void;
   isLoading: boolean;
   skills: Skill[];
 }) {
-  const [formData, setFormData] = useState<Partial<Resource>>({
+  const [formData, setFormData] = useState<ResourceFormData>({
     employeeId: '',
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
-    role: '',
+    designation: '',
     department: '',
-    skills: [],
-    availability: 'full-time',
-    costRate: 0,
-    billRate: 0,
-    location: '',
-    startDate: new Date().toISOString().split('T')[0],
-    status: 'active',
-    manager: '',
     phone: '',
+    band: 'E1-E2',
+    capacity: 100,
+    costPerHour: 0,
+    billRateDefault: 0,
+    dateOfJoining: new Date().toISOString().split('T')[0],
+    status: 'ACTIVE',
+    skills: [],
   });
 
   useEffect(() => {
     if (resource) {
       setFormData({
         employeeId: resource.employeeId || '',
-        name: resource.name || '',
+        firstName: resource.firstName || '',
+        lastName: resource.lastName || '',
         email: resource.email || '',
-        role: resource.role || '',
-        department: resource.department || '',
-        skills: getSkillNames(resource.skills),
-        availability: resource.availability || 'full-time',
-        costRate: resource.costRate || 0,
-        billRate: resource.billRate || 0,
-        location: resource.location || '',
-        startDate: resource.startDate?.split('T')[0] || '',
-        status: resource.status || 'active',
-        manager: resource.manager || '',
+        designation: resource.designation || '',
+        department: resource.practice?.name || '',
         phone: resource.phone || '',
+        band: resource.band || 'E1-E2',
+        capacity: resource.capacity || 100,
+        costPerHour: resource.costPerHour || 0,
+        billRateDefault: resource.billRateDefault || 0,
+        dateOfJoining: resource.dateOfJoining?.split('T')[0] || '',
+        status: resource.status || 'ACTIVE',
+        skills: getSkillNames(resource.skills),
       });
     } else {
       setFormData({
         employeeId: '',
-        name: '',
+        firstName: '',
+        lastName: '',
         email: '',
-        role: '',
+        designation: '',
         department: '',
-        skills: [],
-        availability: 'full-time',
-        costRate: 0,
-        billRate: 0,
-        location: '',
-        startDate: new Date().toISOString().split('T')[0],
-        status: 'active',
-        manager: '',
         phone: '',
+        band: 'E1-E2',
+        capacity: 100,
+        costPerHour: 0,
+        billRateDefault: 0,
+        dateOfJoining: new Date().toISOString().split('T')[0],
+        status: 'ACTIVE',
+        skills: [],
       });
     }
   }, [resource, isOpen]);
@@ -191,22 +213,31 @@ function ResourceFormModal({
                 <Input
                   value={formData.employeeId}
                   onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-                  placeholder="EMP001"
+                  placeholder="NVS00001"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                 <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="John Doe"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  placeholder="John"
                   required
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                <Input
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  placeholder="Doe"
+                  required
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <Input
@@ -217,76 +248,66 @@ function ResourceFormModal({
                   required
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 <Input
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="+91 9876543210"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Designation *</label>
                 <select
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  value={formData.designation}
+                  onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
                   required
                 >
-                  <option value="">Select Role</option>
-                  <option value="Developer">Developer</option>
-                  <option value="Senior Developer">Senior Developer</option>
+                  <option value="">Select Designation</option>
+                  <option value="Software Engineer">Software Engineer</option>
+                  <option value="Senior Software Engineer">Senior Software Engineer</option>
                   <option value="Tech Lead">Tech Lead</option>
                   <option value="Architect">Architect</option>
-                  <option value="Designer">Designer</option>
                   <option value="Project Manager">Project Manager</option>
                   <option value="Business Analyst">Business Analyst</option>
                   <option value="QA Engineer">QA Engineer</option>
                   <option value="DevOps Engineer">DevOps Engineer</option>
+                  <option value="Data Engineer">Data Engineer</option>
                   <option value="Data Scientist">Data Scientist</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
-                <select
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  required
-                >
-                  <option value="">Select Department</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Design">Design</option>
-                  <option value="Product">Product</option>
-                  <option value="Data">Data</option>
-                  <option value="Operations">Operations</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Sales">Sales</option>
-                  <option value="HR">HR</option>
-                  <option value="Finance">Finance</option>
-                </select>
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
-                <Input
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="New York, NY"
+                <label className="block text-sm font-medium text-gray-700 mb-1">Band *</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={formData.band}
+                  onChange={(e) => setFormData({ ...formData, band: e.target.value })}
                   required
-                />
+                >
+                  <option value="E1-E2">E1-E2 (Entry)</option>
+                  <option value="E3-E4">E3-E4 (Mid)</option>
+                  <option value="M1-M2">M1-M2 (Senior)</option>
+                  <option value="M3+">M3+ (Lead/Manager)</option>
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Capacity %</label>
                 <Input
-                  value={formData.manager}
-                  onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
-                  placeholder="Jane Smith"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.capacity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, capacity: parseInt(e.target.value) || 100 })
+                  }
+                  placeholder="100"
                 />
               </div>
             </div>
@@ -294,51 +315,45 @@ function ResourceFormModal({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cost Rate ($/hr) *
+                  Cost Rate ($/hr)
                 </label>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.costRate}
+                  value={formData.costPerHour}
                   onChange={(e) =>
-                    setFormData({ ...formData, costRate: parseFloat(e.target.value) || 0 })
+                    setFormData({ ...formData, costPerHour: parseFloat(e.target.value) || 0 })
                   }
                   placeholder="75.00"
-                  required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bill Rate ($/hr) *
+                  Bill Rate ($/hr)
                 </label>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.billRate}
+                  value={formData.billRateDefault}
                   onChange={(e) =>
-                    setFormData({ ...formData, billRate: parseFloat(e.target.value) || 0 })
+                    setFormData({ ...formData, billRateDefault: parseFloat(e.target.value) || 0 })
                   }
                   placeholder="150.00"
-                  required
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
-                <select
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  value={formData.availability}
-                  onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
-                >
-                  <option value="full-time">Full Time</option>
-                  <option value="part-time">Part Time</option>
-                  <option value="contract">Contract</option>
-                  <option value="bench">On Bench</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Joining *</label>
+                <Input
+                  type="date"
+                  value={formData.dateOfJoining}
+                  onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
+                  required
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -347,22 +362,11 @@ function ResourceFormModal({
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="on-leave">On Leave</option>
-                  <option value="terminated">Terminated</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                  <option value="NOTICE">On Notice</option>
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
-              <Input
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                required
-              />
             </div>
 
             <div>
@@ -421,7 +425,7 @@ export default function ResourcesPage() {
     status: '',
   });
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Resource;
+    key: string;
     direction: 'asc' | 'desc';
   } | null>(null);
 
@@ -439,8 +443,10 @@ export default function ResourcesPage() {
   } = useQuery({
     queryKey: ['resources', showInactive],
     queryFn: async () => {
-      // Pass includeInactive parameter to API
-      return api.get<{ data: Resource[] }>(`/resources?includeInactive=${showInactive}`);
+      // Pass includeInactive parameter and higher limit to API
+      return api.get<{ data: Resource[]; pagination: { total: number; page: number; limit: number } }>(
+        `/resources?includeInactive=${showInactive}&limit=1000`
+      );
     },
   });
 
@@ -508,33 +514,42 @@ export default function ResourcesPage() {
       const search = searchTerm.toLowerCase();
       result = result.filter(
         (resource) =>
-          resource.name?.toLowerCase().includes(search) ||
+          resource.firstName?.toLowerCase().includes(search) ||
+          resource.lastName?.toLowerCase().includes(search) ||
           resource.email?.toLowerCase().includes(search) ||
           resource.employeeId?.toLowerCase().includes(search) ||
-          resource.role?.toLowerCase().includes(search) ||
+          resource.designation?.toLowerCase().includes(search) ||
           getSkillNames(resource.skills).some((skill) => skill.toLowerCase().includes(search))
       );
     }
 
     // Apply filters
     if (filters.department) {
-      result = result.filter((r) => r.department === filters.department);
+      result = result.filter((r) => r.practice?.name === filters.department);
     }
     if (filters.role) {
-      result = result.filter((r) => r.role === filters.role);
+      result = result.filter((r) => r.designation === filters.role);
     }
     if (filters.availability) {
-      result = result.filter((r) => r.availability === filters.availability);
+      // bench filter
+      if (filters.availability === 'bench') {
+        result = result.filter((r) => r.isOnBench);
+      }
     }
     if (filters.status) {
-      result = result.filter((r) => r.status === filters.status);
+      result = result.filter((r) => r.status?.toUpperCase() === filters.status.toUpperCase());
     }
 
     // Sort
     if (sortConfig) {
       result.sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
+        let aValue: any;
+        let bValue: any;
+        
+        // Handle compound fields like name (firstName + lastName)
+        aValue = (a as any)[sortConfig.key];
+        bValue = (b as any)[sortConfig.key];
+        
         if (aValue === undefined || aValue === null) return 1;
         if (bValue === undefined || bValue === null) return -1;
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -547,7 +562,7 @@ export default function ResourcesPage() {
   }, [resources, searchTerm, filters, sortConfig]);
 
   // Handlers
-  const handleSort = (key: keyof Resource) => {
+  const handleSort = (key: string) => {
     setSortConfig((current) => {
       if (current?.key === key) {
         return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
@@ -559,13 +574,13 @@ export default function ResourcesPage() {
   const handleExport = () => {
     const headers = [
       'Employee ID',
-      'Name',
+      'First Name',
+      'Last Name',
       'Email',
-      'Role',
-      'Department',
+      'Designation',
+      'Practice',
       'Skills',
-      'Availability',
-      'Cost Rate',
+      'Utilization %',
       'Bill Rate',
       'Location',
       'Status',
@@ -575,15 +590,15 @@ export default function ResourcesPage() {
       ...filteredResources.map((r) =>
         [
           r.employeeId,
-          r.name,
+          r.firstName,
+          r.lastName,
           r.email,
-          r.role,
-          r.department,
+          r.designation || '',
+          r.practice?.name || '',
           `"${getSkillNames(r.skills).join('; ')}"`,
-          r.availability,
-          r.costRate,
-          r.billRate,
-          r.location,
+          r.currentUtilization || 0,
+          r.billRateDefault || 0,
+          r.location?.name || '',
           r.status,
         ].join(',')
       ),
@@ -625,38 +640,29 @@ export default function ResourcesPage() {
   };
 
   // Get unique values for filters
-  const uniqueDepartments = [...new Set(resources.map((r) => r.department).filter(Boolean))];
-  const uniqueRoles = [...new Set(resources.map((r) => r.role).filter(Boolean))];
+  const uniqueDepartments = [...new Set(resources.map((r) => r.practice?.name).filter(Boolean))];
+  const uniqueDesignations = [...new Set(resources.map((r) => r.designation).filter(Boolean))];
 
   // Statistics
   const stats = {
-    total: resources.length,
-    active: resources.filter((r) => r.status === 'active').length,
-    onBench: resources.filter((r) => r.availability === 'bench').length,
+    total: resourcesData?.pagination?.total || resources.length,
+    active: resources.filter((r) => r.status?.toUpperCase() === 'ACTIVE').length,
+    onBench: resources.filter((r) => r.isOnBench).length,
     avgBillRate:
       resources.length > 0
-        ? resources.reduce((sum, r) => sum + (r.billRate || 0), 0) / resources.length
+        ? resources.reduce((sum, r) => sum + (r.billRateDefault || 0), 0) / resources.length
         : 0,
   };
 
   const getStatusBadge = (status: string) => {
+    const upperStatus = status?.toUpperCase();
     const styles: Record<string, string> = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      'on-leave': 'bg-yellow-100 text-yellow-800',
-      terminated: 'bg-red-100 text-red-800',
+      ACTIVE: 'bg-green-100 text-green-800',
+      INACTIVE: 'bg-gray-100 text-gray-800',
+      NOTICE: 'bg-yellow-100 text-yellow-800',
+      TERMINATED: 'bg-red-100 text-red-800',
     };
-    return styles[status] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getAvailabilityBadge = (availability: string) => {
-    const styles: Record<string, string> = {
-      'full-time': 'bg-blue-100 text-blue-800',
-      'part-time': 'bg-purple-100 text-purple-800',
-      contract: 'bg-orange-100 text-orange-800',
-      bench: 'bg-red-100 text-red-800',
-    };
-    return styles[availability] || 'bg-gray-100 text-gray-800';
+    return styles[upperStatus] || 'bg-gray-100 text-gray-800';
   };
 
   if (error) {
@@ -790,13 +796,13 @@ export default function ResourcesPage() {
             {showFilters && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Practice</label>
                   <select
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                     value={filters.department}
                     onChange={(e) => setFilters({ ...filters, department: e.target.value })}
                   >
-                    <option value="">All Departments</option>
+                    <option value="">All Practices</option>
                     {uniqueDepartments.map((dept) => (
                       <option key={dept} value={dept}>
                         {dept}
@@ -805,16 +811,16 @@ export default function ResourcesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Designation</label>
                   <select
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                     value={filters.role}
                     onChange={(e) => setFilters({ ...filters, role: e.target.value })}
                   >
-                    <option value="">All Roles</option>
-                    {uniqueRoles.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
+                    <option value="">All Designations</option>
+                    {uniqueDesignations.map((designation) => (
+                      <option key={designation} value={designation}>
+                        {designation}
                       </option>
                     ))}
                   </select>
@@ -829,9 +835,6 @@ export default function ResourcesPage() {
                     onChange={(e) => setFilters({ ...filters, availability: e.target.value })}
                   >
                     <option value="">All</option>
-                    <option value="full-time">Full Time</option>
-                    <option value="part-time">Part Time</option>
-                    <option value="contract">Contract</option>
                     <option value="bench">On Bench</option>
                   </select>
                 </div>
@@ -843,10 +846,9 @@ export default function ResourcesPage() {
                     onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                   >
                     <option value="">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="on-leave">On Leave</option>
-                    <option value="terminated">Terminated</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="NOTICE">On Notice</option>
                   </select>
                 </div>
                 <div className="md:col-span-4 flex justify-end">
@@ -917,11 +919,11 @@ export default function ResourcesPage() {
                     </th>
                     <th
                       className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('name')}
+                      onClick={() => handleSort('firstName')}
                     >
                       <div className="flex items-center gap-1">
                         Name
-                        {sortConfig?.key === 'name' &&
+                        {sortConfig?.key === 'firstName' &&
                           (sortConfig.direction === 'asc' ? (
                             <ChevronUp className="h-4 w-4" />
                           ) : (
@@ -931,15 +933,12 @@ export default function ResourcesPage() {
                     </th>
                     <th
                       className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('role')}
+                      onClick={() => handleSort('designation')}
                     >
                       Role
                     </th>
-                    <th
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('department')}
-                    >
-                      Department
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+                      Practice
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Skills</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
@@ -947,7 +946,7 @@ export default function ResourcesPage() {
                     </th>
                     <th
                       className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('billRate')}
+                      onClick={() => handleSort('billRateDefault')}
                     >
                       Bill Rate
                     </th>
@@ -959,8 +958,11 @@ export default function ResourcesPage() {
                 </thead>
                 <tbody className="divide-y">
                   {filteredResources.map((resource) => {
-                    const isInactive = resource.status?.toLowerCase() === 'inactive' || 
-                                       resource.status?.toLowerCase() === 'terminated';
+                    const isInactive = resource.status?.toUpperCase() === 'INACTIVE' || 
+                                       resource.status?.toUpperCase() === 'TERMINATED';
+                    const fullName = `${resource.firstName || ''} ${resource.lastName || ''}`.trim();
+                    const utilization = resource.currentUtilization ?? 0;
+                    const isOnBench = resource.isOnBench;
                     return (
                     <tr 
                       key={resource.id} 
@@ -970,14 +972,14 @@ export default function ResourcesPage() {
                       <td className="px-4 py-3">
                         <div>
                           <p className={`text-sm font-medium ${isInactive ? 'text-gray-500' : 'text-gray-900'}`}>
-                            {resource.name}
+                            {fullName}
                             {isInactive && <span className="ml-2 text-xs text-red-500">(Former)</span>}
                           </p>
                           <p className="text-sm text-gray-500">{resource.email}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{resource.role}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{resource.department}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{resource.designation || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{resource.practice?.name || '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {(resource.skills || []).slice(0, 3).map((skill, index) => {
@@ -1005,14 +1007,18 @@ export default function ResourcesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${getAvailabilityBadge(resource.availability)}`}
-                        >
-                          {resource.availability}
-                        </span>
+                        {isOnBench ? (
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                            On Bench
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                            {utilization}% Allocated
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        ${resource.billRate?.toFixed(0) || 0}/hr
+                        ${resource.billRateDefault?.toFixed(0) || 0}/hr
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -1093,7 +1099,7 @@ export default function ResourcesPage() {
         }}
         onConfirm={handleDeleteResource}
         title="Delete Resource"
-        description={`Are you sure you want to delete "${selectedResource?.name}"? This action cannot be undone and will remove all associated data.`}
+        description={`Are you sure you want to delete "${selectedResource?.firstName} ${selectedResource?.lastName}"? This action cannot be undone and will remove all associated data.`}
         confirmLabel="Delete"
         cancelLabel="Cancel"
         variant="danger"
