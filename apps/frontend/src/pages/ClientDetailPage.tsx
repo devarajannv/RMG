@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,14 @@ interface Client {
   _count: { contracts: number; projects: number };
 }
 
+interface Currency {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  isBase: boolean;
+}
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -57,6 +65,48 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'contracts' | 'projects'>('overview');
+
+  // Currency state
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [baseCurrency] = useState<string>('INR');
+
+  useEffect(() => {
+    loadCurrencies();
+  }, []);
+
+  async function loadCurrencies() {
+    try {
+      const res = await api.get<Currency[]>('/currency/currencies');
+      setCurrencies(res || []);
+      const base = res?.find((c: Currency) => c.isBase) || res?.find((c: Currency) => c.code === 'INR');
+      if (base) setSelectedCurrency(base);
+    } catch (err) {
+      setSelectedCurrency({ id: '', code: 'INR', name: 'Indian Rupee', symbol: '₹', isBase: true });
+    }
+  }
+
+  const loadExchangeRate = useCallback(async () => {
+    if (!selectedCurrency || selectedCurrency.code === baseCurrency) {
+      setExchangeRate(1);
+      return;
+    }
+    try {
+      const res = await api.post<{ rate: number }>('/currency/exchange-rates/convert', {
+        amount: 1,
+        fromCurrency: baseCurrency,
+        toCurrency: selectedCurrency.code,
+      });
+      setExchangeRate(res.rate || 1);
+    } catch {
+      setExchangeRate(1);
+    }
+  }, [selectedCurrency, baseCurrency]);
+
+  useEffect(() => {
+    loadExchangeRate();
+  }, [loadExchangeRate]);
 
   useEffect(() => {
     if (id) {
@@ -105,9 +155,19 @@ export default function ClientDetailPage() {
   }
 
   function formatCurrency(value: number) {
-    if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
-    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
-    return `₹${value.toLocaleString()}`;
+    const converted = value * exchangeRate;
+    const symbol = selectedCurrency?.symbol || '₹';
+    const code = selectedCurrency?.code || 'INR';
+    
+    if (code === 'INR') {
+      if (converted >= 10000000) return `${symbol}${(converted / 10000000).toFixed(1)}Cr`;
+      if (converted >= 100000) return `${symbol}${(converted / 100000).toFixed(1)}L`;
+      return `${symbol}${converted.toLocaleString()}`;
+    } else {
+      if (converted >= 1000000) return `${symbol}${(converted / 1000000).toFixed(1)}M`;
+      if (converted >= 1000) return `${symbol}${(converted / 1000).toFixed(1)}K`;
+      return `${symbol}${converted.toLocaleString()}`;
+    }
   }
 
   if (loading) {

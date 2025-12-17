@@ -1133,4 +1133,168 @@ model AgentMessage {
   @@index([conversationId, timestamp])
 }
 
+// =============================================================================
+// AI MIGRATION TOOL
+// =============================================================================
+model ImportJob {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  userId          String    @db.Uuid
+  
+  // Job Identity
+  name            String    @db.VarChar(200)
+  description     String?
+  
+  // Source File
+  sourceFileName  String    @db.VarChar(255)
+  sourceFileType  String    @db.VarChar(50)   // CSV, XLSX, JSON, PDF, IMAGE
+  sourceFileSize  Int
+  sourceFilePath  String    @db.VarChar(500)
+  
+  // Import Configuration
+  importPurpose   ImportPurpose @default(MIGRATION)
+  duplicateAction DuplicateAction @default(SKIP)
+  
+  // AI Analysis
+  detectedEntities Json?    // { resources: 500, allocations: 200, ... }
+  fieldMappings   Json?     // AI-suggested mappings
+  dependencyOrder Json?     // Order to import entities
+  referencesToCreate Json?  // Missing references to auto-create
+  
+  // Autonomy Level (earned over time)
+  autonomyLevel   Int       @default(1)  // 1=confirm all, 2=auto high-confidence, 3=full auto
+  sourceFingerprint String? @db.VarChar(64)  // Hash to identify same source format
+  
+  // Processing Status
+  status          ImportJobStatus @default(PENDING_ANALYSIS)
+  analysisStarted DateTime?
+  analysisCompleted DateTime?
+  importStarted   DateTime?
+  importCompleted DateTime?
+  
+  // Results
+  totalRecords    Int       @default(0)
+  importedRecords Int       @default(0)
+  skippedRecords  Int       @default(0)
+  errorRecords    Int       @default(0)
+  
+  // Auto-created references
+  autoCreatedRefs Json?     // { practices: ['AI & ML'], locations: ['Coimbatore'] }
+  
+  // Rollback
+  canRollback     Boolean   @default(true)
+  rollbackExpires DateTime?
+  rolledBackAt    DateTime?
+  rolledBackBy    String?   @db.Uuid
+  
+  // Audit
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  records         ImportJobRecord[]
+  mappings        ImportMapping[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, sourceFingerprint])
+}
+
+enum ImportPurpose {
+  MIGRATION       // First-time bulk load - skip duplicates
+  SYNC            // Refresh from HR system - update duplicates
+  MANUAL          // Ad-hoc upload - flag duplicates
+}
+
+enum DuplicateAction {
+  SKIP            // Keep existing, ignore incoming
+  UPDATE          // Overwrite existing with incoming
+  FLAG            // Mark for user review
+}
+
+enum ImportJobStatus {
+  PENDING_ANALYSIS    // File uploaded, waiting for AI analysis
+  ANALYZING           // AI analyzing file
+  PENDING_APPROVAL    // Waiting for user to approve mappings/refs
+  APPROVED            // User approved, ready to import
+  IMPORTING           // Import in progress
+  COMPLETED           // Import finished
+  COMPLETED_WITH_ERRORS // Import finished with some errors
+  FAILED              // Import failed
+  ROLLED_BACK         // Import was rolled back
+}
+
+model ImportMapping {
+  id              String    @id @default(uuid()) @db.Uuid
+  importJobId     String    @db.Uuid
+  importJob       ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  
+  // Source Column
+  sourceColumn    String    @db.VarChar(100)
+  sourceSampleValues Json?  // First few values for preview
+  
+  // Target Field
+  targetEntity    String    @db.VarChar(50)   // resource, project, allocation, etc.
+  targetField     String    @db.VarChar(100)
+  
+  // AI Confidence
+  confidence      Decimal   @db.Decimal(3, 2) // 0.00 to 1.00
+  aiReasoning     String?   @db.VarChar(500)  // Why AI made this mapping
+  
+  // User Override
+  userApproved    Boolean   @default(false)
+  userOverridden  Boolean   @default(false)
+  
+  // Transformation
+  transformationType String? @db.VarChar(50)  // DATE_PARSE, LOOKUP, UPPERCASE, etc.
+  transformationConfig Json? // Config for transformation
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([importJobId, sourceColumn])
+  @@index([importJobId])
+}
+
+model ImportJobRecord {
+  id              String    @id @default(uuid()) @db.Uuid
+  importJobId     String    @db.Uuid
+  importJob       ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  
+  // Source Data
+  rowNumber       Int
+  sourceData      Json      // Original row data
+  
+  // Target
+  targetEntity    String    @db.VarChar(50)
+  targetId        String?   @db.Uuid  // ID of created/updated record
+  
+  // Processing
+  status          ImportRecordStatus @default(PENDING)
+  confidence      Decimal?  @db.Decimal(3, 2)
+  
+  // Errors/Warnings
+  errors          Json?     // Array of error messages
+  warnings        Json?     // Array of warning messages
+  
+  // For rollback
+  previousData    Json?     // Data before update (for rollback)
+  wasCreated      Boolean   @default(false) // true if new record, false if update
+  
+  createdAt       DateTime  @default(now())
+
+  @@index([importJobId, status])
+  @@index([importJobId, targetEntity])
+}
+
+enum ImportRecordStatus {
+  PENDING         // Waiting to be processed
+  PROCESSING      // Currently being processed
+  IMPORTED        // Successfully imported
+  UPDATED         // Successfully updated existing
+  SKIPPED         // Skipped (duplicate, etc.)
+  ERROR           // Failed with error
+  FLAGGED         // Flagged for user review
+}
+
 

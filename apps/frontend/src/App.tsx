@@ -219,7 +219,22 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster />
-      {/* AI Agent components - only show when authenticated */}
+      {/* AI Agent components - rendered conditionally inside */}
+      <AuthenticatedAgentWidgets />
+    </>
+  );
+}
+
+// Only render AI widgets when authenticated
+function AuthenticatedAgentWidgets() {
+  const { isAuthenticated, hasHydrated } = useAuthStore();
+  
+  if (!hasHydrated || !isAuthenticated) {
+    return null;
+  }
+  
+  return (
+    <>
       <AgentWidget />
       <CommandPalette />
     </>

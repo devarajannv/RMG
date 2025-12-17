@@ -40,7 +40,7 @@ const navItems = [
   { icon: BarChart3, label: 'Reports', href: '/reports' },
   { icon: Clock, label: 'Timesheets', href: '/timesheets' },
   { icon: PieChart, label: 'Analytics', href: '/analytics' },
-  { icon: Database, label: 'Data Management', href: '/export-import' },
+  { icon: Database, label: 'Data Management', href: '/data-management' },
   { icon: Settings, label: 'Settings', href: '/settings' },
 ];
 

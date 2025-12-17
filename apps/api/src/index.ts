@@ -29,6 +29,7 @@ import { currencyRoutes } from './modules/currency';
 import { roleRoutes } from './modules/roles';
 import { documentRoutes } from './modules/documents';
 import { agentRoutes } from './modules/agent';
+import { aiMigrationRoutes } from './modules/ai-migration';
 
 const app = express();
 
@@ -125,6 +126,7 @@ app.use('/api/v1/currency', currencyRoutes);
 app.use('/api/v1/roles', roleRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/agent', agentRoutes);
+app.use('/api/v1/ai-migration', aiMigrationRoutes);
 
 // Error handling
 app.use(errorHandler);

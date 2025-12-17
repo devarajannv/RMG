@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
   Plus,
@@ -14,11 +15,35 @@ import {
   Building2,
   Calendar,
   DollarSign,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  X,
+  ChevronUp,
+  ChevronDown,
+  Play,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+  ConfirmDialog,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import MainLayout from '@/components/layout/MainLayout';
@@ -33,16 +58,31 @@ interface Contract {
   name: string;
   type: 'MSA' | 'SOW' | 'AMENDMENT' | 'NDA' | 'OTHER';
   status: 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED' | 'RENEWED';
+  description?: string;
   startDate: string;
   endDate?: string;
   signedDate?: string;
   value?: number;
   currency: string;
   billingType: 'TM' | 'FIXED' | 'RETAINER' | 'MILESTONE' | 'HYBRID';
+  paymentTerms?: string;
   autoRenew: boolean;
+  notes?: string;
   client: { id: string; name: string; code: string };
   accountManager?: { id: string; firstName: string; lastName: string };
   _count?: { projects: number };
+}
+
+interface Client {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface Resource {
+  id: string;
+  firstName: string;
+  lastName: string;
 }
 
 interface ContractStats {
@@ -113,15 +153,360 @@ function getDaysUntilExpiry(endDate?: string): number | null {
 }
 
 // ============================================================================
+// Contract Form Modal Component
+// ============================================================================
+
+function ContractFormModal({
+  isOpen,
+  onClose,
+  contract,
+  onSubmit,
+  isLoading,
+  clients,
+  managers,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  contract?: Contract | null;
+  onSubmit: (data: any) => void;
+  isLoading: boolean;
+  clients: Client[];
+  managers: Resource[];
+}) {
+  const [formData, setFormData] = useState({
+    clientId: '',
+    contractNumber: '',
+    name: '',
+    type: 'SOW' as Contract['type'],
+    status: 'DRAFT' as Contract['status'],
+    description: '',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
+    signedDate: '',
+    value: 0,
+    currency: 'INR',
+    billingType: 'TM' as Contract['billingType'],
+    paymentTerms: 'Net 30',
+    autoRenew: false,
+    accountMgrId: '',
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (contract) {
+      setFormData({
+        clientId: contract.client?.id || '',
+        contractNumber: contract.contractNumber || '',
+        name: contract.name || '',
+        type: contract.type || 'SOW',
+        status: contract.status || 'DRAFT',
+        description: contract.description || '',
+        startDate: contract.startDate?.split('T')[0] || '',
+        endDate: contract.endDate?.split('T')[0] || '',
+        signedDate: contract.signedDate?.split('T')[0] || '',
+        value: contract.value || 0,
+        currency: contract.currency || 'INR',
+        billingType: contract.billingType || 'TM',
+        paymentTerms: contract.paymentTerms || 'Net 30',
+        autoRenew: contract.autoRenew || false,
+        accountMgrId: contract.accountManager?.id || '',
+        notes: contract.notes || '',
+      });
+    } else {
+      setFormData({
+        clientId: '',
+        contractNumber: '',
+        name: '',
+        type: 'SOW',
+        status: 'DRAFT',
+        description: '',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        signedDate: '',
+        value: 0,
+        currency: 'INR',
+        billingType: 'TM',
+        paymentTerms: 'Net 30',
+        autoRenew: false,
+        accountMgrId: '',
+        notes: '',
+      });
+    }
+  }, [contract, isOpen]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const submitData: any = {
+      clientId: formData.clientId,
+      contractNumber: formData.contractNumber,
+      name: formData.name,
+      type: formData.type,
+      billingType: formData.billingType,
+      startDate: new Date(formData.startDate),
+      currency: formData.currency,
+    };
+
+    if (formData.description) submitData.description = formData.description;
+    if (formData.endDate) submitData.endDate = new Date(formData.endDate);
+    if (formData.signedDate) submitData.signedDate = new Date(formData.signedDate);
+    if (formData.value > 0) submitData.value = formData.value;
+    if (formData.paymentTerms) submitData.paymentTerms = formData.paymentTerms;
+    if (formData.accountMgrId) submitData.accountMgrId = formData.accountMgrId;
+    if (formData.notes) submitData.notes = formData.notes;
+    submitData.autoRenew = formData.autoRenew;
+
+    if (contract) {
+      submitData.status = formData.status;
+    }
+
+    onSubmit(submitData);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{contract ? 'Edit Contract' : 'Create New Contract'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <DialogBody className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client *</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={formData.clientId}
+                  onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+                  required
+                  disabled={!!contract}
+                >
+                  <option value="">Select Client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name} ({client.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contract Number *
+                </label>
+                <Input
+                  value={formData.contractNumber}
+                  onChange={(e) => setFormData({ ...formData, contractNumber: e.target.value })}
+                  placeholder="CTR-2024-001"
+                  required
+                  disabled={!!contract}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contract Name *
+              </label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Project Implementation Agreement"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as Contract['type'] })}
+                  required
+                >
+                  {Object.entries(TYPE_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {contract && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as Contract['status'] })}
+                  >
+                    {Object.entries(STATUS_CONFIG).map(([key, { label }]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                rows={2}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Contract description..."
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                <Input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <Input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  min={formData.startDate}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Signed Date</label>
+                <Input
+                  type="date"
+                  value={formData.signedDate}
+                  onChange={(e) => setFormData({ ...formData, signedDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.value}
+                  onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={formData.currency}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                >
+                  <option value="INR">INR - Indian Rupee</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="GBP">GBP - British Pound</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Billing Type *</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={formData.billingType}
+                  onChange={(e) => setFormData({ ...formData, billingType: e.target.value as Contract['billingType'] })}
+                  required
+                >
+                  {Object.entries(BILLING_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={formData.paymentTerms}
+                  onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                >
+                  <option value="Net 15">Net 15</option>
+                  <option value="Net 30">Net 30</option>
+                  <option value="Net 45">Net 45</option>
+                  <option value="Net 60">Net 60</option>
+                  <option value="Due on Receipt">Due on Receipt</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Account Manager</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={formData.accountMgrId}
+                  onChange={(e) => setFormData({ ...formData, accountMgrId: e.target.value })}
+                >
+                  <option value="">Select Manager</option>
+                  {managers.map((manager) => (
+                    <option key={manager.id} value={manager.id}>
+                      {manager.firstName} {manager.lastName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="autoRenew"
+                checked={formData.autoRenew}
+                onChange={(e) => setFormData({ ...formData, autoRenew: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="autoRenew" className="text-sm text-gray-700">
+                Auto-renew contract
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                rows={2}
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes..."
+              />
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Saving...' : contract ? 'Update Contract' : 'Create Contract'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
 export default function ContractsPage() {
   const navigate = useNavigate();
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [stats, setStats] = useState<ContractStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,51 +516,211 @@ export default function ContractsPage() {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    loadData();
-  }, [page, statusFilter, typeFilter]);
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
 
-  async function loadData() {
-    setLoading(true);
-    setError(null);
+  // Build query params
+  const queryParams = new URLSearchParams();
+  queryParams.set('page', String(page));
+  queryParams.set('limit', '20');
+  if (searchTerm) queryParams.set('search', searchTerm);
+  if (statusFilter) queryParams.set('status', statusFilter);
+  if (typeFilter) queryParams.set('type', typeFilter);
 
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '20',
-        ...(searchTerm && { search: searchTerm }),
-        ...(statusFilter && { status: statusFilter }),
-        ...(typeFilter && { type: typeFilter }),
-      });
+  // Fetch contracts
+  const { data: contractsData, isLoading } = useQuery({
+    queryKey: ['contracts', { page, searchTerm, statusFilter, typeFilter }],
+    queryFn: () => api.get<{ data: Contract[]; pagination: any }>(`/contracts?${queryParams.toString()}`),
+  });
 
-      const [contractsRes, statsRes] = await Promise.all([
-        api.get<{ data: Contract[]; pagination: { totalPages: number } }>(`/contracts?${params}`),
-        api.get<{ data: ContractStats }>('/contracts/stats/summary'),
-      ]);
+  // Fetch stats
+  const { data: statsData } = useQuery({
+    queryKey: ['contracts-stats'],
+    queryFn: () => api.get<{ data: ContractStats }>('/contracts/stats/summary'),
+  });
 
-      setContracts(contractsRes.data);
-      setTotalPages(contractsRes.pagination.totalPages);
-      setStats(statsRes.data);
-    } catch (err) {
-      console.error('Failed to load contracts:', err);
-      setError('Failed to load contracts');
-    } finally {
-      setLoading(false);
+  // Fetch clients for form
+  const { data: clientsData } = useQuery({
+    queryKey: ['clients-list'],
+    queryFn: () => api.get<{ data: Client[] }>('/clients?limit=100'),
+  });
+
+  // Fetch resources for manager selection
+  const { data: resourcesData } = useQuery({
+    queryKey: ['resources-list'],
+    queryFn: () => api.get<{ data: Resource[] }>('/resources?limit=100'),
+  });
+
+  const contracts: Contract[] = contractsData?.data ?? [];
+  const pagination = contractsData?.pagination;
+  const stats: ContractStats | null = statsData?.data ?? null;
+  const clients: Client[] = clientsData?.data ?? [];
+  const managers: Resource[] = resourcesData?.data ?? [];
+
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await api.post('/contracts', data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['contracts-stats'] });
+      setShowAddModal(false);
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || error.message || 'Failed to create contract');
+    },
+  });
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await api.put(`/contracts/${id}`, data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['contracts-stats'] });
+      setShowEditModal(false);
+      setSelectedContract(null);
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || error.message || 'Failed to update contract');
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/contracts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['contracts-stats'] });
+      setShowDeleteDialog(false);
+      setSelectedContract(null);
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || error.message || 'Failed to delete contract');
+    },
+  });
+
+  // Activate mutation
+  const activateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post(`/contracts/${id}/activate`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['contracts-stats'] });
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || error.message || 'Failed to activate contract');
+    },
+  });
+
+  // Handlers
+  const handleCreateContract = (data: any) => {
+    createMutation.mutate(data);
+  };
+
+  const handleUpdateContract = (data: any) => {
+    if (selectedContract) {
+      const { clientId, contractNumber, ...updateData } = data;
+      updateMutation.mutate({ id: selectedContract.id, data: updateData });
     }
-  }
+  };
 
-  function handleSearch() {
+  const handleDeleteContract = () => {
+    if (selectedContract) {
+      deleteMutation.mutate(selectedContract.id);
+    }
+  };
+
+  const handleActivateContract = (contract: Contract, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    activateMutation.mutate(contract.id);
+  };
+
+  const openEditModal = (contract: Contract, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedContract(contract);
+    setShowEditModal(true);
+  };
+
+  const openDeleteDialog = (contract: Contract, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedContract(contract);
+    setShowDeleteDialog(true);
+  };
+
+  const handleExport = () => {
+    const headers = [
+      'Contract Number',
+      'Name',
+      'Client',
+      'Type',
+      'Status',
+      'Billing Type',
+      'Start Date',
+      'End Date',
+      'Value',
+      'Currency',
+    ];
+    const csvContent = [
+      headers.join(','),
+      ...contracts.map((c) =>
+        [
+          c.contractNumber,
+          `"${c.name}"`,
+          c.client.name,
+          c.type,
+          c.status,
+          c.billingType,
+          c.startDate?.split('T')[0] || '',
+          c.endDate?.split('T')[0] || '',
+          c.value || '',
+          c.currency,
+        ].join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contracts-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const clearFilters = () => {
+    setStatusFilter('');
+    setTypeFilter('');
+    setSearchTerm('');
     setPage(1);
-    loadData();
-  }
+  };
+
+  const handleSearch = () => {
+    setPage(1);
+  };
 
   const StatusBadge = ({ status }: { status: Contract['status'] }) => {
     const config = STATUS_CONFIG[status];
     const Icon = config.icon;
     return (
-      <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium', config.color)}>
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
+          config.color
+        )}
+      >
         <Icon className="h-3 w-3" />
         {config.label}
       </span>
@@ -191,10 +736,16 @@ export default function ContractsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Contracts</h1>
             <p className="text-gray-500 text-sm">Manage client contracts and agreements</p>
           </div>
-          <Button onClick={() => navigate('/contracts/new')}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Contract
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button onClick={() => setShowAddModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Contract
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -226,13 +777,17 @@ export default function ContractsPage() {
             </Card>
             <Card className="border-l-4 border-l-red-500">
               <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-red-700">{stats.byStatus['EXPIRED'] || 0}</p>
+                <p className="text-2xl font-bold text-red-700">
+                  {stats.byStatus['EXPIRED'] || 0}
+                </p>
                 <p className="text-xs text-gray-500">Expired</p>
               </CardContent>
             </Card>
             <Card className="border-l-4 border-l-blue-500">
               <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-blue-700">{formatCurrency(stats.totalActiveValue)}</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(stats.totalActiveValue)}
+                </p>
                 <p className="text-xs text-gray-500">Active Value</p>
               </CardContent>
             </Card>
@@ -257,9 +812,17 @@ export default function ContractsPage() {
                 <Button onClick={handleSearch}>Search</Button>
               </div>
 
-              <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+              >
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
+                {showFilters ? (
+                  <ChevronUp className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                )}
               </Button>
             </div>
 
@@ -270,11 +833,16 @@ export default function ContractsPage() {
                   <select
                     className="border rounded-lg px-3 py-2 text-sm"
                     value={statusFilter}
-                    onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                    onChange={(e) => {
+                      setStatusFilter(e.target.value);
+                      setPage(1);
+                    }}
                   >
                     <option value="">All Statuses</option>
                     {Object.entries(STATUS_CONFIG).map(([key, { label }]) => (
-                      <option key={key} value={key}>{label}</option>
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -283,18 +851,21 @@ export default function ContractsPage() {
                   <select
                     className="border rounded-lg px-3 py-2 text-sm"
                     value={typeFilter}
-                    onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+                    onChange={(e) => {
+                      setTypeFilter(e.target.value);
+                      setPage(1);
+                    }}
                   >
                     <option value="">All Types</option>
                     {Object.entries(TYPE_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
                     ))}
                   </select>
                 </div>
-                <Button
-                  variant="ghost"
-                  onClick={() => { setStatusFilter(''); setTypeFilter(''); setPage(1); }}
-                >
+                <Button variant="ghost" onClick={clearFilters}>
+                  <X className="h-4 w-4 mr-1" />
                   Clear Filters
                 </Button>
               </div>
@@ -302,35 +873,27 @@ export default function ContractsPage() {
           </CardContent>
         </Card>
 
-        {/* Error State */}
-        {error && (
-          <div className="bg-red-50 text-red-700 p-4 rounded-lg">
-            {error}
-            <Button variant="link" onClick={loadData} className="ml-2">Retry</Button>
-          </div>
-        )}
-
         {/* Loading State */}
-        {loading && (
+        {isLoading && (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         )}
 
         {/* Contracts List */}
-        {!loading && contracts.length === 0 && (
+        {!isLoading && contracts.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
               <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No contracts found</p>
-              <Button className="mt-4" onClick={() => navigate('/contracts/new')}>
+              <Button className="mt-4" onClick={() => setShowAddModal(true)}>
                 Create First Contract
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {!loading && contracts.length > 0 && (
+        {!isLoading && contracts.length > 0 && (
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -350,7 +913,8 @@ export default function ContractsPage() {
                   <tbody className="divide-y divide-gray-100">
                     {contracts.map((contract) => {
                       const daysToExpiry = getDaysUntilExpiry(contract.endDate);
-                      const isExpiringSoon = daysToExpiry !== null && daysToExpiry > 0 && daysToExpiry <= 30;
+                      const isExpiringSoon =
+                        daysToExpiry !== null && daysToExpiry > 0 && daysToExpiry <= 30;
 
                       return (
                         <tr
@@ -416,13 +980,47 @@ export default function ContractsPage() {
                             </span>
                           </td>
                           <td className="p-4 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => { e.stopPropagation(); }}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    navigate(`/contracts/${contract.id}`);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openEditModal(contract)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                {contract.status === 'DRAFT' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleActivateContract(contract)}
+                                  >
+                                    <Play className="h-4 w-4 mr-2" />
+                                    Activate
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => openDeleteDialog(contract)}
+                                  destructive
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       );
@@ -432,10 +1030,10 @@ export default function ContractsPage() {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {pagination && pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between p-4 border-t">
                   <p className="text-sm text-gray-500">
-                    Page {page} of {totalPages}
+                    Page {page} of {pagination.totalPages}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -449,7 +1047,7 @@ export default function ContractsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={page === totalPages}
+                      disabled={page === pagination.totalPages}
                       onClick={() => setPage(page + 1)}
                     >
                       Next
@@ -472,21 +1070,65 @@ export default function ContractsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-orange-700 mb-3">
-                {stats.expiringSoon} contract(s) expiring within the next 30 days.
-                Review and take action to avoid service disruption.
+                {stats.expiringSoon} contract(s) expiring within the next 30 days. Review and take
+                action to avoid service disruption.
               </p>
               <Button
                 variant="outline"
                 className="border-orange-300 text-orange-700 hover:bg-orange-100"
-                onClick={() => { setStatusFilter('ACTIVE'); setShowFilters(true); }}
+                onClick={() => {
+                  setStatusFilter('ACTIVE');
+                  setShowFilters(true);
+                }}
               >
                 View Expiring Contracts
               </Button>
             </CardContent>
           </Card>
         )}
+
+        {/* Add Contract Modal */}
+        <ContractFormModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSubmit={handleCreateContract}
+          isLoading={createMutation.isPending}
+          clients={clients}
+          managers={managers}
+        />
+
+        {/* Edit Contract Modal */}
+        <ContractFormModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedContract(null);
+          }}
+          contract={selectedContract}
+          onSubmit={handleUpdateContract}
+          isLoading={updateMutation.isPending}
+          clients={clients}
+          managers={managers}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowDeleteDialog(false);
+              setSelectedContract(null);
+            }
+          }}
+          onConfirm={handleDeleteContract}
+          title="Delete Contract"
+          description={`Are you sure you want to delete "${selectedContract?.name}"? This action cannot be undone and will affect all linked projects.`}
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          loading={deleteMutation.isPending}
+        />
       </div>
     </MainLayout>
   );
 }
-

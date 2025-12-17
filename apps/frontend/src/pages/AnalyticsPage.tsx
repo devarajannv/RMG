@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
@@ -24,6 +24,14 @@ import {
 // ============================================================================
 // Types
 // ============================================================================
+
+interface Currency {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  isBase: boolean;
+}
 
 interface ExecutiveMetrics {
   summary: {
@@ -147,6 +155,59 @@ export default function AnalyticsPage() {
   const [projects, setProjects] = useState<ProjectHealthMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Currency state
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [baseCurrency, setBaseCurrency] = useState<string>('INR');
+
+  // Load currencies on mount
+  useEffect(() => {
+    loadCurrencies();
+  }, []);
+
+  async function loadCurrencies() {
+    try {
+      const res = await api.get<Currency[]>('/currency/currencies');
+      setCurrencies(res || []);
+      
+      // Find base currency (INR) and set as default
+      const base = res?.find((c: Currency) => c.isBase) || res?.find((c: Currency) => c.code === 'INR');
+      if (base) {
+        setSelectedCurrency(base);
+        setBaseCurrency(base.code);
+      }
+    } catch (err) {
+      console.error('Failed to load currencies:', err);
+      // Set INR as fallback
+      setSelectedCurrency({ id: '', code: 'INR', name: 'Indian Rupee', symbol: '₹', isBase: true });
+    }
+  }
+
+  // Update exchange rate when currency changes
+  const loadExchangeRate = useCallback(async () => {
+    if (!selectedCurrency || selectedCurrency.code === baseCurrency) {
+      setExchangeRate(1);
+      return;
+    }
+
+    try {
+      const res = await api.post<{ convertedAmount: number; rate: number }>('/currency/exchange-rates/convert', {
+        amount: 1,
+        fromCurrency: baseCurrency,
+        toCurrency: selectedCurrency.code,
+      });
+      setExchangeRate(res.rate || 1);
+    } catch (err) {
+      console.error('Failed to get exchange rate:', err);
+      setExchangeRate(1);
+    }
+  }, [selectedCurrency, baseCurrency]);
+
+  useEffect(() => {
+    loadExchangeRate();
+  }, [loadExchangeRate]);
+
   useEffect(() => {
     loadData();
   }, [activeTab]);
@@ -188,10 +249,23 @@ export default function AnalyticsPage() {
   }
 
   function formatCurrency(value: number): string {
-    if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
-    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
-    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
-    return `₹${value}`;
+    // Apply exchange rate conversion
+    const converted = value * exchangeRate;
+    const symbol = selectedCurrency?.symbol || '₹';
+    const code = selectedCurrency?.code || 'INR';
+    
+    // Format based on currency
+    if (code === 'INR') {
+      if (converted >= 10000000) return `${symbol}${(converted / 10000000).toFixed(1)}Cr`;
+      if (converted >= 100000) return `${symbol}${(converted / 100000).toFixed(1)}L`;
+      if (converted >= 1000) return `${symbol}${(converted / 1000).toFixed(1)}K`;
+      return `${symbol}${converted.toFixed(0)}`;
+    } else {
+      // For other currencies, use standard formatting
+      if (converted >= 1000000) return `${symbol}${(converted / 1000000).toFixed(1)}M`;
+      if (converted >= 1000) return `${symbol}${(converted / 1000).toFixed(1)}K`;
+      return `${symbol}${converted.toFixed(0)}`;
+    }
   }
 
   return (
@@ -205,9 +279,43 @@ export default function AnalyticsPage() {
             Comprehensive insights across organization
           </p>
         </div>
-        <Button onClick={() => { setExecutive(null); setPractice(null); setFinancial(null); setProjects(null); loadData(); }} variant="outline">
-          ↻ Refresh All
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Currency Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Currency:</span>
+            <select
+              value={selectedCurrency?.code || 'INR'}
+              onChange={(e) => {
+                const curr = currencies.find(c => c.code === e.target.value);
+                if (curr) setSelectedCurrency(curr);
+              }}
+              className="px-3 py-1.5 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              {currencies.length > 0 ? (
+                currencies.map(curr => (
+                  <option key={curr.code} value={curr.code}>
+                    {curr.symbol} {curr.code}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="INR">₹ INR</option>
+                  <option value="USD">$ USD</option>
+                  <option value="EUR">€ EUR</option>
+                  <option value="GBP">£ GBP</option>
+                </>
+              )}
+            </select>
+            {exchangeRate !== 1 && (
+              <span className="text-xs text-gray-400">
+                (1 {baseCurrency} = {exchangeRate.toFixed(4)} {selectedCurrency?.code})
+              </span>
+            )}
+          </div>
+          <Button onClick={() => { setExecutive(null); setPractice(null); setFinancial(null); setProjects(null); loadData(); }} variant="outline">
+            ↻ Refresh All
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}

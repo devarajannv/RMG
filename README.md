@@ -354,6 +354,68 @@ Allocation
 | State Management | Zustand, TanStack Query |
 | Charts | Recharts |
 | Authentication | JWT, Argon2 |
+| Testing | Vitest, React Testing Library, MSW |
+
+---
+
+## ✅ Testing
+
+### Test Coverage Summary
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Backend API Tests | 889 | ✅ Passing |
+| Frontend UI Tests | 204 | ✅ Passing |
+| **Total** | **1,093** | ✅ **100%** |
+
+### Running Tests
+
+```bash
+# Run all tests
+npm run test
+
+# Run backend tests only
+cd apps/api && npm run test
+
+# Run frontend tests only
+cd apps/frontend && npm run test
+
+# Run tests with coverage
+npm run test -- --coverage
+```
+
+### Backend Test Coverage (889 tests)
+
+- **Resources Module**: 57 tests
+- **Allocations Module**: 45 tests
+- **Analytics Module**: 103 tests
+- **AI Migration Module**: 79 tests
+- **Currency Module**: 80 tests
+- **Other Modules**: 525+ tests
+
+### Frontend Test Coverage (204 tests)
+
+| Page | Tests | Coverage |
+|------|-------|----------|
+| LoginPage | 10 | Auth flow, validation |
+| DashboardPage | 12 | Metrics, charts, navigation |
+| ResourcesPage | 10 | CRUD, filtering, export |
+| ProjectsPage | 11 | CRUD, filtering, search |
+| AllocationsPage | 20 | Timeline, creation, gantt |
+| ClientsPage | 12 | CRUD, filtering |
+| ContractsPage | 9 | CRUD, filtering |
+| SettingsPage | 15 | Tabs, form navigation |
+| AnalyticsPage | 10 | Dashboard tabs |
+| BenchAnalysisPage | 14 | Bench management tabs |
+| ReportsPage | 19 | Report categories, export |
+| TimesheetsPage | 8 | Week navigation |
+| SmartSearchPage | 9 | Search, insights tabs |
+| ExportImportPage | 11 | Data management tabs |
+| ResourceDetailPage | 3 | Loading, error states |
+| ProjectDetailPage | 3 | Loading, error states |
+| ClientDetailPage | 2 | Loading, error states |
+| ContractDetailPage | 2 | Loading, error states |
+| **Global Components** | 24 | Layout, shared components |
 
 ---
 

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
 
 interface Message {
   id: string;
@@ -28,24 +29,28 @@ interface AgentResponse {
 export function AgentWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load suggestions on mount
+  // Load suggestions on mount (only when authenticated)
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     const loadSuggestions = async () => {
       try {
         const res = await api.get<{ suggestions: string[] }>('/agent/suggestions');
         setSuggestions((res as { suggestions: string[] }).suggestions || []);
       } catch (error) {
-        console.error('Failed to load suggestions:', error);
+        // Silently fail - suggestions are not critical
+        console.debug('Failed to load suggestions:', error);
       }
     };
     loadSuggestions();
-  }, []);
+  }, [isAuthenticated]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   AreaChart,
   Area,
@@ -93,6 +93,14 @@ interface CapacityForecast {
   projectedAvailable: number;
 }
 
+interface Currency {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  isBase: boolean;
+}
+
 // ============================================================================
 // Brand Colors
 // ============================================================================
@@ -108,17 +116,6 @@ const BRAND = {
 };
 
 const CHART_COLORS = [BRAND.primary, BRAND.secondary, BRAND.accent, BRAND.success];
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-function formatCurrency(value: number): string {
-  if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
-  if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
-  if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
-  return `₹${value}`;
-}
 
 // ============================================================================
 // Stat Card Component
@@ -186,6 +183,72 @@ export default function DashboardPage() {
   const [capacityForecast, setCapacityForecast] = useState<CapacityForecast[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Currency state
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [baseCurrency] = useState<string>('INR');
+
+  // Load currencies on mount
+  useEffect(() => {
+    loadCurrencies();
+  }, []);
+
+  async function loadCurrencies() {
+    try {
+      const res = await api.get<Currency[]>('/currency/currencies');
+      setCurrencies(res || []);
+      const base = res?.find((c: Currency) => c.isBase) || res?.find((c: Currency) => c.code === 'INR');
+      if (base) {
+        setSelectedCurrency(base);
+      }
+    } catch (err) {
+      console.error('Failed to load currencies:', err);
+      setSelectedCurrency({ id: '', code: 'INR', name: 'Indian Rupee', symbol: '₹', isBase: true });
+    }
+  }
+
+  // Update exchange rate when currency changes
+  const loadExchangeRate = useCallback(async () => {
+    if (!selectedCurrency || selectedCurrency.code === baseCurrency) {
+      setExchangeRate(1);
+      return;
+    }
+    try {
+      const res = await api.post<{ convertedAmount: number; rate: number }>('/currency/exchange-rates/convert', {
+        amount: 1,
+        fromCurrency: baseCurrency,
+        toCurrency: selectedCurrency.code,
+      });
+      setExchangeRate(res.rate || 1);
+    } catch (err) {
+      console.error('Failed to get exchange rate:', err);
+      setExchangeRate(1);
+    }
+  }, [selectedCurrency, baseCurrency]);
+
+  useEffect(() => {
+    loadExchangeRate();
+  }, [loadExchangeRate]);
+
+  // Dynamic currency formatter
+  function formatCurrency(value: number): string {
+    const converted = value * exchangeRate;
+    const symbol = selectedCurrency?.symbol || '₹';
+    const code = selectedCurrency?.code || 'INR';
+    
+    if (code === 'INR') {
+      if (converted >= 10000000) return `${symbol}${(converted / 10000000).toFixed(1)}Cr`;
+      if (converted >= 100000) return `${symbol}${(converted / 100000).toFixed(1)}L`;
+      if (converted >= 1000) return `${symbol}${(converted / 1000).toFixed(1)}K`;
+      return `${symbol}${converted.toFixed(0)}`;
+    } else {
+      if (converted >= 1000000) return `${symbol}${(converted / 1000000).toFixed(1)}M`;
+      if (converted >= 1000) return `${symbol}${(converted / 1000).toFixed(1)}K`;
+      return `${symbol}${converted.toFixed(0)}`;
+    }
+  }
 
   useEffect(() => {
     loadDashboardData();
@@ -275,13 +338,47 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold text-[#1B3A5F]">Dashboard</h1>
             <p className="text-gray-500 mt-1">Real-time overview of your resource management</p>
           </div>
-          <button
-            onClick={loadDashboardData}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 shadow-sm hover:shadow transition-all"
-          >
-            <Activity className="h-4 w-4" />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Currency Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Currency:</span>
+              <select
+                value={selectedCurrency?.code || 'INR'}
+                onChange={(e) => {
+                  const curr = currencies.find(c => c.code === e.target.value);
+                  if (curr) setSelectedCurrency(curr);
+                }}
+                className="px-3 py-1.5 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-[#1B3A5F] focus:border-[#1B3A5F]"
+              >
+                {currencies.length > 0 ? (
+                  currencies.map(curr => (
+                    <option key={curr.code} value={curr.code}>
+                      {curr.symbol} {curr.code}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="INR">₹ INR</option>
+                    <option value="USD">$ USD</option>
+                    <option value="EUR">€ EUR</option>
+                    <option value="GBP">£ GBP</option>
+                  </>
+                )}
+              </select>
+              {exchangeRate !== 1 && (
+                <span className="text-xs text-gray-400">
+                  (1 {baseCurrency} = {exchangeRate.toFixed(4)} {selectedCurrency?.code})
+                </span>
+              )}
+            </div>
+            <button
+              onClick={loadDashboardData}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 shadow-sm hover:shadow transition-all"
+            >
+              <Activity className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Primary KPI Cards */}
