@@ -406,6 +406,27 @@ export async function updateResource(
     }
   }
 
+  // Warn if setting status to INACTIVE/NOTICE while having active allocations
+  if (input.status && input.status !== 'ACTIVE' && existing.status === 'ACTIVE') {
+    const activeAllocations = await prisma.allocation.count({
+      where: {
+        resourceId,
+        tenantId,
+        deletedAt: null,
+        status: { in: ['PROPOSED', 'CONFIRMED', 'ACTIVE'] },
+        endDate: { gte: new Date() },
+      },
+    });
+    
+    if (activeAllocations > 0) {
+      throw new ApiError(
+        `Cannot mark resource as ${input.status}. They have ${activeAllocations} active/upcoming allocation(s). Please end or reassign their allocations first.`,
+        400,
+        'RESOURCE_HAS_ACTIVE_ALLOCATIONS'
+      );
+    }
+  }
+
   const updateData: Prisma.ResourceUpdateInput = {};
 
   if (input.email) updateData.email = input.email.toLowerCase();

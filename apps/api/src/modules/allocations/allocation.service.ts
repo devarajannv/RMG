@@ -70,13 +70,22 @@ export async function createAllocation(
   userId: string,
   skipConflictCheck = false
 ) {
-  // Validate resource
+  // Validate resource exists
   const resource = await prisma.resource.findFirst({
-    where: { id: input.resourceId, tenantId, deletedAt: null, status: 'ACTIVE' },
+    where: { id: input.resourceId, tenantId, deletedAt: null },
   });
 
   if (!resource) {
-    throw new ApiError('Resource not found or inactive', 404, 'RESOURCE_NOT_FOUND');
+    throw new ApiError('Resource not found', 404, 'RESOURCE_NOT_FOUND');
+  }
+
+  // Check resource is active (cannot allocate to inactive/former employees)
+  if (resource.status !== 'ACTIVE') {
+    throw new ApiError(
+      `Cannot create allocation for inactive resource. ${resource.firstName} ${resource.lastName} has status: ${resource.status}`,
+      400,
+      'RESOURCE_INACTIVE'
+    );
   }
 
   // Validate project

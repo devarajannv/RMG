@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, EmploymentType, ResourceStatus, ClientStatus, ClientTier, ProjectType, ProjectStatus, AllocationStatus, PracticeStatus, LocationType, LocationStatus, Proficiency, BillingType } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
+import argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
@@ -30,8 +30,8 @@ function parseCSV(content: string): Record<string, string>[] {
       row[header] = (values[idx] || '').trim();
     });
     
-    // Skip rows without Emp Id
-    if (row['Emp Id']) {
+    // Skip rows without Emp Id or invalid ones
+    if (row['Emp Id'] && !row['Emp Id'].startsWith(' ')) {
       rows.push(row);
     }
   }
@@ -67,14 +67,108 @@ function parseCSVLine(line: string): string[] {
 }
 
 // ============================================================================
-// Hash password (simple for seeding)
+// Date Parser
 // ============================================================================
 
-async function hashPassword(password: string): Promise<string> {
-  // Using argon2 would be better, but for seeding we'll use a simple hash
-  // In production, the auth service uses argon2
-  const { hash } = await import('argon2');
-  return hash(password);
+function parseDate(dateStr: string | undefined): Date | null {
+  if (!dateStr) return null;
+  
+  const monthMap: Record<string, number> = {
+    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+  };
+  
+  // Try DD-Mon-YY format (e.g., 20-Jun-23)
+  const match1 = dateStr.match(/^(\d{1,2})-(\w{3})-(\d{2})$/);
+  if (match1) {
+    const day = parseInt(match1[1]);
+    const month = monthMap[match1[2]];
+    let year = parseInt(match1[3]);
+    year = year < 50 ? 2000 + year : 1900 + year;
+    if (month !== undefined) {
+      return new Date(year, month, day);
+    }
+  }
+  
+  // Try standard Date parsing
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+  
+  return null;
+}
+
+// ============================================================================
+// Skill Normalizer - Clean up and categorize skills
+// ============================================================================
+
+function normalizeSkill(skill: string): { name: string; category: string } {
+  if (!skill) return { name: 'General', category: 'Technical' };
+  
+  const skillLower = skill.toLowerCase();
+  
+  // Determine category based on skill content
+  let category = 'Technical';
+  if (skillLower.includes('qa') || skillLower.includes('test') || skillLower.includes('assurance')) {
+    category = 'Quality Assurance';
+  } else if (skillLower.includes('.net') || skillLower.includes('c#') || skillLower.includes('asp')) {
+    category = '.NET Development';
+  } else if (skillLower.includes('java') && !skillLower.includes('javascript')) {
+    category = 'Java Development';
+  } else if (skillLower.includes('react') || skillLower.includes('angular') || skillLower.includes('vue')) {
+    category = 'Frontend Development';
+  } else if (skillLower.includes('python') || skillLower.includes('data') || skillLower.includes('ml')) {
+    category = 'Data & AI';
+  } else if (skillLower.includes('devops') || skillLower.includes('azure') || skillLower.includes('aws')) {
+    category = 'DevOps & Cloud';
+  } else if (skillLower.includes('mobile') || skillLower.includes('ios') || skillLower.includes('android')) {
+    category = 'Mobile Development';
+  } else if (skillLower.includes('hr') || skillLower.includes('recruit')) {
+    category = 'Human Resources';
+  } else if (skillLower.includes('sales') || skillLower.includes('market')) {
+    category = 'Sales & Marketing';
+  } else if (skillLower.includes('finance') || skillLower.includes('account')) {
+    category = 'Finance';
+  } else if (skillLower.includes('admin')) {
+    category = 'Administration';
+  } else if (skillLower.includes('cc&b') || skillLower.includes('util')) {
+    category = 'Utilities';
+  } else if (skillLower.includes('rpa') || skillLower.includes('automat')) {
+    category = 'RPA & Automation';
+  }
+  
+  // Clean up the skill name (truncate if too long)
+  const name = skill.substring(0, 100);
+  
+  return { name, category };
+}
+
+// ============================================================================
+// Project Type Mapper
+// ============================================================================
+
+function mapProjectType(csvType: string): ProjectType {
+  const type = csvType?.toUpperCase().trim();
+  switch (type) {
+    case 'T&M': return 'BILLABLE';
+    case 'FB': return 'BILLABLE';
+    case 'FMB': return 'BILLABLE';
+    case 'FMB+T&M': return 'BILLABLE';
+    case 'INTERNAL': return 'INTERNAL';
+    default: return 'BILLABLE';
+  }
+}
+
+function mapBillingType(csvType: string): BillingType {
+  const type = csvType?.toUpperCase().trim();
+  switch (type) {
+    case 'T&M': return BillingType.TM;
+    case 'FB': return BillingType.FIXED;
+    case 'FMB': return BillingType.FIXED;
+    case 'FMB+T&M': return BillingType.MILESTONE;
+    default: return BillingType.TM;
+  }
 }
 
 // ============================================================================
@@ -83,6 +177,7 @@ async function hashPassword(password: string): Promise<string> {
 
 async function main() {
   console.log('🌱 Seeding database with real CSV data...\n');
+  console.log('='.repeat(60));
   
   const csvPath = path.join(__dirname, '../../../Analysis Copy RMG_Master_File V2.csv');
   
@@ -94,9 +189,11 @@ async function main() {
   const csvContent = fs.readFileSync(csvPath, 'utf-8');
   const rows = parseCSV(csvContent);
   
-  console.log(`📊 Found ${rows.length} rows in CSV\n`);
+  console.log(`📊 Parsed ${rows.length} data rows from CSV\n`);
   
+  // -------------------------------------------------------------------------
   // Clean existing data
+  // -------------------------------------------------------------------------
   console.log('🧹 Cleaning existing data...');
   await prisma.auditLog.deleteMany();
   await prisma.timesheetEntry.deleteMany();
@@ -109,162 +206,340 @@ async function main() {
   await prisma.client.deleteMany();
   await prisma.skill.deleteMany();
   await prisma.skillCategory.deleteMany();
+  await prisma.rolePermission.deleteMany();
   await prisma.userRole.deleteMany();
   await prisma.user.deleteMany();
   await prisma.resource.deleteMany();
   await prisma.role.deleteMany();
   await prisma.practice.deleteMany();
   await prisma.location.deleteMany();
+  await prisma.exchangeRate.deleteMany();
+  await prisma.currency.deleteMany();
+  await prisma.document.deleteMany();
   await prisma.tenant.deleteMany();
   
+  console.log('   ✓ Cleaned all tables\n');
+  
+  // -------------------------------------------------------------------------
   // Create tenant
+  // -------------------------------------------------------------------------
   console.log('🏢 Creating tenant...');
   const tenant = await prisma.tenant.create({
     data: {
-      name: 'NewVision Software',
+      name: 'NewVision Software Pvt. Ltd.',
       slug: 'newvision',
-      settings: {},
+      tier: 'ENTERPRISE',
       status: 'ACTIVE',
+      timezone: 'Asia/Kolkata',
+      currency: 'INR',
+      fiscalYearStart: 4,
+      settings: {
+        defaultCapacity: 100,
+        targetUtilization: 85,
+        workingHoursPerDay: 8,
+        workingDaysPerWeek: 5,
+      },
     },
   });
+  console.log(`   ✓ Created tenant: ${tenant.name}\n`);
   
+  // -------------------------------------------------------------------------
   // Extract unique values from CSV
+  // -------------------------------------------------------------------------
+  console.log('📋 Analyzing CSV data...');
+  
   const uniqueLocations = new Set<string>();
   const uniquePractices = new Set<string>();
-  const uniqueSkills = new Set<string>();
-  const uniqueClients = new Set<string>();
-  const uniqueProjects = new Map<string, { code: string; name: string; client: string; type: string; status: string }>();
+  const uniqueSkills = new Map<string, { name: string; category: string }>();
+  const uniqueClients = new Map<string, { name: string; isInternal: boolean }>();
+  const uniqueProjects = new Map<string, { 
+    code: string; name: string; client: string; type: string; status: string; billingType: string 
+  }>();
   
+  // First pass: collect unique values
   rows.forEach(row => {
-    if (row['Location']) uniqueLocations.add(row['Location']);
-    if (row['Practice']) uniquePractices.add(row['Practice']);
-    if (row['Skill']) uniqueSkills.add(row['Skill']);
-    if (row['Client']) uniqueClients.add(row['Client']);
-    if (row['Project Code'] && row['Project']) {
-      uniqueProjects.set(row['Project Code'], {
-        code: row['Project Code'],
-        name: row['Project'],
-        client: row['Client'],
-        type: row['Project type'] || 'DELIVERY',
-        status: row['Project Status'] || 'ACTIVE',
+    const location = row['Location']?.trim();
+    const practice = row['Practice']?.trim();
+    const skill = row['Skill']?.trim();
+    const client = row['Client']?.trim();
+    const projectCode = row['Project Code']?.trim();
+    const projectName = row['Project']?.trim();
+    const projectType = row['Project type']?.trim();
+    const projectStatus = row['Project Status']?.trim();
+    
+    if (location) uniqueLocations.add(location);
+    if (practice) uniquePractices.add(practice);
+    if (skill) {
+      const normalized = normalizeSkill(skill);
+      uniqueSkills.set(skill, normalized);
+    }
+    if (client) {
+      uniqueClients.set(client, {
+        name: client,
+        isInternal: client.toLowerCase() === 'newvision'
+      });
+    }
+    if (projectCode && projectName) {
+      uniqueProjects.set(projectCode, {
+        code: projectCode,
+        name: projectName,
+        client: client || 'NewVision',
+        type: projectType || 'T&M',
+        status: projectStatus || 'Active',
+        billingType: projectType || 'T&M'
       });
     }
   });
   
-  // Create locations
-  console.log(`📍 Creating ${uniqueLocations.size} locations...`);
+  console.log(`   Locations: ${uniqueLocations.size}`);
+  console.log(`   Practices: ${uniquePractices.size}`);
+  console.log(`   Skills: ${uniqueSkills.size}`);
+  console.log(`   Clients: ${uniqueClients.size}`);
+  console.log(`   Projects: ${uniqueProjects.size}\n`);
+  
+  // -------------------------------------------------------------------------
+  // Create Locations
+  // -------------------------------------------------------------------------
+  console.log('📍 Creating locations...');
   const locationMap = new Map<string, string>();
-  let locCounter = 1;
+  
+  const locationCodes: Record<string, string> = {
+    'Pune': 'PNE',
+    'Hyderabad': 'HYD',
+    'Bhopal': 'BPL',
+    'Indore': 'IDR',
+    'Dubai': 'DXB',
+    'USA': 'USA',
+    'USA (Atlanta)': 'ATL',
+    'Egypt': 'EGY',
+  };
+  
   for (const loc of uniqueLocations) {
     if (!loc) continue;
-    const locCode = `L${String(locCounter++).padStart(3, '0')}`;
-    const location = await prisma.location.create({
-      data: {
-        tenantId: tenant.id,
-        name: loc.substring(0, 100),
-        code: locCode,
-        type: 'OFFICE',
-        country: 'IN',
-        timezone: 'Asia/Kolkata',
-        status: 'ACTIVE',
-      },
-    });
-    locationMap.set(loc, location.id);
+    const code = locationCodes[loc] || loc.substring(0, 3).toUpperCase();
+    const isOnshore = !['USA', 'USA (Atlanta)', 'Dubai', 'Egypt'].includes(loc);
+    
+    try {
+      const location = await prisma.location.create({
+        data: {
+          tenantId: tenant.id,
+          name: `${loc} Office`,
+          code,
+          type: LocationType.OFFICE,
+          country: isOnshore ? 'IN' : (loc.includes('USA') ? 'US' : loc.substring(0, 2).toUpperCase()),
+          timezone: isOnshore ? 'Asia/Kolkata' : (loc.includes('USA') ? 'America/New_York' : 'UTC'),
+          isOnshore,
+          status: LocationStatus.ACTIVE,
+          address: isOnshore ? { city: loc, state: loc, country: 'India' } : undefined,
+        },
+      });
+      locationMap.set(loc, location.id);
+    } catch (err: any) {
+      console.log(`   Warning: Could not create location ${loc}: ${err.message}`);
+    }
   }
+  console.log(`   ✓ Created ${locationMap.size} locations\n`);
   
-  // Create practices
-  console.log(`🏛️ Creating ${uniquePractices.size} practices...`);
+  // -------------------------------------------------------------------------
+  // Create Practices
+  // -------------------------------------------------------------------------
+  console.log('🏛️ Creating practices...');
   const practiceMap = new Map<string, string>();
+  
+  const practiceCodes: Record<string, string> = {
+    'Digital Assurance': 'DA',
+    'Microsoft': 'MSFT',
+    'Data': 'DATA',
+    'Managed Services': 'MNS',
+    'Digital Product Studio': 'DPS',
+    'Utilities': 'UTL',
+    'HR': 'HR',
+    'Sales and Marketing': 'SM',
+    'Java': 'JAVA',
+    'RPA': 'RPA',
+    'Delivery Excellence': 'DE',
+    'LAMP': 'LAMP',
+    'Business Excellence': 'BE',
+    'Mobility': 'MOB',
+    'Internal IT': 'IT',
+    'Administration': 'ADM',
+    'Finance': 'FIN',
+    'Management': 'MGT',
+  };
+  
   let pracCounter = 1;
   for (const prac of uniquePractices) {
     if (!prac) continue;
-    const pracCode = `P${String(pracCounter++).padStart(3, '0')}`;
-    const practice = await prisma.practice.create({
-      data: {
-        tenantId: tenant.id,
-        name: prac.substring(0, 100),
-        code: pracCode,
-        targetUtilization: 85,
-        status: 'ACTIVE',
-      },
-    });
-    practiceMap.set(prac, practice.id);
+    const code = practiceCodes[prac] || `P${String(pracCounter++).padStart(2, '0')}`;
+    
+    try {
+      const practice = await prisma.practice.create({
+        data: {
+          tenantId: tenant.id,
+          name: prac,
+          code,
+          targetUtilization: 85,
+          status: PracticeStatus.ACTIVE,
+        },
+      });
+      practiceMap.set(prac, practice.id);
+    } catch (err: any) {
+      console.log(`   Warning: Could not create practice ${prac}: ${err.message}`);
+    }
   }
+  console.log(`   ✓ Created ${practiceMap.size} practices\n`);
   
-  // Create skill category and skills
-  console.log(`💡 Creating ${uniqueSkills.size} skills...`);
-  const skillCategory = await prisma.skillCategory.create({
-    data: {
-      tenantId: tenant.id,
-      name: 'Technical Skills',
-    },
-  });
-  
+  // -------------------------------------------------------------------------
+  // Create Skill Categories and Skills
+  // -------------------------------------------------------------------------
+  console.log('💡 Creating skill categories and skills...');
+  const skillCategoryMap = new Map<string, string>();
   const skillMap = new Map<string, string>();
-  for (const skillName of uniqueSkills) {
-    if (!skillName) continue;
-    const skill = await prisma.skill.create({
-      data: {
-        tenantId: tenant.id,
-        categoryId: skillCategory.id,
-        name: skillName.substring(0, 100),
-        description: skillName.substring(0, 500),
-      },
-    });
-    skillMap.set(skillName, skill.id);
-  }
   
-  // Create clients
-  console.log(`🏢 Creating ${uniqueClients.size} clients...`);
+  // Get unique categories
+  const categories = new Set<string>();
+  uniqueSkills.forEach(s => categories.add(s.category));
+  
+  // Create categories
+  for (const catName of categories) {
+    try {
+      const category = await prisma.skillCategory.create({
+        data: {
+          tenantId: tenant.id,
+          name: catName,
+        },
+      });
+      skillCategoryMap.set(catName, category.id);
+    } catch (err: any) {
+      // Ignore duplicates
+    }
+  }
+  console.log(`   ✓ Created ${skillCategoryMap.size} skill categories`);
+  
+  // Create skills
+  for (const [originalName, normalized] of uniqueSkills) {
+    const categoryId = skillCategoryMap.get(normalized.category);
+    
+    try {
+      const skill = await prisma.skill.create({
+        data: {
+          tenantId: tenant.id,
+          categoryId,
+          name: normalized.name,
+          description: originalName.length > 100 ? originalName.substring(0, 500) : null,
+        },
+      });
+      skillMap.set(originalName, skill.id);
+    } catch (err: any) {
+      // Handle duplicates by finding existing
+      const existing = await prisma.skill.findFirst({
+        where: { tenantId: tenant.id, name: normalized.name }
+      });
+      if (existing) {
+        skillMap.set(originalName, existing.id);
+      }
+    }
+  }
+  console.log(`   ✓ Created ${skillMap.size} skills\n`);
+  
+  // -------------------------------------------------------------------------
+  // Create Clients
+  // -------------------------------------------------------------------------
+  console.log('🏢 Creating clients...');
   const clientMap = new Map<string, string>();
-  for (const clientName of uniqueClients) {
-    if (!clientName) continue;
-    const client = await prisma.client.create({
-      data: {
-        tenantId: tenant.id,
-        name: clientName,
-        code: clientName.substring(0, 10).toUpperCase().replace(/[^A-Z0-9]/g, ''),
-        status: 'ACTIVE',
-        tier: 'STANDARD',
-      },
-    });
-    clientMap.set(clientName, client.id);
-  }
   
-  // Create projects
-  console.log(`📁 Creating ${uniqueProjects.size} projects...`);
+  for (const [name, info] of uniqueClients) {
+    if (!name) continue;
+    
+    const code = name.substring(0, 10).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    
+    try {
+      const client = await prisma.client.create({
+        data: {
+          tenantId: tenant.id,
+          name: name,
+          code: code || 'CLT',
+          status: ClientStatus.ACTIVE,
+          tier: info.isInternal ? ClientTier.STRATEGIC : ClientTier.STANDARD,
+          industry: info.isInternal ? 'Technology' : 'Various',
+        },
+      });
+      clientMap.set(name, client.id);
+    } catch (err: any) {
+      console.log(`   Warning: Could not create client ${name}: ${err.message}`);
+    }
+  }
+  console.log(`   ✓ Created ${clientMap.size} clients\n`);
+  
+  // -------------------------------------------------------------------------
+  // Create Projects
+  // -------------------------------------------------------------------------
+  console.log('📁 Creating projects...');
   const projectMap = new Map<string, string>();
+  
   for (const [code, proj] of uniqueProjects) {
     const clientId = clientMap.get(proj.client);
-    if (!clientId) continue;
+    if (!clientId) {
+      // Use NewVision as default client for internal projects
+      const defaultClientId = clientMap.get('NewVision');
+      if (!defaultClientId) continue;
+    }
     
-    const projectStatus = proj.status?.toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 
-                          proj.status?.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'ACTIVE';
+    const projectStatus: ProjectStatus = 
+      proj.status?.toLowerCase().includes('billable') ? 'ACTIVE' :
+      proj.status?.toLowerCase().includes('complet') ? 'COMPLETED' :
+      proj.status?.toLowerCase().includes('hold') ? 'ON_HOLD' : 'ACTIVE';
     
-    const project = await prisma.project.create({
-      data: {
-        tenantId: tenant.id,
-        clientId,
-        code,
-        name: proj.name.substring(0, 200),
-        type: 'BILLABLE',
-        status: projectStatus,
-        startDate: new Date('2024-01-01'),
-        healthStatus: 'GREEN',
-      },
-    });
-    projectMap.set(code, project.id);
+    try {
+      const project = await prisma.project.create({
+        data: {
+          tenantId: tenant.id,
+          clientId: clientId || clientMap.get('NewVision')!,
+          code,
+          name: proj.name.substring(0, 200),
+          type: mapProjectType(proj.type),
+          billingType: mapBillingType(proj.billingType),
+          status: projectStatus,
+          startDate: new Date('2024-01-01'),
+          healthStatus: 'GREEN',
+        },
+      });
+      projectMap.set(code, project.id);
+    } catch (err: any) {
+      // Handle unique constraint violations
+      const existing = await prisma.project.findFirst({
+        where: { tenantId: tenant.id, code }
+      });
+      if (existing) {
+        projectMap.set(code, existing.id);
+      }
+    }
   }
+  console.log(`   ✓ Created ${projectMap.size} projects\n`);
   
-  // Create roles
+  // -------------------------------------------------------------------------
+  // Create Roles
+  // -------------------------------------------------------------------------
   console.log('🔐 Creating roles...');
   const adminRole = await prisma.role.create({
     data: {
       tenantId: tenant.id,
       name: 'Admin',
-      description: 'Full system access',
+      description: 'Full system administrator access',
       permissions: ['*'],
       isSystem: true,
+      level: 0,
+    },
+  });
+  
+  const pmRole = await prisma.role.create({
+    data: {
+      tenantId: tenant.id,
+      name: 'Project Manager',
+      description: 'Manage projects and allocations',
+      permissions: ['project:*', 'allocation:*', 'resource:read', 'client:read', 'report:read', 'timesheet:*'],
+      isSystem: true,
+      level: 2,
     },
   });
   
@@ -272,48 +547,76 @@ async function main() {
     data: {
       tenantId: tenant.id,
       name: 'Resource Manager',
-      description: 'Manage resources and allocations',
-      permissions: ['resource:*', 'allocation:*', 'project:read', 'client:read', 'report:read'],
+      description: 'Manage resources and bench',
+      permissions: ['resource:*', 'allocation:*', 'project:read', 'client:read', 'report:read', 'bench:*'],
       isSystem: true,
+      level: 2,
     },
   });
   
-  // Create resources from CSV
-  console.log(`👥 Creating resources from ${rows.length} rows...`);
+  await prisma.role.create({
+    data: {
+      tenantId: tenant.id,
+      name: 'User',
+      description: 'Basic user access',
+      permissions: ['resource:read', 'project:read', 'timesheet:own'],
+      isSystem: true,
+      level: 3,
+    },
+  });
+  
+  console.log('   ✓ Created 4 roles\n');
+  
+  // -------------------------------------------------------------------------
+  // Create Resources from CSV
+  // -------------------------------------------------------------------------
+  console.log('👥 Creating resources...');
   const resourceMap = new Map<string, string>();
   const processedEmpIds = new Set<string>();
+  const emailSet = new Set<string>();
   
+  // First pass: create all unique resources
   for (const row of rows) {
-    const empId = row['Emp Id'];
-    
-    // Skip empty or already processed
-    if (!empId || empId.trim() === '') continue;
-    if (processedEmpIds.has(empId)) continue;
+    const empId = row['Emp Id']?.trim();
+    if (!empId || processedEmpIds.has(empId)) continue;
     processedEmpIds.add(empId);
     
-    const fullName = row['Full Name'] || 'Unknown';
-    const nameParts = fullName.trim().split(/\s+/);
+    const fullName = row['Full Name']?.trim() || empId;
+    const nameParts = fullName.split(/\s+/);
     const firstName = (nameParts[0] || 'Unknown').substring(0, 100);
     const lastName = (nameParts.slice(1).join(' ') || 'User').substring(0, 100);
     
-    const isActive = row['Active']?.toUpperCase() !== 'NO' && row['Active']?.toUpperCase() !== 'N';
-    const isConsultant = row['FTE/ Consultant']?.toUpperCase().includes('CONSULT');
+    const isActive = row['Active']?.toUpperCase() === 'ACTIVE';
+    const empType = row['FTE/ Consultant']?.toUpperCase() || '';
+    const isConsultant = empType.includes('CONSULT');
     
     // Parse date of joining
-    let dateOfJoining = new Date('2024-01-01');
-    if (row['DOJ']) {
-      const doj = new Date(row['DOJ']);
-      if (!isNaN(doj.getTime())) {
-        dateOfJoining = doj;
-      }
-    }
+    const doj = parseDate(row['DOJ']) || new Date('2024-01-01');
     
-    // Clean email
-    let email = row['email ID']?.trim();
+    // Clean email - handle duplicates
+    let email = row['email ID']?.trim().toLowerCase();
     if (!email || !email.includes('@')) {
       email = `${empId.toLowerCase()}@newvision.in`;
     }
+    // Handle duplicate emails by appending empId
+    if (emailSet.has(email)) {
+      email = `${empId.toLowerCase()}.${email}`;
+    }
+    emailSet.add(email);
     email = email.substring(0, 255);
+    
+    // Map designation/role
+    const designation = (row['Role'] || 'Engineer').substring(0, 100);
+    
+    // Determine band from experience or role
+    const exp = parseFloat(row[' Relevant Experience '] || '0') || 0;
+    let band = 'L3';
+    if (designation.toLowerCase().includes('director') || exp > 15) band = 'L6';
+    else if (designation.toLowerCase().includes('manager') || exp > 10) band = 'L5';
+    else if (designation.toLowerCase().includes('lead') || designation.toLowerCase().includes('architect') || exp > 7) band = 'L4';
+    else if (designation.toLowerCase().includes('senior') || exp > 4) band = 'L3';
+    else if (exp > 2) band = 'L2';
+    else band = 'L1';
     
     try {
       const resource = await prisma.resource.create({
@@ -321,84 +624,88 @@ async function main() {
           tenantId: tenant.id,
           employeeId: empId.substring(0, 50),
           firstName,
-          lastName: lastName || 'User',
+          lastName,
           email,
-          designation: (row['Role'] || 'Engineer').substring(0, 100),
-          band: 'L3',
-          employmentType: isConsultant ? 'CONTRACTOR' : 'FTE',
-          status: isActive ? 'ACTIVE' : 'INACTIVE',
-          dateOfJoining,
-          practiceId: practiceMap.get(row['Practice']) || null,
-          locationId: locationMap.get(row['Location']) || null,
+          designation,
+          band,
+          employmentType: isConsultant ? EmploymentType.CONTRACTOR : EmploymentType.FTE,
+          status: isActive ? ResourceStatus.ACTIVE : ResourceStatus.INACTIVE,
+          dateOfJoining: doj,
+          practiceId: practiceMap.get(row['Practice']?.trim() || '') || null,
+          locationId: locationMap.get(row['Location']?.trim() || '') || null,
           capacity: 100,
+          tags: [],
         },
       });
       
       resourceMap.set(empId, resource.id);
       
       // Assign skill if present
-      const skillId = skillMap.get(row['Skill']);
+      const skillName = row['Skill']?.trim();
+      const skillId = skillMap.get(skillName || '');
       if (skillId) {
-        await prisma.resourceSkill.create({
-          data: {
-            resourceId: resource.id,
-            skillId,
-            proficiency: 'INTERMEDIATE',
-            yearsExp: parseFloat(row[' Relevant Experience ']) || 0,
-          },
-        });
+        try {
+          await prisma.resourceSkill.create({
+            data: {
+              resourceId: resource.id,
+              skillId,
+              proficiency: exp > 7 ? Proficiency.EXPERT : exp > 4 ? Proficiency.ADVANCED : exp > 2 ? Proficiency.INTERMEDIATE : Proficiency.BEGINNER,
+              yearsExp: exp,
+            },
+          });
+        } catch {
+          // Skill already assigned
+        }
       }
     } catch (err: any) {
-      if (resourceMap.size < 3) {
-        console.log(`   Error for ${empId}:`, err.message);
+      if (resourceMap.size < 5) {
+        console.log(`   Warning: ${empId}: ${err.message?.substring(0, 80)}`);
       }
     }
   }
   
-  console.log(`   Created ${resourceMap.size} unique resources`);
+  console.log(`   ✓ Created ${resourceMap.size} unique resources\n`);
   
-  // Create allocations
+  // -------------------------------------------------------------------------
+  // Create Allocations
+  // -------------------------------------------------------------------------
   console.log('📊 Creating allocations...');
   let allocationCount = 0;
-  let skippedNoResource = 0;
-  let skippedNoProject = 0;
-  let skippedErrors = 0;
-  
-  // Check first few rows for debugging
-  if (rows.length > 0) {
-    const sampleRow = rows[0];
-    console.log(`   Sample row keys: ${Object.keys(sampleRow).filter(k => k.includes('Proj') || k.includes('Emp')).join(', ')}`);
-    console.log(`   Sample Emp Id: "${sampleRow['Emp Id']}", Project Code: "${sampleRow['Project Code']}"`);
-    console.log(`   Project map size: ${projectMap.size}, has NV000214: ${projectMap.has('NV000214')}`);
-    console.log(`   Sample project codes in map: ${Array.from(projectMap.keys()).slice(0, 5).join(', ')}`);
-  }
+  let skippedCount = 0;
+  const processedAllocations = new Set<string>();
   
   for (const row of rows) {
-    const empId = row['Emp Id'];
-    const projectCode = row['Project Code'];
-    const resourceId = resourceMap.get(empId);
-    const projectId = projectMap.get(projectCode);
+    const empId = row['Emp Id']?.trim();
+    const projectCode = row['Project Code']?.trim();
+    const status = row['Status']?.trim();
     
-    if (!resourceId) { skippedNoResource++; continue; }
-    if (!projectId) { skippedNoProject++; continue; }
+    // Only create allocations for current assignments
+    if (status?.toLowerCase() !== 'current') {
+      skippedCount++;
+      continue;
+    }
     
-    const allocationPct = parseInt(row['Allocation%']) || 100;
+    const resourceId = resourceMap.get(empId || '');
+    const projectId = projectMap.get(projectCode || '');
+    
+    if (!resourceId || !projectId) {
+      skippedCount++;
+      continue;
+    }
+    
+    // Prevent duplicate allocations
+    const allocKey = `${resourceId}-${projectId}`;
+    if (processedAllocations.has(allocKey)) {
+      skippedCount++;
+      continue;
+    }
+    processedAllocations.add(allocKey);
+    
+    const allocationPct = parseInt(row['Allocation%']?.replace(/[^0-9]/g, '') || '100') || 100;
     const isBillable = row['Billable (Y/N)']?.toUpperCase() === 'Y';
     
-    // Parse dates
-    let startDate = new Date('2024-01-01');
-    let endDate = new Date('2025-12-31');
-    
-    if (row['Start Date']) {
-      const sd = new Date(row['Start Date']);
-      if (!isNaN(sd.getTime())) startDate = sd;
-    }
-    if (row['End Date']) {
-      const ed = new Date(row['End Date']);
-      if (!isNaN(ed.getTime())) endDate = ed;
-    }
-    
-    // Get the role from the CSV or default
+    const startDate = parseDate(row['Start Date']) || new Date('2024-01-01');
+    const endDate = parseDate(row['End Date']) || new Date('2025-12-31');
     const role = (row['Role'] || 'Developer').substring(0, 100);
     
     try {
@@ -410,26 +717,24 @@ async function main() {
           role,
           startDate,
           endDate,
-          percentage: allocationPct,
+          percentage: Math.min(allocationPct, 100),
           isBillable,
-          status: 'ACTIVE',
+          status: AllocationStatus.ACTIVE,
         },
       });
       allocationCount++;
     } catch (err: any) {
-      if (allocationCount === 0 && skippedErrors < 3) {
-        console.log(`   Allocation error sample: ${err.message?.substring(0, 200)}`);
-      }
-      skippedErrors++;
+      skippedCount++;
     }
   }
   
-  console.log(`   Created ${allocationCount} allocations`);
-  console.log(`   Skipped: ${skippedNoResource} no resource, ${skippedNoProject} no project, ${skippedErrors} errors`);
+  console.log(`   ✓ Created ${allocationCount} allocations (skipped ${skippedCount})\n`);
   
-  // Create admin user
-  console.log('👤 Creating admin user...');
-  const hashedPassword = await hashPassword('Password123!@#');
+  // -------------------------------------------------------------------------
+  // Create Admin Users
+  // -------------------------------------------------------------------------
+  console.log('👤 Creating system users...');
+  const hashedPassword = await argon2.hash('Password123!@#');
   
   const adminUser = await prisma.user.create({
     data: {
@@ -450,7 +755,6 @@ async function main() {
     },
   });
   
-  // Create RM user
   const rmUser = await prisma.user.create({
     data: {
       tenantId: tenant.id,
@@ -470,18 +774,74 @@ async function main() {
     },
   });
   
-  console.log('\n✅ Seeding complete!');
-  console.log('\n📝 Login credentials:');
-  console.log('   Email: admin@newvision.in');
-  console.log('   Password: Password123!@#');
-  console.log('\n📊 Summary:');
-  console.log(`   Resources: ${resourceMap.size}`);
-  console.log(`   Locations: ${locationMap.size}`);
-  console.log(`   Practices: ${practiceMap.size}`);
-  console.log(`   Skills: ${skillMap.size}`);
-  console.log(`   Clients: ${clientMap.size}`);
-  console.log(`   Projects: ${projectMap.size}`);
+  const pmUser = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      email: 'pm@newvision.in',
+      passwordHash: hashedPassword,
+      firstName: 'Project',
+      lastName: 'Manager',
+      status: 'ACTIVE',
+    },
+  });
+  
+  await prisma.userRole.create({
+    data: {
+      userId: pmUser.id,
+      roleId: pmRole.id,
+      assignedBy: adminUser.id,
+    },
+  });
+  
+  console.log('   ✓ Created 3 system users\n');
+  
+  // -------------------------------------------------------------------------
+  // Create Default Currencies
+  // -------------------------------------------------------------------------
+  console.log('💰 Creating currencies...');
+  const currencies = [
+    { code: 'INR', name: 'Indian Rupee', symbol: '₹', isBase: true },
+    { code: 'USD', name: 'US Dollar', symbol: '$', isBase: false },
+    { code: 'EUR', name: 'Euro', symbol: '€', isBase: false },
+    { code: 'GBP', name: 'British Pound', symbol: '£', isBase: false },
+    { code: 'AED', name: 'UAE Dirham', symbol: 'د.إ', isBase: false },
+  ];
+  
+  for (const curr of currencies) {
+    await prisma.currency.create({
+      data: {
+        tenantId: tenant.id,
+        code: curr.code,
+        name: curr.name,
+        symbol: curr.symbol,
+        isBase: curr.isBase,
+      },
+    });
+  }
+  console.log('   ✓ Created 5 currencies\n');
+  
+  // -------------------------------------------------------------------------
+  // Summary
+  // -------------------------------------------------------------------------
+  console.log('='.repeat(60));
+  console.log('✅ Seeding complete!\n');
+  console.log('📊 SUMMARY:');
+  console.log(`   Tenant:      ${tenant.name}`);
+  console.log(`   Locations:   ${locationMap.size}`);
+  console.log(`   Practices:   ${practiceMap.size}`);
+  console.log(`   Skills:      ${skillMap.size} (${skillCategoryMap.size} categories)`);
+  console.log(`   Clients:     ${clientMap.size}`);
+  console.log(`   Projects:    ${projectMap.size}`);
+  console.log(`   Resources:   ${resourceMap.size}`);
   console.log(`   Allocations: ${allocationCount}`);
+  console.log(`   Users:       3 system users`);
+  console.log(`   Currencies:  5`);
+  
+  console.log('\n📝 LOGIN CREDENTIALS:');
+  console.log('   Admin:    admin@newvision.in / Password123!@#');
+  console.log('   RM:       rm@newvision.in / Password123!@#');
+  console.log('   PM:       pm@newvision.in / Password123!@#');
+  console.log('='.repeat(60));
 }
 
 main()
@@ -492,4 +852,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

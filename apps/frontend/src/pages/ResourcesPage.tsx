@@ -413,6 +413,7 @@ export default function ResourcesPage() {
   // State
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);  // Toggle for inactive resources
   const [filters, setFilters] = useState({
     department: '',
     role: '',
@@ -436,9 +437,10 @@ export default function ResourcesPage() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['resources'],
+    queryKey: ['resources', showInactive],
     queryFn: async () => {
-      return api.get<{ data: Resource[] }>('/resources');
+      // Pass includeInactive parameter to API
+      return api.get<{ data: Resource[] }>(`/resources?includeInactive=${showInactive}`);
     },
   });
 
@@ -760,6 +762,16 @@ export default function ResourcesPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              {/* Show Inactive Toggle */}
+              <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-600 whitespace-nowrap">Show Former Employees</span>
+              </label>
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -946,12 +958,21 @@ export default function ResourcesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredResources.map((resource) => (
-                    <tr key={resource.id} className="hover:bg-gray-50">
+                  {filteredResources.map((resource) => {
+                    const isInactive = resource.status?.toLowerCase() === 'inactive' || 
+                                       resource.status?.toLowerCase() === 'terminated';
+                    return (
+                    <tr 
+                      key={resource.id} 
+                      className={`hover:bg-gray-50 ${isInactive ? 'bg-gray-100 opacity-70' : ''}`}
+                    >
                       <td className="px-4 py-3 text-sm text-gray-900">{resource.employeeId}</td>
                       <td className="px-4 py-3">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{resource.name}</p>
+                          <p className={`text-sm font-medium ${isInactive ? 'text-gray-500' : 'text-gray-900'}`}>
+                            {resource.name}
+                            {isInactive && <span className="ml-2 text-xs text-red-500">(Former)</span>}
+                          </p>
                           <p className="text-sm text-gray-500">{resource.email}</p>
                         </div>
                       </td>
@@ -1030,7 +1051,8 @@ export default function ResourcesPage() {
                         </DropdownMenu>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

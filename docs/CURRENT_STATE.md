@@ -8,13 +8,37 @@ RMGaaS (Resource Management as a Service) is a comprehensive resource management
 
 ---
 
-## Recent Bug Fixes (December 17, 2025)
+## Recent Changes (December 17, 2025)
+
+### Inactive/Former Employee Handling
+- ✅ Dashboard "Total Resources" now shows only ACTIVE employees (655 active, 854 inactive/former)
+- ✅ Added "inactive" count to dashboard metrics
+- ✅ Resources API defaults to ACTIVE-only (use `includeInactive=true` to see all)
+- ✅ Added "Show Former Employees" toggle on Resources page
+- ✅ Visual distinction for former employees (opacity, gray background, "Former" badge)
+- ✅ Cannot allocate inactive resources (validation with clear error message)
+- ✅ Cannot mark resource INACTIVE if they have active allocations (must reassign first)
+- ✅ All resource dropdowns (allocations, managers) show only active employees
 
 ### Authentication & Page Rendering
 - ✅ Fixed login page flash/reload issue (auth store hydration)
 - ✅ Fixed "Objects are not valid as a React child" error on Resources page (skills object handling)
 - ✅ Fixed missing sidebar on Resources page (added MainLayout wrapper)
 - ✅ Fixed Data Management navigation link mismatch
+
+---
+
+## Data Status
+
+### CSV Import Complete (December 17, 2025)
+- **Source File**: `Analysis Copy RMG_Master_File V2.csv`
+- **Resources**: 1,509 (655 active, 854 inactive/former)
+- **Clients**: 27
+- **Projects**: 152
+- **Skills**: 485
+- **Practices**: 5 (AI & ML, Cloud, Data Engineering, Enterprise Applications, QA & Automation)
+- **Locations**: 5 (Bangalore, Chennai, Hyderabad, Mumbai, Pune)
+- **Bands**: 4 (E1-E2, E3-E4, M1-M2, M3+)
 
 ---
 

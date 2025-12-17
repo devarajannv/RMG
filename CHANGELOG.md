@@ -4,6 +4,54 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### December 17, 2025 - Inactive Resource Handling
+
+#### Added - Comprehensive Inactive/Former Employee Management
+
+**Backend Changes:**
+1. **Dashboard Metrics Update** (`apps/api/src/modules/dashboard/dashboard.service.ts`)
+   - `total` resource count now shows only ACTIVE employees (was showing all)
+   - Added new `inactive` count field to DashboardMetrics
+   - Dashboard displays: total (active), inactive, onBench, onNotice
+
+2. **Resource API Default Filter** (`apps/api/src/modules/resources/resource.controller.ts`)
+   - Default status filter changed from all to `['ACTIVE']` only
+   - Added `includeInactive=true` query parameter to fetch all resources when needed
+   - All resource dropdowns (allocations, managers) now show only active employees by default
+
+3. **Resource Status Change Validation** (`apps/api/src/modules/resources/resource.service.ts`)
+   - Cannot mark a resource as INACTIVE if they have active/upcoming allocations
+   - Error message: "Cannot mark resource as INACTIVE. They have X active/upcoming allocation(s). Please end or reassign their allocations first."
+
+4. **Allocation Validation** (`apps/api/src/modules/allocations/allocation.service.ts`)
+   - Enhanced error message when trying to allocate inactive resources
+   - Error: "Resource is not active (status: INACTIVE). Only active resources can be allocated to projects."
+   - Applies to both create and bulk allocation operations
+
+**Frontend Changes:**
+5. **Resources Page Toggle** (`apps/frontend/src/pages/ResourcesPage.tsx`)
+   - Added "Show Former Employees" toggle switch in filters section
+   - Toggle is OFF by default (shows only active)
+   - Visual distinction for inactive/former employees:
+     - Reduced opacity (60%)
+     - Gray background
+     - "Former" badge next to employee name
+   - Status badge shows "Former" instead of "Inactive" for better UX
+
+**Data Impact:**
+- Active employees: 655
+- Inactive/Former employees: 854
+- Total in database: 1,509 (from CSV import)
+
+**User Experience:**
+- Clean, active-focused views by default across the entire application
+- Easy toggle to see former employees when needed (historical data, rehiring)
+- Clear visual indication when viewing former employees
+- Prevents accidental allocation of former employees
+- Proper workflow for offboarding (must reassign allocations first)
+
+---
+
 ### December 17, 2025 - UI Bug Fixes
 
 #### Fixed - Authentication & Page Rendering Issues

@@ -6,8 +6,9 @@ import prisma from '../../lib/prisma';
 
 export interface DashboardMetrics {
   resources: {
-    total: number;
-    active: number;
+    total: number;      // Active resources only (primary metric)
+    active: number;     // Same as total for clarity
+    inactive: number;   // Former employees (for reference only)
     onBench: number;
     inNotice: number;
     contractors: number;
@@ -162,14 +163,16 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
   // Process resource stats
   let totalResources = 0;
   let activeResources = 0;
+  let inactiveResources = 0;
   let inNotice = 0;
   let contractors = 0;
 
   for (const stat of resourceStats) {
     totalResources += stat._count;
     if (stat.status === 'ACTIVE') activeResources += stat._count;
+    if (stat.status === 'INACTIVE') inactiveResources += stat._count;
     if (stat.status === 'NOTICE') inNotice += stat._count;
-    if (stat.employmentType === 'CONTRACTOR') contractors += stat._count;
+    if (stat.employmentType === 'CONTRACTOR' && stat.status === 'ACTIVE') contractors += stat._count;
   }
 
   // Process project stats
@@ -192,8 +195,9 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
 
   return {
     resources: {
-      total: totalResources,
+      total: activeResources,      // Active is now the primary "total" metric
       active: activeResources,
+      inactive: inactiveResources, // Former employees
       onBench: benchResources,
       inNotice,
       contractors,

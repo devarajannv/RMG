@@ -46,6 +46,7 @@ const listResourcesSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   search: z.string().optional(),
   status: z.union([z.string(), z.array(z.string())]).optional(),
+  includeInactive: z.coerce.boolean().default(false),  // New: toggle to include inactive
   employmentType: z.union([z.string(), z.array(z.string())]).optional(),
   practiceId: z.string().uuid().optional(),
   locationId: z.string().uuid().optional(),
@@ -81,9 +82,17 @@ router.get(
     try {
       const query = listResourcesSchema.parse(req.query);
       
+      // Default to ACTIVE status unless includeInactive is true or status is explicitly set
+      let statusFilter = normalizeArray(query.status);
+      if (!statusFilter && !query.includeInactive) {
+        statusFilter = ['ACTIVE'];  // Default to active only
+      } else if (query.includeInactive && !statusFilter) {
+        statusFilter = undefined;  // Show all statuses
+      }
+      
       const filters = {
         search: query.search,
-        status: normalizeArray(query.status),
+        status: statusFilter,
         employmentType: normalizeArray(query.employmentType),
         practiceId: query.practiceId,
         locationId: query.locationId,
