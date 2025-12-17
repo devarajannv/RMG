@@ -445,7 +445,7 @@ export default function ResourcesPage() {
     queryFn: async () => {
       // Pass includeInactive parameter and higher limit to API
       return api.get<{ data: Resource[]; pagination: { total: number; page: number; limit: number } }>(
-        `/resources?includeInactive=${showInactive}&limit=1000`
+        `/resources?includeInactive=${showInactive}&limit=500`
       );
     },
   });
