@@ -84,4 +84,16 @@ export const Errors = {
     new ApiError('Too many requests', 429, 'RATE_LIMITED'),
 };
 
+/**
+ * Async handler wrapper for Express route handlers
+ * Catches async errors and passes them to the error handler
+ */
+export function asyncHandler<T>(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<T>
+) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
 

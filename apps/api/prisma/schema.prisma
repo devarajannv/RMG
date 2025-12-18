@@ -14,39 +14,52 @@ datasource db {
 // TENANT (Organization)
 // =============================================================================
 model Tenant {
-  id              String    @id @default(uuid()) @db.Uuid
-  name            String    @db.VarChar(200)
-  slug            String    @unique @db.VarChar(100)
-  tier            TenantTier @default(FREE)
+  id              String       @id @default(uuid()) @db.Uuid
+  name            String       @db.VarChar(200)
+  slug            String       @unique @db.VarChar(100)
+  tier            TenantTier   @default(FREE)
   status          TenantStatus @default(TRIAL)
   settings        Json?
-  logoUrl         String?   @db.VarChar(500)
-  primaryColor    String?   @db.VarChar(7)
-  timezone        String    @default("Asia/Kolkata") @db.VarChar(50)
-  currency        String    @default("INR") @db.VarChar(3)
-  fiscalYearStart Int       @default(4)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  logoUrl         String?      @db.VarChar(500)
+  primaryColor    String?      @db.VarChar(7)
+  timezone        String       @default("Asia/Kolkata") @db.VarChar(50)
+  currency        String       @default("INR") @db.VarChar(3)
+  fiscalYearStart Int          @default(4)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   deletedAt       DateTime?
 
   // Relations
-  users           User[]
-  resources       Resource[]
-  projects        Project[]
-  clients         Client[]
-  contracts       Contract[]
-  allocations     Allocation[]
-  practices       Practice[]
-  locations       Location[]
-  skills          Skill[]
-  skillCategories SkillCategory[]
-  roles           Role[]
-  auditLogs       AuditLog[]
+  users            User[]
+  resources        Resource[]
+  projects         Project[]
+  clients          Client[]
+  contracts        Contract[]
+  allocations      Allocation[]
+  practices        Practice[]
+  locations        Location[]
+  skills           Skill[]
+  skillCategories  SkillCategory[]
+  roles            Role[]
+  auditLogs        AuditLog[]
   timesheetEntries TimesheetEntry[]
   timesheetPeriods TimesheetPeriod[]
   opportunities    Opportunity[]
   currencies       Currency[]
   documents        Document[]
+
+  // Request Flow Relations
+  requests                 Request[]
+  approvalChains           ApprovalChain[]
+  approvalRules            ApprovalRule[]
+  tenantRequestTypeConfigs TenantRequestTypeConfig[]
+  delegations              Delegation[]
+  requestSequences         RequestSequence[]
+  requestTemplates         RequestTemplate[]
+  slaPriorityMatrix        SlaPriorityMatrix[]
+  businessHoursConfig      BusinessHoursConfig?
+  holidays                 Holiday[]
+  webhooks                 Webhook[]
 
   @@index([status])
   @@index([tier])
@@ -68,37 +81,56 @@ enum TenantStatus {
 // USER (System User)
 // =============================================================================
 model User {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  resourceId      String?   @db.Uuid
-  resource        Resource? @relation(fields: [resourceId], references: [id])
-  email           String    @db.VarChar(255)
-  passwordHash    String    @db.VarChar(255)
-  firstName       String    @db.VarChar(100)
-  lastName        String    @db.VarChar(100)
-  status          UserStatus @default(ACTIVE)
-  emailVerified   Boolean   @default(false)
-  lastLoginAt     DateTime?
-  failedLogins    Int       @default(0)
-  lockedUntil     DateTime?
-  mfaEnabled      Boolean   @default(false)
-  mfaSecret       String?   @db.VarChar(100)
-  microsoftId     String?   @db.VarChar(100)  // Azure AD Object ID for SSO
-  googleId        String?   @db.VarChar(100)  // Google ID for future SSO
-  preferences     Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id            String     @id @default(uuid()) @db.Uuid
+  tenantId      String     @db.Uuid
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  resourceId    String?    @db.Uuid
+  resource      Resource?  @relation(fields: [resourceId], references: [id])
+  email         String     @db.VarChar(255)
+  passwordHash  String     @db.VarChar(255)
+  firstName     String     @db.VarChar(100)
+  lastName      String     @db.VarChar(100)
+  status        UserStatus @default(ACTIVE)
+  emailVerified Boolean    @default(false)
+  lastLoginAt   DateTime?
+  failedLogins  Int        @default(0)
+  lockedUntil   DateTime?
+  mfaEnabled    Boolean    @default(false)
+  mfaSecret     String?    @db.VarChar(100)
+  microsoftId   String?    @db.VarChar(100) // Azure AD Object ID for SSO
+  googleId      String?    @db.VarChar(100) // Google ID for future SSO
+  preferences   Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
 
   // Relations
-  roles               UserRole[]
-  allocationsRequested Allocation[] @relation("AllocationRequestedBy")
-  allocationsApproved  Allocation[] @relation("AllocationApprovedBy")
-  timesheetsApproved   TimesheetEntry[] @relation("TimesheetApprovedBy")
+  roles                UserRole[]
+  allocationsRequested Allocation[]      @relation("AllocationRequestedBy")
+  allocationsApproved  Allocation[]      @relation("AllocationApprovedBy")
+  timesheetsApproved   TimesheetEntry[]  @relation("TimesheetApprovedBy")
   periodsApproved      TimesheetPeriod[] @relation("PeriodApprovedBy")
-  skillsVerified       ResourceSkill[] @relation("SkillVerifiedBy")
+  skillsVerified       ResourceSkill[]   @relation("SkillVerifiedBy")
   auditLogs            AuditLog[]
+
+  // Request Flow Relations
+  requestsCreated         Request[]                @relation("RequestRequester")
+  requestsOnBehalf        Request[]                @relation("RequestOnBehalf")
+  approvalStepsAssigned   ApprovalStep[]           @relation("StepApprover")
+  approvalsAssigned       RequestApproval[]        @relation("ApprovalApprover")
+  approvalsDelegatedFrom  RequestApproval[]        @relation("DelegatedApproval")
+  approvalsReassignedFrom RequestApproval[]        @relation("ReassignedApproval")
+  requestComments         RequestComment[]         @relation("RequestCommentUser")
+  requestHistory          RequestHistory[]         @relation("RequestHistoryUser")
+  attachmentsUploaded     RequestAttachment[]      @relation("AttachmentUploader")
+  watchingRequests        RequestWatcher[]         @relation("RequestWatcher")
+  watchersAdded           RequestWatcher[]         @relation("WatcherAddedBy")
+  requestLocks            RequestLock[]            @relation("RequestLocker")
+  delegationsAsDelegator  Delegation[]             @relation("Delegator")
+  delegationsAsDelegate   Delegation[]             @relation("Delegate")
+  slaEscalations          SlaBreachEvent[]         @relation("SlaEscalatedTo")
+  notifications           Notification[]           @relation("UserNotifications")
+  notificationPreferences NotificationPreference[] @relation("NotificationPreferences")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -114,34 +146,37 @@ enum UserStatus {
 // ROLE & PERMISSIONS
 // =============================================================================
 model Role {
-  id          String    @id @default(uuid()) @db.Uuid
-  tenantId    String    @db.Uuid
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
-  name        String    @db.VarChar(100)
-  description String?   @db.VarChar(500)
-  isSystem    Boolean   @default(false)
-  permissions Json      // Legacy: Array of permission strings
-  level       Int       @default(0)  // Hierarchy level: 0=org, 1=delivery, 2=practice, 3=team
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String   @db.VarChar(100)
+  description  String?  @db.VarChar(500)
+  isSystem     Boolean  @default(false)
+  permissions  Json // Legacy: Array of permission strings
+  level        Int      @default(0) // Hierarchy level: 0=org, 1=delivery, 2=practice, 3=team
   parentRoleId String?  @db.Uuid
   parentRole   Role?    @relation("RoleHierarchy", fields: [parentRoleId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
   users           UserRole[]
-  childRoles      Role[] @relation("RoleHierarchy")
+  childRoles      Role[]           @relation("RoleHierarchy")
   rolePermissions RolePermission[]
+
+  // Request Flow Relations
+  approvalSteps ApprovalStep[] @relation("StepApproverRole")
 
   @@unique([tenantId, name])
 }
 
 model UserRole {
-  userId      String   @db.Uuid
-  user        User     @relation(fields: [userId], references: [id])
-  roleId      String   @db.Uuid
-  role        Role     @relation(fields: [roleId], references: [id])
-  assignedAt  DateTime @default(now())
-  assignedBy  String   @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id])
+  roleId     String   @db.Uuid
+  role       Role     @relation(fields: [roleId], references: [id])
+  assignedAt DateTime @default(now())
+  assignedBy String   @db.Uuid
 
   @@id([userId, roleId])
 }
@@ -150,62 +185,66 @@ model UserRole {
 // RESOURCE (Employee/Contractor)
 // =============================================================================
 model Resource {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  practiceId      String?   @db.Uuid
-  practice        Practice? @relation(fields: [practiceId], references: [id])
-  managerId       String?   @db.Uuid
-  manager         Resource? @relation("ResourceManager", fields: [managerId], references: [id])
-  locationId      String?   @db.Uuid
-  location        Location? @relation(fields: [locationId], references: [id])
-  
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @db.Uuid
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  practiceId String?   @db.Uuid
+  practice   Practice? @relation(fields: [practiceId], references: [id])
+  managerId  String?   @db.Uuid
+  manager    Resource? @relation("ResourceManager", fields: [managerId], references: [id])
+  locationId String?   @db.Uuid
+  location   Location? @relation(fields: [locationId], references: [id])
+
   // Identity
-  employeeId      String    @db.VarChar(50)
-  firstName       String    @db.VarChar(100)
-  lastName        String    @db.VarChar(100)
-  preferredName   String?   @db.VarChar(100)
-  email           String    @db.VarChar(255)
-  phone           String?   @db.VarChar(20)
-  photoUrl        String?   @db.VarChar(500)
-  
+  employeeId    String  @db.VarChar(50)
+  firstName     String  @db.VarChar(100)
+  lastName      String  @db.VarChar(100)
+  preferredName String? @db.VarChar(100)
+  email         String  @db.VarChar(255)
+  phone         String? @db.VarChar(20)
+  photoUrl      String? @db.VarChar(500)
+
   // Employment
-  employmentType  EmploymentType
-  band            String    @db.VarChar(10)
-  designation     String    @db.VarChar(100)
-  department      String?   @db.VarChar(100)
-  dateOfJoining   DateTime  @db.Date
-  dateOfExit      DateTime? @db.Date
-  exitReason      String?   @db.VarChar(200)
-  
+  employmentType EmploymentType
+  band           String         @db.VarChar(10)
+  designation    String         @db.VarChar(100)
+  department     String?        @db.VarChar(100)
+  dateOfJoining  DateTime       @db.Date
+  dateOfExit     DateTime?      @db.Date
+  exitReason     String?        @db.VarChar(200)
+
   // Capacity
-  capacity        Int       @default(100)
-  costPerHour     Decimal?  @db.Decimal(10, 2)
-  billRateDefault Decimal?  @db.Decimal(10, 2)
-  
+  capacity        Int      @default(100)
+  costPerHour     Decimal? @db.Decimal(10, 2)
+  billRateDefault Decimal? @db.Decimal(10, 2)
+
   // Status
   status          ResourceStatus @default(ACTIVE)
-  benchSince      DateTime? @db.Date
-  lastAllocatedAt DateTime? @db.Date
-  
+  benchSince      DateTime?      @db.Date
+  lastAllocatedAt DateTime?      @db.Date
+
   // Metadata
-  tags            String[]
-  customFields    Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  tags         String[]
+  customFields Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   // Relations
-  user              User[]
-  directReports     Resource[] @relation("ResourceManager")
-  skills            ResourceSkill[]
-  allocations       Allocation[]
-  projectsManaged   Project[] @relation("ProjectManager")
-  contractsManaged  Contract[] @relation("ContractAccountManager")
-  opportunitiesOwned Opportunity[] @relation("OpportunityOwner")
-  timesheetEntries  TimesheetEntry[]
-  timesheetPeriods  TimesheetPeriod[]
-  practicesHead     Practice[] @relation("PracticeHead")
+  user               User[]
+  directReports      Resource[]        @relation("ResourceManager")
+  skills             ResourceSkill[]
+  allocations        Allocation[]
+  projectsManaged    Project[]         @relation("ProjectManager")
+  contractsManaged   Contract[]        @relation("ContractAccountManager")
+  opportunitiesOwned Opportunity[]     @relation("OpportunityOwner")
+  timesheetEntries   TimesheetEntry[]
+  timesheetPeriods   TimesheetPeriod[]
+  practicesHead      Practice[]        @relation("PracticeHead")
+
+  // Request Flow Relations
+  requests                 Request[]
+  requestAffectedResources RequestAffectedResource[]
 
   @@unique([tenantId, employeeId])
   @@unique([tenantId, email])
@@ -241,26 +280,26 @@ model SkillCategory {
   updatedAt DateTime @updatedAt
 
   // Relations
-  skills    Skill[]
+  skills Skill[]
 
   @@unique([tenantId, name])
 }
 
 model Skill {
-  id           String    @id @default(uuid()) @db.Uuid
-  tenantId     String    @db.Uuid
-  tenant       Tenant    @relation(fields: [tenantId], references: [id])
-  categoryId   String?   @db.Uuid
+  id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String         @db.Uuid
+  tenant       Tenant         @relation(fields: [tenantId], references: [id])
+  categoryId   String?        @db.Uuid
   category     SkillCategory? @relation(fields: [categoryId], references: [id])
-  name         String    @db.VarChar(100)
-  description  String?   @db.VarChar(500)
-  isVerifiable Boolean   @default(false)
-  status       SkillStatus @default(ACTIVE)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  name         String         @db.VarChar(100)
+  description  String?        @db.VarChar(500)
+  isVerifiable Boolean        @default(false)
+  status       SkillStatus    @default(ACTIVE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   // Relations
-  resources    ResourceSkill[]
+  resources ResourceSkill[]
 
   @@unique([tenantId, name])
 }
@@ -271,20 +310,20 @@ enum SkillStatus {
 }
 
 model ResourceSkill {
-  resourceId   String   @db.Uuid
-  resource     Resource @relation(fields: [resourceId], references: [id])
-  skillId      String   @db.Uuid
-  skill        Skill    @relation(fields: [skillId], references: [id])
-  proficiency  Proficiency
-  yearsExp     Decimal? @db.Decimal(3, 1)
-  lastUsed     DateTime? @db.Date
-  certified    Boolean  @default(false)
-  certExpiry   DateTime? @db.Date
-  verifiedBy   String?  @db.Uuid
-  verifiedByUser User?  @relation("SkillVerifiedBy", fields: [verifiedBy], references: [id])
-  verifiedAt   DateTime?
-  notes        String?  @db.VarChar(500)
-  updatedAt    DateTime @updatedAt
+  resourceId     String      @db.Uuid
+  resource       Resource    @relation(fields: [resourceId], references: [id])
+  skillId        String      @db.Uuid
+  skill          Skill       @relation(fields: [skillId], references: [id])
+  proficiency    Proficiency
+  yearsExp       Decimal?    @db.Decimal(3, 1)
+  lastUsed       DateTime?   @db.Date
+  certified      Boolean     @default(false)
+  certExpiry     DateTime?   @db.Date
+  verifiedBy     String?     @db.Uuid
+  verifiedByUser User?       @relation("SkillVerifiedBy", fields: [verifiedBy], references: [id])
+  verifiedAt     DateTime?
+  notes          String?     @db.VarChar(500)
+  updatedAt      DateTime    @updatedAt
 
   @@id([resourceId, skillId])
   @@index([skillId])
@@ -301,28 +340,28 @@ enum Proficiency {
 // CLIENT
 // =============================================================================
 model Client {
-  id             String    @id @default(uuid()) @db.Uuid
-  tenantId       String    @db.Uuid
-  tenant         Tenant    @relation(fields: [tenantId], references: [id])
-  name           String    @db.VarChar(200)
-  code           String    @db.VarChar(20)
-  industry       String?   @db.VarChar(100)
-  website        String?   @db.VarChar(255)
-  logoUrl        String?   @db.VarChar(500)
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @db.Uuid
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  name           String       @db.VarChar(200)
+  code           String       @db.VarChar(20)
+  industry       String?      @db.VarChar(100)
+  website        String?      @db.VarChar(255)
+  logoUrl        String?      @db.VarChar(500)
   status         ClientStatus @default(ACTIVE)
   tier           ClientTier?
   billingAddress Json?
   contacts       Json?
   notes          String?
   customFields   Json?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
 
   // Relations
-  contracts      Contract[]
-  projects       Project[]
-  opportunities  Opportunity[]
+  contracts     Contract[]
+  projects      Project[]
+  opportunities Opportunity[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -345,50 +384,53 @@ enum ClientTier {
 // CONTRACT
 // =============================================================================
 model Contract {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  clientId        String    @db.Uuid
-  client          Client    @relation(fields: [clientId], references: [id])
-  accountMgrId    String?   @db.Uuid
-  accountManager  Resource? @relation("ContractAccountManager", fields: [accountMgrId], references: [id])
-  
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @db.Uuid
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  clientId       String    @db.Uuid
+  client         Client    @relation(fields: [clientId], references: [id])
+  accountMgrId   String?   @db.Uuid
+  accountManager Resource? @relation("ContractAccountManager", fields: [accountMgrId], references: [id])
+
   // Identity
-  contractNumber  String    @db.VarChar(50)
-  name            String    @db.VarChar(200)
-  type            ContractType
-  description     String?
-  
+  contractNumber String       @db.VarChar(50)
+  name           String       @db.VarChar(200)
+  type           ContractType
+  description    String?
+
   // Timeline
-  startDate       DateTime  @db.Date
-  endDate         DateTime? @db.Date
-  signedDate      DateTime? @db.Date
-  
+  startDate  DateTime  @db.Date
+  endDate    DateTime? @db.Date
+  signedDate DateTime? @db.Date
+
   // Financials
-  value           Decimal?  @db.Decimal(15, 2)
-  currency        String    @default("INR") @db.VarChar(3)
-  billingType     BillingType
-  paymentTerms    String?   @db.VarChar(50)
-  
+  value        Decimal?    @db.Decimal(15, 2)
+  currency     String      @default("INR") @db.VarChar(3)
+  billingType  BillingType
+  paymentTerms String?     @db.VarChar(50)
+
   // Status
-  status          ContractStatus @default(DRAFT)
-  renewalDate     DateTime? @db.Date
-  autoRenew       Boolean   @default(false)
-  
+  status      ContractStatus @default(DRAFT)
+  renewalDate DateTime?      @db.Date
+  autoRenew   Boolean        @default(false)
+
   // Documents
-  documentUrl     String?   @db.VarChar(500)
-  attachments     Json?
-  
+  documentUrl String? @db.VarChar(500)
+  attachments Json?
+
   // Metadata
-  notes           String?
-  customFields    Json?
-  externalRefs    Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  notes        String?
+  customFields Json?
+  externalRefs Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   // Relations
-  projects        Project[]
+  projects Project[]
+
+  // Request Flow Relations
+  requests Request[]
 
   @@unique([tenantId, contractNumber])
   @@index([tenantId, clientId])
@@ -426,55 +468,58 @@ enum BillingType {
 // PROJECT
 // =============================================================================
 model Project {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  clientId        String?   @db.Uuid
-  client          Client?   @relation(fields: [clientId], references: [id])
-  contractId      String?   @db.Uuid
-  contract        Contract? @relation(fields: [contractId], references: [id])
-  managerId       String?   @db.Uuid
-  manager         Resource? @relation("ProjectManager", fields: [managerId], references: [id])
-  practiceId      String?   @db.Uuid
-  practice        Practice? @relation(fields: [practiceId], references: [id])
-  
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @db.Uuid
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  clientId   String?   @db.Uuid
+  client     Client?   @relation(fields: [clientId], references: [id])
+  contractId String?   @db.Uuid
+  contract   Contract? @relation(fields: [contractId], references: [id])
+  managerId  String?   @db.Uuid
+  manager    Resource? @relation("ProjectManager", fields: [managerId], references: [id])
+  practiceId String?   @db.Uuid
+  practice   Practice? @relation(fields: [practiceId], references: [id])
+
   // Identity
-  code            String    @db.VarChar(50)
-  name            String    @db.VarChar(200)
-  description     String?
-  
+  code        String  @db.VarChar(50)
+  name        String  @db.VarChar(200)
+  description String?
+
   // Classification
-  type            ProjectType
-  category        String?   @db.VarChar(100)
-  deliveryModel   DeliveryModel?
-  
+  type          ProjectType
+  category      String?        @db.VarChar(100)
+  deliveryModel DeliveryModel?
+
   // Timeline
-  startDate       DateTime  @db.Date
-  endDate         DateTime? @db.Date
-  actualEndDate   DateTime? @db.Date
-  
+  startDate     DateTime  @db.Date
+  endDate       DateTime? @db.Date
+  actualEndDate DateTime? @db.Date
+
   // Financials
-  budgetHours     Int?
-  budgetAmount    Decimal?  @db.Decimal(15, 2)
-  billingType     BillingType?
-  defaultRate     Decimal?  @db.Decimal(10, 2)
-  
+  budgetHours  Int?
+  budgetAmount Decimal?     @db.Decimal(15, 2)
+  billingType  BillingType?
+  defaultRate  Decimal?     @db.Decimal(10, 2)
+
   // Status
-  status          ProjectStatus @default(PIPELINE)
-  healthStatus    HealthStatus?
-  priority        Priority    @default(MEDIUM)
-  
+  status       ProjectStatus @default(PIPELINE)
+  healthStatus HealthStatus?
+  priority     Priority      @default(MEDIUM)
+
   // Metadata
-  tags            String[]
-  customFields    Json?
-  externalRefs    Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  tags         String[]
+  customFields Json?
+  externalRefs Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   // Relations
-  allocations     Allocation[]
+  allocations      Allocation[]
   timesheetEntries TimesheetEntry[]
+
+  // Request Flow Relations
+  requests Request[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -521,46 +566,49 @@ enum Priority {
 // ALLOCATION
 // =============================================================================
 model Allocation {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  resourceId      String    @db.Uuid
-  resource        Resource  @relation(fields: [resourceId], references: [id])
-  projectId       String    @db.Uuid
-  project         Project   @relation(fields: [projectId], references: [id])
-  requestedById   String?   @db.Uuid
-  requestedBy     User?     @relation("AllocationRequestedBy", fields: [requestedById], references: [id])
-  approvedById    String?   @db.Uuid
-  approvedBy      User?     @relation("AllocationApprovedBy", fields: [approvedById], references: [id])
-  
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  resourceId    String   @db.Uuid
+  resource      Resource @relation(fields: [resourceId], references: [id])
+  projectId     String   @db.Uuid
+  project       Project  @relation(fields: [projectId], references: [id])
+  requestedById String?  @db.Uuid
+  requestedBy   User?    @relation("AllocationRequestedBy", fields: [requestedById], references: [id])
+  approvedById  String?  @db.Uuid
+  approvedBy    User?    @relation("AllocationApprovedBy", fields: [approvedById], references: [id])
+
   // Assignment
-  role            String    @db.VarChar(100)
-  percentage      Int
-  startDate       DateTime  @db.Date
-  endDate         DateTime  @db.Date
-  actualEndDate   DateTime? @db.Date
-  
+  role          String    @db.VarChar(100)
+  percentage    Int
+  startDate     DateTime  @db.Date
+  endDate       DateTime  @db.Date
+  actualEndDate DateTime? @db.Date
+
   // Status
-  status          AllocationStatus @default(PROPOSED)
-  isBillable      Boolean   @default(true)
-  billRate        Decimal?  @db.Decimal(10, 2)
-  
+  status     AllocationStatus @default(PROPOSED)
+  isBillable Boolean          @default(true)
+  billRate   Decimal?         @db.Decimal(10, 2)
+
   // Lifecycle
-  confirmedAt     DateTime?
-  startedAt       DateTime?
-  completedAt     DateTime?
-  cancelledAt     DateTime?
-  cancelReason    String?   @db.VarChar(500)
-  
+  confirmedAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?   @db.VarChar(500)
+
   // Metadata
-  notes           String?
-  customFields    Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  notes        String?
+  customFields Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   // Relations
   timesheetEntries TimesheetEntry[]
+
+  // Request Flow Relations
+  requests Request[]
 
   @@index([tenantId, resourceId, startDate, endDate])
   @@index([tenantId, projectId, startDate, endDate])
@@ -580,26 +628,29 @@ enum AllocationStatus {
 // PRACTICE (Business Unit)
 // =============================================================================
 model Practice {
-  id                String    @id @default(uuid()) @db.Uuid
-  tenantId          String    @db.Uuid
-  tenant            Tenant    @relation(fields: [tenantId], references: [id])
-  headId            String?   @db.Uuid
-  head              Resource? @relation("PracticeHead", fields: [headId], references: [id])
-  parentId          String?   @db.Uuid
-  parent            Practice? @relation("PracticeHierarchy", fields: [parentId], references: [id])
-  name              String    @db.VarChar(100)
-  code              String    @db.VarChar(20)
-  description       String?   @db.VarChar(500)
+  id                String         @id @default(uuid()) @db.Uuid
+  tenantId          String         @db.Uuid
+  tenant            Tenant         @relation(fields: [tenantId], references: [id])
+  headId            String?        @db.Uuid
+  head              Resource?      @relation("PracticeHead", fields: [headId], references: [id])
+  parentId          String?        @db.Uuid
+  parent            Practice?      @relation("PracticeHierarchy", fields: [parentId], references: [id])
+  name              String         @db.VarChar(100)
+  code              String         @db.VarChar(20)
+  description       String?        @db.VarChar(500)
   targetUtilization Int?
-  costCenter        String?   @db.VarChar(50)
+  costCenter        String?        @db.VarChar(50)
   status            PracticeStatus @default(ACTIVE)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   // Relations
-  children          Practice[] @relation("PracticeHierarchy")
-  resources         Resource[]
-  projects          Project[]
+  children  Practice[] @relation("PracticeHierarchy")
+  resources Resource[]
+  projects  Project[]
+
+  // Request Flow Relations
+  approvalChains ApprovalChain[]
 
   @@unique([tenantId, code])
   @@index([tenantId, parentId])
@@ -614,19 +665,19 @@ enum PracticeStatus {
 // LOCATION
 // =============================================================================
 model Location {
-  id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @db.Uuid
-  tenant    Tenant    @relation(fields: [tenantId], references: [id])
-  name      String    @db.VarChar(100)
-  code      String    @db.VarChar(20)
+  id        String         @id @default(uuid()) @db.Uuid
+  tenantId  String         @db.Uuid
+  tenant    Tenant         @relation(fields: [tenantId], references: [id])
+  name      String         @db.VarChar(100)
+  code      String         @db.VarChar(20)
   type      LocationType
   address   Json?
-  timezone  String    @db.VarChar(50)
-  country   String    @db.VarChar(2)
-  isOnshore Boolean   @default(false)
+  timezone  String         @db.VarChar(50)
+  country   String         @db.VarChar(2)
+  isOnshore Boolean        @default(false)
   status    LocationStatus @default(ACTIVE)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   // Relations
   resources Resource[]
@@ -649,42 +700,42 @@ enum LocationStatus {
 // TIMESHEET_ENTRY
 // =============================================================================
 model TimesheetEntry {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  resourceId      String    @db.Uuid
-  resource        Resource  @relation(fields: [resourceId], references: [id])
-  projectId       String    @db.Uuid
-  project         Project   @relation(fields: [projectId], references: [id])
-  allocationId    String?   @db.Uuid
-  allocation      Allocation? @relation(fields: [allocationId], references: [id])
-  approvedById    String?   @db.Uuid
-  approvedBy      User?     @relation("TimesheetApprovedBy", fields: [approvedById], references: [id])
-  
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @db.Uuid
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  resourceId   String      @db.Uuid
+  resource     Resource    @relation(fields: [resourceId], references: [id])
+  projectId    String      @db.Uuid
+  project      Project     @relation(fields: [projectId], references: [id])
+  allocationId String?     @db.Uuid
+  allocation   Allocation? @relation(fields: [allocationId], references: [id])
+  approvedById String?     @db.Uuid
+  approvedBy   User?       @relation("TimesheetApprovedBy", fields: [approvedById], references: [id])
+
   // Time Entry
-  date            DateTime  @db.Date
-  hours           Decimal   @db.Decimal(4, 2)
-  taskType        String?   @db.VarChar(100)
-  description     String?
-  
+  date        DateTime @db.Date
+  hours       Decimal  @db.Decimal(4, 2)
+  taskType    String?  @db.VarChar(100)
+  description String?
+
   // Classification
-  isBillable      Boolean   @default(true)
-  isOvertime      Boolean   @default(false)
-  billRate        Decimal?  @db.Decimal(10, 2)
-  
+  isBillable Boolean  @default(true)
+  isOvertime Boolean  @default(false)
+  billRate   Decimal? @db.Decimal(10, 2)
+
   // Status
   status          TimesheetStatus @default(DRAFT)
   submittedAt     DateTime?
   approvedAt      DateTime?
   rejectedAt      DateTime?
-  rejectionReason String?   @db.VarChar(500)
-  
+  rejectionReason String?         @db.VarChar(500)
+
   // Metadata
-  tags            String[]
-  customFields    Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  tags         String[]
+  customFields Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   @@index([tenantId, resourceId, date])
   @@index([tenantId, projectId, date])
@@ -703,33 +754,33 @@ enum TimesheetStatus {
 // TIMESHEET_PERIOD
 // =============================================================================
 model TimesheetPeriod {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  resourceId      String    @db.Uuid
-  resource        Resource  @relation(fields: [resourceId], references: [id])
-  approvedById    String?   @db.Uuid
-  approvedBy      User?     @relation("PeriodApprovedBy", fields: [approvedById], references: [id])
-  
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  resourceId   String   @db.Uuid
+  resource     Resource @relation(fields: [resourceId], references: [id])
+  approvedById String?  @db.Uuid
+  approvedBy   User?    @relation("PeriodApprovedBy", fields: [approvedById], references: [id])
+
   // Period
-  periodStart     DateTime  @db.Date
-  periodEnd       DateTime  @db.Date
-  periodType      PeriodType
-  
+  periodStart DateTime   @db.Date
+  periodEnd   DateTime   @db.Date
+  periodType  PeriodType
+
   // Aggregates
-  totalHours      Decimal   @db.Decimal(5, 2)
-  billableHours   Decimal   @db.Decimal(5, 2)
-  overtimeHours   Decimal   @db.Decimal(5, 2)
-  
+  totalHours    Decimal @db.Decimal(5, 2)
+  billableHours Decimal @db.Decimal(5, 2)
+  overtimeHours Decimal @db.Decimal(5, 2)
+
   // Status
-  status          PeriodStatus @default(OPEN)
-  submittedAt     DateTime?
-  approvedAt      DateTime?
-  rejectedAt      DateTime?
-  comments        String?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  status      PeriodStatus @default(OPEN)
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
+  comments    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tenantId, resourceId, periodStart, periodEnd])
   @@index([tenantId, status])
@@ -753,48 +804,48 @@ enum PeriodStatus {
 // OPPORTUNITY (Pipeline/Deals from CRM)
 // =============================================================================
 model Opportunity {
-  id                 String    @id @default(uuid()) @db.Uuid
-  tenantId           String    @db.Uuid
-  tenant             Tenant    @relation(fields: [tenantId], references: [id])
-  clientId           String?   @db.Uuid
-  client             Client?   @relation(fields: [clientId], references: [id])
-  ownerId            String?   @db.Uuid
-  owner              Resource? @relation("OpportunityOwner", fields: [ownerId], references: [id])
-  
+  id       String    @id @default(uuid()) @db.Uuid
+  tenantId String    @db.Uuid
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  clientId String?   @db.Uuid
+  client   Client?   @relation(fields: [clientId], references: [id])
+  ownerId  String?   @db.Uuid
+  owner    Resource? @relation("OpportunityOwner", fields: [ownerId], references: [id])
+
   // Identity
-  externalId         String    @db.VarChar(100)
-  name               String    @db.VarChar(200)
-  description        String?
-  
+  externalId  String  @db.VarChar(100)
+  name        String  @db.VarChar(200)
+  description String?
+
   // Pipeline
-  stage              String    @db.VarChar(50)
-  probability        Int?
-  expectedCloseDate  DateTime? @db.Date
-  
+  stage             String    @db.VarChar(50)
+  probability       Int?
+  expectedCloseDate DateTime? @db.Date
+
   // Value
-  dealValue          Decimal?  @db.Decimal(15, 2)
-  currency           String    @default("INR") @db.VarChar(3)
-  
+  dealValue Decimal? @db.Decimal(15, 2)
+  currency  String   @default("INR") @db.VarChar(3)
+
   // Resource Needs
   estimatedHeadcount Int?
   requiredSkills     Json?
   estimatedStart     DateTime? @db.Date
   estimatedDuration  Int?
-  
+
   // Status
-  status             OpportunityStatus @default(OPEN)
-  wonDate            DateTime? @db.Date
-  lostDate           DateTime? @db.Date
-  lostReason         String?   @db.VarChar(200)
-  
+  status     OpportunityStatus @default(OPEN)
+  wonDate    DateTime?         @db.Date
+  lostDate   DateTime?         @db.Date
+  lostReason String?           @db.VarChar(200)
+
   // Sync
-  source             String    @db.VarChar(50)
-  lastSyncedAt       DateTime?
-  externalUrl        String?   @db.VarChar(500)
-  
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
+  source       String    @db.VarChar(50)
+  lastSyncedAt DateTime?
+  externalUrl  String?   @db.VarChar(500)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@unique([tenantId, externalId, source])
   @@index([tenantId, status])
@@ -813,17 +864,17 @@ enum OpportunityStatus {
 // AUDIT_LOG
 // =============================================================================
 model AuditLog {
-  id          String    @id @default(uuid()) @db.Uuid
-  tenantId    String    @db.Uuid
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
-  userId      String?   @db.Uuid
-  user        User?     @relation(fields: [userId], references: [id])
-  entityType  String    @db.VarChar(50)
-  entityId    String    @db.Uuid
-  action      AuditAction
-  changes     Json?
-  metadata    Json?
-  timestamp   DateTime  @default(now())
+  id         String      @id @default(uuid()) @db.Uuid
+  tenantId   String      @db.Uuid
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  userId     String?     @db.Uuid
+  user       User?       @relation(fields: [userId], references: [id])
+  entityType String      @db.VarChar(50)
+  entityId   String      @db.Uuid
+  action     AuditAction
+  changes    Json?
+  metadata   Json?
+  timestamp  DateTime    @default(now())
 
   @@index([tenantId, entityType, entityId])
   @@index([tenantId, userId])
@@ -853,17 +904,17 @@ enum AuditAction {
 // CURRENCY & EXCHANGE RATES
 // =============================================================================
 model Currency {
-  id          String    @id @default(uuid()) @db.Uuid
-  tenantId    String    @db.Uuid
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
-  code        String    @db.VarChar(3)   // ISO 4217: USD, INR, EUR
-  name        String    @db.VarChar(100)
-  symbol      String    @db.VarChar(10)
-  isBase      Boolean   @default(false)  // Organization's base currency
-  isActive    Boolean   @default(true)
-  decimalPlaces Int     @default(2)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  code          String   @db.VarChar(3) // ISO 4217: USD, INR, EUR
+  name          String   @db.VarChar(100)
+  symbol        String   @db.VarChar(10)
+  isBase        Boolean  @default(false) // Organization's base currency
+  isActive      Boolean  @default(true)
+  decimalPlaces Int      @default(2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   exchangeRatesFrom ExchangeRate[] @relation("FromCurrency")
@@ -875,19 +926,19 @@ model Currency {
 }
 
 model ExchangeRate {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  fromCurrencyId  String    @db.Uuid
-  fromCurrency    Currency  @relation("FromCurrency", fields: [fromCurrencyId], references: [id])
-  toCurrencyId    String    @db.Uuid
-  toCurrency      Currency  @relation("ToCurrency", fields: [toCurrencyId], references: [id])
-  rate            Decimal   @db.Decimal(18, 8)  // High precision for currency conversion
-  effectiveFrom   DateTime  @db.Date
-  effectiveTo     DateTime? @db.Date
-  source          String    @default("MANUAL") @db.VarChar(50)  // MANUAL, API, IMPORT
-  createdById     String?   @db.Uuid
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @db.Uuid
+  fromCurrencyId String    @db.Uuid
+  fromCurrency   Currency  @relation("FromCurrency", fields: [fromCurrencyId], references: [id])
+  toCurrencyId   String    @db.Uuid
+  toCurrency     Currency  @relation("ToCurrency", fields: [toCurrencyId], references: [id])
+  rate           Decimal   @db.Decimal(18, 8) // High precision for currency conversion
+  effectiveFrom  DateTime  @db.Date
+  effectiveTo    DateTime? @db.Date
+  source         String    @default("MANUAL") @db.VarChar(50) // MANUAL, API, IMPORT
+  createdById    String?   @db.Uuid
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([tenantId, fromCurrencyId, toCurrencyId, effectiveFrom])
   @@index([tenantId, effectiveFrom])
@@ -898,14 +949,14 @@ model ExchangeRate {
 // ENHANCED ROLE MANAGEMENT
 // =============================================================================
 model Permission {
-  id          String    @id @default(uuid()) @db.Uuid
-  tenantId    String    @db.Uuid
-  module      String    @db.VarChar(50)   // resources, projects, contracts, etc.
-  action      String    @db.VarChar(50)   // create, read, update, delete, approve, export
-  scope       String    @default("ALL") @db.VarChar(50)  // ALL, OWN, TEAM, PRACTICE
-  description String?   @db.VarChar(200)
-  isSystem    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  module      String   @db.VarChar(50) // resources, projects, contracts, etc.
+  action      String   @db.VarChar(50) // create, read, update, delete, approve, export
+  scope       String   @default("ALL") @db.VarChar(50) // ALL, OWN, TEAM, PRACTICE
+  description String?  @db.VarChar(200)
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   // Relations
   rolePermissions RolePermission[]
@@ -920,21 +971,21 @@ model RolePermission {
   permissionId String     @db.Uuid
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   granted      Boolean    @default(true)
-  conditions   Json?      // Additional conditions for fine-grained access
+  conditions   Json? // Additional conditions for fine-grained access
   createdAt    DateTime   @default(now())
 
   @@id([roleId, permissionId])
 }
 
 model RoleAssignmentAudit {
-  id          String    @id @default(uuid()) @db.Uuid
-  tenantId    String    @db.Uuid
-  userId      String    @db.Uuid
-  roleId      String    @db.Uuid
-  action      String    @db.VarChar(20)   // ASSIGNED, REVOKED
-  assignedBy  String    @db.Uuid
-  reason      String?   @db.VarChar(500)
-  timestamp   DateTime  @default(now())
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  userId     String   @db.Uuid
+  roleId     String   @db.Uuid
+  action     String   @db.VarChar(20) // ASSIGNED, REVOKED
+  assignedBy String   @db.Uuid
+  reason     String?  @db.VarChar(500)
+  timestamp  DateTime @default(now())
 
   @@index([tenantId, userId])
   @@index([tenantId, timestamp])
@@ -944,56 +995,56 @@ model RoleAssignmentAudit {
 // DOCUMENT MANAGEMENT
 // =============================================================================
 model Document {
-  id                String    @id @default(uuid()) @db.Uuid
-  tenantId          String    @db.Uuid
-  tenant            Tenant    @relation(fields: [tenantId], references: [id])
-  
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
   // Identity
-  name              String    @db.VarChar(255)
-  description       String?
-  mimeType          String    @db.VarChar(100)
-  fileSize          Int       // Size in bytes
-  
+  name        String  @db.VarChar(255)
+  description String?
+  mimeType    String  @db.VarChar(100)
+  fileSize    Int // Size in bytes
+
   // Classification
-  classification    DocumentClassification @default(INTERNAL)
-  category          String?   @db.VarChar(100)  // MSA, SOW, CR, INVOICE, TIMESHEET, etc.
-  tags              String[]
-  
+  classification DocumentClassification @default(INTERNAL)
+  category       String?                @db.VarChar(100) // MSA, SOW, CR, INVOICE, TIMESHEET, etc.
+  tags           String[]
+
   // Storage
-  storageProvider   String    @default("LOCAL") @db.VarChar(50)  // LOCAL, S3, AZURE
-  storagePath       String    @db.VarChar(500)
-  checksum          String?   @db.VarChar(64)  // SHA-256 hash for integrity
-  
+  storageProvider String  @default("LOCAL") @db.VarChar(50) // LOCAL, S3, AZURE
+  storagePath     String  @db.VarChar(500)
+  checksum        String? @db.VarChar(64) // SHA-256 hash for integrity
+
   // Relationships
-  entityType        String?   @db.VarChar(50)   // contract, project, resource, etc.
-  entityId          String?   @db.Uuid
-  
+  entityType String? @db.VarChar(50) // contract, project, resource, etc.
+  entityId   String? @db.Uuid
+
   // E-Signature
   signatureStatus   SignatureStatus?
-  signatureProvider String?   @db.VarChar(50)  // DOCUSIGN, ADOBE_SIGN
-  signatureRef      String?   @db.VarChar(200) // External signature ID
-  
+  signatureProvider String?          @db.VarChar(50) // DOCUSIGN, ADOBE_SIGN
+  signatureRef      String?          @db.VarChar(200) // External signature ID
+
   // Current version tracking
-  currentVersionId  String?   @db.Uuid
-  versionCount      Int       @default(1)
-  
+  currentVersionId String? @db.Uuid
+  versionCount     Int     @default(1)
+
   // Ownership
-  uploadedById      String    @db.Uuid
-  
+  uploadedById String @db.Uuid
+
   // Status
-  status            DocumentStatus @default(ACTIVE)
-  expiresAt         DateTime?
-  
+  status    DocumentStatus @default(ACTIVE)
+  expiresAt DateTime?
+
   // Metadata
-  customFields      Json?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
+  customFields Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   // Relations
-  versions          DocumentVersion[]
-  accessRules       DocumentAccess[]
-  accessLogs        DocumentAccessLog[]
+  versions    DocumentVersion[]
+  accessRules DocumentAccess[]
+  accessLogs  DocumentAccessLog[]
 
   @@index([tenantId, entityType, entityId])
   @@index([tenantId, classification])
@@ -1024,49 +1075,49 @@ enum SignatureStatus {
 }
 
 model DocumentVersion {
-  id            String    @id @default(uuid()) @db.Uuid
-  documentId    String    @db.Uuid
-  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid()) @db.Uuid
+  documentId    String   @db.Uuid
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   versionNumber Int
-  
+
   // Storage
-  storagePath   String    @db.VarChar(500)
-  fileSize      Int
-  checksum      String?   @db.VarChar(64)
-  
+  storagePath String  @db.VarChar(500)
+  fileSize    Int
+  checksum    String? @db.VarChar(64)
+
   // Metadata
-  changeNotes   String?   @db.VarChar(500)
-  createdById   String    @db.Uuid
-  createdAt     DateTime  @default(now())
+  changeNotes String?  @db.VarChar(500)
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
 
   @@unique([documentId, versionNumber])
   @@index([documentId])
 }
 
 model DocumentAccess {
-  id            String    @id @default(uuid()) @db.Uuid
-  documentId    String    @db.Uuid
-  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @db.Uuid
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
   // Access target (one of these should be set)
-  roleId        String?   @db.Uuid
-  userId        String?   @db.Uuid
-  practiceId    String?   @db.Uuid
-  
+  roleId     String? @db.Uuid
+  userId     String? @db.Uuid
+  practiceId String? @db.Uuid
+
   // Permissions
-  canView       Boolean   @default(true)
-  canDownload   Boolean   @default(false)
-  canEdit       Boolean   @default(false)
-  canDelete     Boolean   @default(false)
-  canShare      Boolean   @default(false)
-  
+  canView     Boolean @default(true)
+  canDownload Boolean @default(false)
+  canEdit     Boolean @default(false)
+  canDelete   Boolean @default(false)
+  canShare    Boolean @default(false)
+
   // Time-bound access
-  expiresAt     DateTime?
-  
+  expiresAt DateTime?
+
   // Audit
-  grantedById   String    @db.Uuid
-  grantedAt     DateTime  @default(now())
-  revokedAt     DateTime?
+  grantedById String    @db.Uuid
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
 
   @@index([documentId])
   @@index([roleId])
@@ -1074,14 +1125,14 @@ model DocumentAccess {
 }
 
 model DocumentAccessLog {
-  id          String    @id @default(uuid()) @db.Uuid
-  documentId  String    @db.Uuid
-  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  userId      String    @db.Uuid
-  action      String    @db.VarChar(50)  // VIEW, DOWNLOAD, EDIT, DELETE, SHARE
-  ipAddress   String?   @db.VarChar(45)
-  userAgent   String?   @db.VarChar(500)
-  timestamp   DateTime  @default(now())
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @db.Uuid
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String   @db.Uuid
+  action     String   @db.VarChar(50) // VIEW, DOWNLOAD, EDIT, DELETE, SHARE
+  ipAddress  String?  @db.VarChar(45)
+  userAgent  String?  @db.VarChar(500)
+  timestamp  DateTime @default(now())
 
   @@index([documentId, timestamp])
   @@index([userId, timestamp])
@@ -1091,44 +1142,44 @@ model DocumentAccessLog {
 // AI AGENT CONVERSATIONS
 // =============================================================================
 model AgentConversation {
-  id          String    @id @default(uuid()) @db.Uuid
-  tenantId    String    @db.Uuid
-  userId      String    @db.Uuid
-  title       String?   @db.VarChar(200)
-  context     Json?     // Current context (page, selected entity, etc.)
-  status      String    @default("ACTIVE") @db.VarChar(20)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  userId    String   @db.Uuid
+  title     String?  @db.VarChar(200)
+  context   Json? // Current context (page, selected entity, etc.)
+  status    String   @default("ACTIVE") @db.VarChar(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  messages    AgentMessage[]
+  messages AgentMessage[]
 
   @@index([tenantId, userId])
   @@index([tenantId, updatedAt])
 }
 
 model AgentMessage {
-  id              String    @id @default(uuid()) @db.Uuid
-  conversationId  String    @db.Uuid
-  conversation    AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role            String    @db.VarChar(20)  // user, assistant, system
-  content         String
-  
+  id             String            @id @default(uuid()) @db.Uuid
+  conversationId String            @db.Uuid
+  conversation   AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String            @db.VarChar(20) // user, assistant, system
+  content        String
+
   // AI Metadata
-  model           String?   @db.VarChar(50)   // gemini-flash, gpt-4o-mini, etc.
-  tokens          Json?     // { input: X, output: Y }
-  confidence      Decimal?  @db.Decimal(3, 2)
-  routingTier     String?   @db.VarChar(20)   // T1, T2, T3, T4
-  
+  model       String?  @db.VarChar(50) // gemini-flash, gpt-4o-mini, etc.
+  tokens      Json? // { input: X, output: Y }
+  confidence  Decimal? @db.Decimal(3, 2)
+  routingTier String?  @db.VarChar(20) // T1, T2, T3, T4
+
   // Response rendering
-  responseType    String?   @db.VarChar(50)   // text, table, chart, cards
-  responseData    Json?     // Structured data for rich rendering
-  
+  responseType String? @db.VarChar(50) // text, table, chart, cards
+  responseData Json? // Structured data for rich rendering
+
   // Feedback
-  feedback        String?   @db.VarChar(20)   // positive, negative
-  feedbackNote    String?   @db.VarChar(500)
-  
-  timestamp       DateTime  @default(now())
+  feedback     String? @db.VarChar(20) // positive, negative
+  feedbackNote String? @db.VarChar(500)
+
+  timestamp DateTime @default(now())
 
   @@index([conversationId, timestamp])
 }
@@ -1137,63 +1188,63 @@ model AgentMessage {
 // AI MIGRATION TOOL
 // =============================================================================
 model ImportJob {
-  id              String    @id @default(uuid()) @db.Uuid
-  tenantId        String    @db.Uuid
-  userId          String    @db.Uuid
-  
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  userId   String @db.Uuid
+
   // Job Identity
-  name            String    @db.VarChar(200)
-  description     String?
-  
+  name        String  @db.VarChar(200)
+  description String?
+
   // Source File
-  sourceFileName  String    @db.VarChar(255)
-  sourceFileType  String    @db.VarChar(50)   // CSV, XLSX, JSON, PDF, IMAGE
-  sourceFileSize  Int
-  sourceFilePath  String    @db.VarChar(500)
-  
+  sourceFileName String @db.VarChar(255)
+  sourceFileType String @db.VarChar(50) // CSV, XLSX, JSON, PDF, IMAGE
+  sourceFileSize Int
+  sourceFilePath String @db.VarChar(500)
+
   // Import Configuration
-  importPurpose   ImportPurpose @default(MIGRATION)
+  importPurpose   ImportPurpose   @default(MIGRATION)
   duplicateAction DuplicateAction @default(SKIP)
-  
+
   // AI Analysis
-  detectedEntities Json?    // { resources: 500, allocations: 200, ... }
-  fieldMappings   Json?     // AI-suggested mappings
-  dependencyOrder Json?     // Order to import entities
-  referencesToCreate Json?  // Missing references to auto-create
-  
+  detectedEntities   Json? // { resources: 500, allocations: 200, ... }
+  fieldMappings      Json? // AI-suggested mappings
+  dependencyOrder    Json? // Order to import entities
+  referencesToCreate Json? // Missing references to auto-create
+
   // Autonomy Level (earned over time)
-  autonomyLevel   Int       @default(1)  // 1=confirm all, 2=auto high-confidence, 3=full auto
-  sourceFingerprint String? @db.VarChar(64)  // Hash to identify same source format
-  
+  autonomyLevel     Int     @default(1) // 1=confirm all, 2=auto high-confidence, 3=full auto
+  sourceFingerprint String? @db.VarChar(64) // Hash to identify same source format
+
   // Processing Status
-  status          ImportJobStatus @default(PENDING_ANALYSIS)
-  analysisStarted DateTime?
+  status            ImportJobStatus @default(PENDING_ANALYSIS)
+  analysisStarted   DateTime?
   analysisCompleted DateTime?
-  importStarted   DateTime?
-  importCompleted DateTime?
-  
+  importStarted     DateTime?
+  importCompleted   DateTime?
+
   // Results
-  totalRecords    Int       @default(0)
-  importedRecords Int       @default(0)
-  skippedRecords  Int       @default(0)
-  errorRecords    Int       @default(0)
-  
+  totalRecords    Int @default(0)
+  importedRecords Int @default(0)
+  skippedRecords  Int @default(0)
+  errorRecords    Int @default(0)
+
   // Auto-created references
-  autoCreatedRefs Json?     // { practices: ['AI & ML'], locations: ['Coimbatore'] }
-  
+  autoCreatedRefs Json? // { practices: ['AI & ML'], locations: ['Coimbatore'] }
+
   // Rollback
   canRollback     Boolean   @default(true)
   rollbackExpires DateTime?
   rolledBackAt    DateTime?
   rolledBackBy    String?   @db.Uuid
-  
+
   // Audit
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  records         ImportJobRecord[]
-  mappings        ImportMapping[]
+  records  ImportJobRecord[]
+  mappings ImportMapping[]
 
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
@@ -1201,100 +1252,1211 @@ model ImportJob {
 }
 
 enum ImportPurpose {
-  MIGRATION       // First-time bulk load - skip duplicates
-  SYNC            // Refresh from HR system - update duplicates
-  MANUAL          // Ad-hoc upload - flag duplicates
+  MIGRATION // First-time bulk load - skip duplicates
+  SYNC // Refresh from HR system - update duplicates
+  MANUAL // Ad-hoc upload - flag duplicates
 }
 
 enum DuplicateAction {
-  SKIP            // Keep existing, ignore incoming
-  UPDATE          // Overwrite existing with incoming
-  FLAG            // Mark for user review
+  SKIP // Keep existing, ignore incoming
+  UPDATE // Overwrite existing with incoming
+  FLAG // Mark for user review
 }
 
 enum ImportJobStatus {
-  PENDING_ANALYSIS    // File uploaded, waiting for AI analysis
-  ANALYZING           // AI analyzing file
-  PENDING_APPROVAL    // Waiting for user to approve mappings/refs
-  APPROVED            // User approved, ready to import
-  IMPORTING           // Import in progress
-  COMPLETED           // Import finished
+  PENDING_ANALYSIS // File uploaded, waiting for AI analysis
+  ANALYZING // AI analyzing file
+  PENDING_APPROVAL // Waiting for user to approve mappings/refs
+  APPROVED // User approved, ready to import
+  IMPORTING // Import in progress
+  COMPLETED // Import finished
   COMPLETED_WITH_ERRORS // Import finished with some errors
-  FAILED              // Import failed
-  ROLLED_BACK         // Import was rolled back
+  FAILED // Import failed
+  ROLLED_BACK // Import was rolled back
 }
 
 model ImportMapping {
-  id              String    @id @default(uuid()) @db.Uuid
-  importJobId     String    @db.Uuid
-  importJob       ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
-  
+  id          String    @id @default(uuid()) @db.Uuid
+  importJobId String    @db.Uuid
+  importJob   ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+
   // Source Column
-  sourceColumn    String    @db.VarChar(100)
-  sourceSampleValues Json?  // First few values for preview
-  
+  sourceColumn       String @db.VarChar(100)
+  sourceSampleValues Json? // First few values for preview
+
   // Target Field
-  targetEntity    String    @db.VarChar(50)   // resource, project, allocation, etc.
-  targetField     String    @db.VarChar(100)
-  
+  targetEntity String @db.VarChar(50) // resource, project, allocation, etc.
+  targetField  String @db.VarChar(100)
+
   // AI Confidence
-  confidence      Decimal   @db.Decimal(3, 2) // 0.00 to 1.00
-  aiReasoning     String?   @db.VarChar(500)  // Why AI made this mapping
-  
+  confidence  Decimal @db.Decimal(3, 2) // 0.00 to 1.00
+  aiReasoning String? @db.VarChar(500) // Why AI made this mapping
+
   // User Override
-  userApproved    Boolean   @default(false)
-  userOverridden  Boolean   @default(false)
-  
+  userApproved   Boolean @default(false)
+  userOverridden Boolean @default(false)
+
   // Transformation
-  transformationType String? @db.VarChar(50)  // DATE_PARSE, LOOKUP, UPPERCASE, etc.
+  transformationType   String? @db.VarChar(50) // DATE_PARSE, LOOKUP, UPPERCASE, etc.
   transformationConfig Json? // Config for transformation
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([importJobId, sourceColumn])
   @@index([importJobId])
 }
 
 model ImportJobRecord {
-  id              String    @id @default(uuid()) @db.Uuid
-  importJobId     String    @db.Uuid
-  importJob       ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
-  
+  id          String    @id @default(uuid()) @db.Uuid
+  importJobId String    @db.Uuid
+  importJob   ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+
   // Source Data
-  rowNumber       Int
-  sourceData      Json      // Original row data
-  
+  rowNumber  Int
+  sourceData Json // Original row data
+
   // Target
-  targetEntity    String    @db.VarChar(50)
-  targetId        String?   @db.Uuid  // ID of created/updated record
-  
+  targetEntity String  @db.VarChar(50)
+  targetId     String? @db.Uuid // ID of created/updated record
+
   // Processing
-  status          ImportRecordStatus @default(PENDING)
-  confidence      Decimal?  @db.Decimal(3, 2)
-  
+  status     ImportRecordStatus @default(PENDING)
+  confidence Decimal?           @db.Decimal(3, 2)
+
   // Errors/Warnings
-  errors          Json?     // Array of error messages
-  warnings        Json?     // Array of warning messages
-  
+  errors   Json? // Array of error messages
+  warnings Json? // Array of warning messages
+
   // For rollback
-  previousData    Json?     // Data before update (for rollback)
-  wasCreated      Boolean   @default(false) // true if new record, false if update
-  
-  createdAt       DateTime  @default(now())
+  previousData Json? // Data before update (for rollback)
+  wasCreated   Boolean @default(false) // true if new record, false if update
+
+  createdAt DateTime @default(now())
 
   @@index([importJobId, status])
   @@index([importJobId, targetEntity])
 }
 
 enum ImportRecordStatus {
-  PENDING         // Waiting to be processed
-  PROCESSING      // Currently being processed
-  IMPORTED        // Successfully imported
-  UPDATED         // Successfully updated existing
-  SKIPPED         // Skipped (duplicate, etc.)
-  ERROR           // Failed with error
-  FLAGGED         // Flagged for user review
+  PENDING // Waiting to be processed
+  PROCESSING // Currently being processed
+  IMPORTED // Successfully imported
+  UPDATED // Successfully updated existing
+  SKIPPED // Skipped (duplicate, etc.)
+  ERROR // Failed with error
+  FLAGGED // Flagged for user review
 }
 
+// =============================================================================
+// REQUEST FLOW SYSTEM - Enterprise Workflow Management
+// =============================================================================
 
+// Request Type Definition (System-level, tenant can override via config)
+model RequestType {
+  id              String          @id @default(uuid()) @db.Uuid
+  code            String          @unique @db.VarChar(50) // RESOURCE_ALLOCATION, etc.
+  name            String          @db.VarChar(100)
+  description     String?         @db.VarChar(500)
+  category        RequestCategory
+  defaultPriority Priority        @default(MEDIUM)
+
+  // SLA Configuration (defaults, can be overridden per tenant)
+  responseSlaHours   Int                @default(24)
+  resolutionSlaHours Int                @default(72)
+  slaCalculationType SlaCalculationType @default(BUSINESS_HOURS)
+
+  // Behavior
+  isActive            Boolean @default(true)
+  isSystemType        Boolean @default(true) // false = tenant-created
+  requiresApproval    Boolean @default(true)
+  allowDraft          Boolean @default(true)
+  allowAttachments    Boolean @default(true)
+  maxAttachmentSizeMb Int     @default(10)
+  maxAttachments      Int     @default(5)
+
+  // Form Configuration
+  formSchema        Json? // JSON Schema for dynamic form
+  formSchemaVersion Int      @default(1)
+  requiredFields    String[] // List of required field paths
+  sensitiveFields   String[] // Fields to mask/restrict
+
+  // Execution Handlers (service method names)
+  onApprovalHandler     String? @db.VarChar(100)
+  onRejectionHandler    String? @db.VarChar(100)
+  onCancellationHandler String? @db.VarChar(100)
+
+  // Rollback Configuration
+  allowRollback            Boolean            @default(true)
+  rollbackWindowDays       Int                @default(30)
+  rollbackRequiresApproval Boolean            @default(true)
+  rollbackPermission       RollbackPermission @default(ADMIN_ONLY)
+
+  // Visibility
+  visibilityScope RequestVisibility @default(TENANT)
+
+  // Retention
+  retentionDays Int @default(2555) // ~7 years
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  requests          Request[]
+  approvalRules     ApprovalRule[]
+  tenantConfigs     TenantRequestTypeConfig[]
+  templates         RequestTemplate[]
+  slaPriorityMatrix SlaPriorityMatrix[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+// Tenant-specific overrides for system request types
+model TenantRequestTypeConfig {
+  id            String      @id @default(uuid()) @db.Uuid
+  tenantId      String      @db.Uuid
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  requestTypeId String      @db.Uuid
+  requestType   RequestType @relation(fields: [requestTypeId], references: [id])
+
+  // Overrides (null = use system default)
+  responseSlaHours   Int?
+  resolutionSlaHours Int?
+  defaultPriority    Priority?
+  isEnabled          Boolean   @default(true)
+
+  // Tenant-specific approval chain
+  approvalChainId String?        @db.Uuid
+  approvalChain   ApprovalChain? @relation(fields: [approvalChainId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, requestTypeId])
+  @@index([tenantId])
+}
+
+// Approval Chain Definition
+model ApprovalChain {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identity
+  name        String  @db.VarChar(100)
+  code        String  @db.VarChar(50)
+  description String? @db.VarChar(500)
+
+  // Versioning
+  version       Int                 @default(1)
+  status        ApprovalChainStatus @default(DRAFT)
+  publishedAt   DateTime?
+  publishedById String?             @db.Uuid
+
+  // Scope (optional filtering)
+  practiceId String?            @db.Uuid
+  practice   Practice?          @relation(fields: [practiceId], references: [id])
+  scope      ApprovalChainScope @default(TENANT)
+
+  // Effective Period
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+
+  // Versioning chain
+  clonedFromId   String?         @db.Uuid
+  clonedFrom     ApprovalChain?  @relation("ChainVersion", fields: [clonedFromId], references: [id])
+  clonedVersions ApprovalChain[] @relation("ChainVersion")
+
+  // Audit
+  createdById String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  steps         ApprovalStep[]
+  tenantConfigs TenantRequestTypeConfig[]
+  requests      Request[]
+
+  @@unique([tenantId, code, version])
+  @@index([tenantId, status])
+  @@index([tenantId, practiceId])
+}
+
+// Approval Step within a Chain
+model ApprovalStep {
+  id      String        @id @default(uuid()) @db.Uuid
+  chainId String        @db.Uuid
+  chain   ApprovalChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
+
+  // Order & Identity
+  stepOrder    Int
+  name         String  @db.VarChar(100)
+  instructions String? @db.VarChar(1000)
+
+  // Primary Approver
+  approverType   ApproverType
+  approverRoleId String?      @db.Uuid
+  approverRole   Role?        @relation("StepApproverRole", fields: [approverRoleId], references: [id])
+  approverUserId String?      @db.Uuid
+  approverUser   User?        @relation("StepApprover", fields: [approverUserId], references: [id])
+
+  // Dynamic Approver Resolution
+  practiceSource     PracticeSource? // For PRACTICE_HEAD - whose practice?
+  roleAssignmentMode RoleAssignmentMode @default(ANY)
+
+  // Fallback when primary can't be resolved
+  fallbackType       ApproverType?
+  fallbackRoleId     String?       @db.Uuid
+  fallbackUserId     String?       @db.Uuid
+  skipIfUnresolvable Boolean       @default(false)
+
+  // Approval Behavior
+  approvalMode ApprovalMode       @default(ANY)
+  onConflict   ConflictResolution @default(REJECTION_WINS)
+  isOptional   Boolean            @default(false)
+  canDelegate  Boolean            @default(true)
+
+  // Skip Conditions (JSONLogic format)
+  skipCondition Json?
+
+  // Auto-approval (use with caution)
+  autoApproveAfterHours Int?
+  autoApproveCondition  Json?
+
+  // Per-step SLA
+  slaHours Int?
+
+  // Escalation
+  escalateAfterHours Int?
+  escalateToType     ApproverType?
+  escalateToRoleId   String?       @db.Uuid
+  escalateToUserId   String?       @db.Uuid
+
+  // Reminders
+  reminderAfterHours    Int @default(24)
+  reminderIntervalHours Int @default(24)
+  maxReminders          Int @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  approvals RequestApproval[]
+
+  @@unique([chainId, stepOrder])
+  @@index([chainId])
+}
+
+// Conditional Approval Routing Rules
+model ApprovalRule {
+  id            String      @id @default(uuid()) @db.Uuid
+  requestTypeId String      @db.Uuid
+  requestType   RequestType @relation(fields: [requestTypeId], references: [id])
+  tenantId      String      @db.Uuid
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+
+  // Condition
+  name              String            @db.VarChar(100)
+  conditionField    String            @db.VarChar(100) // requestData.amount, resource.band
+  conditionOperator ConditionOperator
+  conditionValue    String            @db.VarChar(500)
+
+  // Action
+  actionType             RuleActionType
+  addChainId             String?        @db.Uuid
+  addStepAfter           Int?
+  skipStepOrder          Int?
+  overridePriority       Priority?
+  overrideApproverUserId String?        @db.Uuid
+
+  // Priority (higher = evaluated first)
+  priority Int     @default(0)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requestTypeId, isActive])
+  @@index([tenantId])
+}
+
+// Main Request Model
+model Request {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identity
+  requestNumber String      @db.VarChar(50)
+  typeId        String      @db.Uuid
+  type          RequestType @relation(fields: [typeId], references: [id])
+
+  // Content
+  title       String  @db.VarChar(200)
+  description String?
+  requestData Json // Validated against RequestType.formSchema
+  locale      String  @default("en") @db.VarChar(10)
+
+  // Requester
+  requesterId  String  @db.Uuid
+  requester    User    @relation("RequestRequester", fields: [requesterId], references: [id])
+  onBehalfOfId String? @db.Uuid
+  onBehalfOf   User?   @relation("RequestOnBehalf", fields: [onBehalfOfId], references: [id])
+
+  // Priority & Urgency
+  priority                Priority  @default(MEDIUM)
+  urgencyJustification    String?   @db.VarChar(500)
+  requestedCompletionDate DateTime? @db.Date
+
+  // Status & Workflow
+  status               RequestStatus  @default(DRAFT)
+  approvalChainId      String?        @db.Uuid
+  approvalChain        ApprovalChain? @relation(fields: [approvalChainId], references: [id])
+  approvalChainVersion Int?
+  currentStepOrder     Int            @default(0)
+
+  // SLA Tracking
+  submittedAt           DateTime?
+  responseDueAt         DateTime?
+  resolutionDueAt       DateTime?
+  firstResponseAt       DateTime?
+  resolvedAt            DateTime?
+  responseSlaBreached   Boolean   @default(false)
+  resolutionSlaBreached Boolean   @default(false)
+  escalatedAt           DateTime?
+  escalationLevel       Int       @default(0)
+
+  // SLA Pause/Resume
+  slaPausedAt          DateTime?
+  slaPauseDurationMins Int       @default(0)
+
+  // Related Entities (primary - for quick queries)
+  resourceId   String?     @db.Uuid
+  resource     Resource?   @relation(fields: [resourceId], references: [id])
+  projectId    String?     @db.Uuid
+  project      Project?    @relation(fields: [projectId], references: [id])
+  allocationId String?     @db.Uuid
+  allocation   Allocation? @relation(fields: [allocationId], references: [id])
+  contractId   String?     @db.Uuid
+  contract     Contract?   @relation(fields: [contractId], references: [id])
+
+  // External References
+  externalRef String? @db.VarChar(200)
+  externalUrl String? @db.VarChar(500)
+
+  // Dependencies
+  dependsOnId       String?   @db.Uuid
+  dependsOn         Request?  @relation("RequestDependency", fields: [dependsOnId], references: [id])
+  dependentRequests Request[] @relation("RequestDependency")
+  blockedReason     String?   @db.VarChar(200)
+
+  // Rollback Support
+  isReversal        Boolean         @default(false)
+  originalRequestId String?         @db.Uuid
+  originalRequest   Request?        @relation("RequestReversal", fields: [originalRequestId], references: [id])
+  reversalRequests  Request[]       @relation("RequestReversal")
+  rollbackData      Json? // Snapshot of state before execution
+  canRollback       Boolean         @default(true)
+  rollbackDeadline  DateTime?
+  rollbackStatus    RollbackStatus?
+  reversedAt        DateTime?
+  reversedById      String?         @db.Uuid
+
+  // Execution Result
+  resultEntityType String? @db.VarChar(50)
+  resultEntityId   String? @db.Uuid
+  executionNotes   String?
+
+  // Optimistic Locking
+  version Int @default(0)
+
+  // Relations
+  approvals         RequestApproval[]
+  comments          RequestComment[]
+  history           RequestHistory[]
+  attachments       RequestAttachment[]
+  watchers          RequestWatcher[]
+  affectedResources RequestAffectedResource[]
+  rollbackSteps     RollbackStep[]
+  slaBreachEvents   SlaBreachEvent[]
+  notifications     Notification[]
+  lock              RequestLock?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([tenantId, requestNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, requesterId])
+  @@index([tenantId, typeId])
+  @@index([tenantId, priority])
+  @@index([tenantId, submittedAt])
+  @@index([tenantId, responseSlaBreached])
+  @@index([tenantId, resolutionSlaBreached])
+  @@index([tenantId, resourceId])
+  @@index([tenantId, projectId])
+  @@index([tenantId, createdAt])
+}
+
+// Request Approval Record
+model RequestApproval {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  // Step Reference
+  stepId    String       @db.Uuid
+  step      ApprovalStep @relation(fields: [stepId], references: [id])
+  stepOrder Int
+  stepName  String       @db.VarChar(100)
+
+  // Assigned Approver
+  approverId       String       @db.Uuid
+  approver         User         @relation("ApprovalApprover", fields: [approverId], references: [id])
+  assignedVia      ApproverType
+  assignmentReason String?      @db.VarChar(200)
+
+  // Delegation
+  delegatedFromId String? @db.Uuid
+  delegatedFrom   User?   @relation("DelegatedApproval", fields: [delegatedFromId], references: [id])
+  delegationId    String? @db.Uuid
+
+  // Reassignment (admin override)
+  reassignedFromId   String?   @db.Uuid
+  reassignedFrom     User?     @relation("ReassignedApproval", fields: [reassignedFromId], references: [id])
+  reassignedById     String?   @db.Uuid
+  reassignedAt       DateTime?
+  reassignmentReason String?   @db.VarChar(500)
+
+  // Status & Decision
+  status   ApprovalActionStatus @default(PENDING)
+  decision ApprovalDecision?
+  comments String?
+
+  // Timeline
+  dueAt     DateTime?
+  viewedAt  DateTime?
+  decidedAt DateTime?
+
+  // Reminders
+  lastReminderAt DateTime?
+  reminderCount  Int       @default(0)
+
+  // Escalation
+  escalatedAt   DateTime?
+  escalatedToId String?   @db.Uuid
+
+  // Audit
+  ipAddress String? @db.VarChar(45)
+  userAgent String? @db.VarChar(500)
+
+  // Optimistic Locking
+  version Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([requestId, stepId, approverId])
+  @@index([requestId, stepOrder])
+  @@index([approverId, status])
+  @@index([dueAt, status])
+  @@index([status])
+}
+
+// Request Comments with Threading
+model RequestComment {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation("RequestCommentUser", fields: [userId], references: [id])
+
+  // Threading
+  parentId String?          @db.Uuid
+  parent   RequestComment?  @relation("CommentThread", fields: [parentId], references: [id])
+  replies  RequestComment[] @relation("CommentThread")
+
+  // Content
+  content    String
+  isInternal Boolean @default(false) // Only visible to approvers
+
+  // Edit tracking
+  isEdited Boolean   @default(false)
+  editedAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([requestId, createdAt])
+  @@index([parentId])
+}
+
+// Request History/Audit Log
+model RequestHistory {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation("RequestHistoryUser", fields: [userId], references: [id])
+
+  // Action
+  action     RequestAction
+  fromStatus RequestStatus?
+  toStatus   RequestStatus?
+  details    Json?
+
+  // Rollback info
+  rollbackReason   String? @db.VarChar(500)
+  affectedEntities Json?
+
+  // Audit
+  ipAddress String? @db.VarChar(45)
+  userAgent String? @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([userId])
+  @@index([action])
+}
+
+// Request Attachments with Virus Scanning
+model RequestAttachment {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  // File Info
+  fileName String  @db.VarChar(255)
+  fileSize Int
+  mimeType String  @db.VarChar(100)
+  filePath String  @db.VarChar(500)
+  checksum String? @db.VarChar(64)
+
+  // Virus Scanning
+  scanStatus AttachmentScanStatus @default(PENDING)
+  scannedAt  DateTime?
+  scanResult String?              @db.VarChar(200)
+
+  // Upload Info
+  uploadedById String @db.Uuid
+  uploadedBy   User   @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([requestId])
+  @@index([scanStatus])
+}
+
+// Request Watchers (CC)
+model RequestWatcher {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation("RequestWatcher", fields: [userId], references: [id])
+  addedById String  @db.Uuid
+  addedBy   User    @relation("WatcherAddedBy", fields: [addedById], references: [id])
+
+  // Notification preferences for this watch
+  notifyOnStatusChange Boolean @default(true)
+  notifyOnComment      Boolean @default(true)
+  notifyOnApproval     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([requestId, userId])
+  @@index([userId])
+}
+
+// For bulk requests affecting multiple resources
+model RequestAffectedResource {
+  id         String   @id @default(uuid()) @db.Uuid
+  requestId  String   @db.Uuid
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  resourceId String   @db.Uuid
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  role       String?  @db.VarChar(100)
+
+  @@unique([requestId, resourceId])
+  @@index([requestId])
+  @@index([resourceId])
+}
+
+// Request sequence for number generation
+model RequestSequence {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @db.Uuid
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  year       Int
+  lastNumber Int    @default(0)
+
+  @@unique([tenantId, year])
+}
+
+// Request Lock for concurrent edit prevention
+model RequestLock {
+  id         String   @id @default(uuid()) @db.Uuid
+  requestId  String   @unique @db.Uuid
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  lockedById String   @db.Uuid
+  lockedBy   User     @relation("RequestLocker", fields: [lockedById], references: [id])
+  lockedAt   DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([expiresAt])
+}
+
+// Rollback Step Tracking
+model RollbackStep {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  stepOrder  Int
+  entityType String            @db.VarChar(50)
+  entityId   String            @db.Uuid
+  operation  RollbackOperation
+
+  // State snapshots
+  beforeState Json
+  afterState  Json
+
+  // Execution tracking
+  status       RollbackStepStatus @default(PENDING)
+  executedAt   DateTime?
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@index([requestId, stepOrder])
+}
+
+// Delegation Management
+model Delegation {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Parties
+  delegatorId String @db.Uuid
+  delegator   User   @relation("Delegator", fields: [delegatorId], references: [id])
+  delegateId  String @db.Uuid
+  delegate    User   @relation("Delegate", fields: [delegateId], references: [id])
+
+  // Scope
+  requestTypeIds String[] @db.Uuid
+  practiceIds    String[] @db.Uuid
+  maxAmount      Decimal? @db.Decimal(15, 2)
+
+  // Period
+  startDate DateTime @db.Timestamptz
+  endDate   DateTime @db.Timestamptz
+  reason    String?  @db.VarChar(500)
+
+  // Approval
+  requiresApproval Boolean                  @default(false)
+  approvalStatus   DelegationApprovalStatus @default(APPROVED)
+  approvedById     String?                  @db.Uuid
+  approvedAt       DateTime?
+
+  // Revocation
+  revokedAt        DateTime?
+  revokedById      String?   @db.Uuid
+  revocationReason String?   @db.VarChar(500)
+
+  // Usage tracking
+  usageCount Int       @default(0)
+  lastUsedAt DateTime?
+
+  // Audit
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, delegatorId])
+  @@index([tenantId, delegateId])
+  @@index([tenantId, startDate, endDate])
+}
+
+// SLA Breach Events
+model SlaBreachEvent {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  breachType SlaBreachType
+  breachedAt DateTime      @default(now())
+  dueAt      DateTime
+  actualAt   DateTime?
+
+  // Escalation tracking
+  escalationLevel Int       @default(1)
+  escalatedToId   String?   @db.Uuid
+  escalatedTo     User?     @relation("SlaEscalatedTo", fields: [escalatedToId], references: [id])
+  escalatedAt     DateTime?
+
+  // Resolution
+  resolvedAt      DateTime?
+  resolutionNotes String?   @db.VarChar(500)
+
+  @@index([requestId])
+  @@index([breachedAt])
+  @@index([breachType])
+}
+
+// SLA Priority Matrix (per tenant per type)
+model SlaPriorityMatrix {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  requestTypeId String?      @db.Uuid
+  requestType   RequestType? @relation(fields: [requestTypeId], references: [id])
+
+  priority           Priority
+  responseSlaHours   Int
+  resolutionSlaHours Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, requestTypeId, priority])
+}
+
+// Business Hours Configuration
+model BusinessHoursConfig {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  timezone    String @default("Asia/Kolkata") @db.VarChar(50)
+  startHour   Int    @default(9)
+  startMinute Int    @default(0)
+  endHour     Int    @default(18)
+  endMinute   Int    @default(0)
+  workDays    Int[]  @default([1, 2, 3, 4, 5]) // 0=Sun, 1=Mon, etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Holiday Calendar
+model Holiday {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  date        DateTime    @db.Date
+  name        String      @db.VarChar(100)
+  type        HolidayType @default(COMPANY)
+  isOptional  Boolean     @default(false)
+  locationIds String[]    @db.Uuid
+
+  // Recurring support
+  isRecurring    Boolean @default(false)
+  recurringMonth Int?
+  recurringDay   Int?
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, date, name])
+  @@index([tenantId, date])
+}
+
+// Request Templates
+model RequestTemplate {
+  id            String      @id @default(uuid()) @db.Uuid
+  tenantId      String      @db.Uuid
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  requestTypeId String      @db.Uuid
+  requestType   RequestType @relation(fields: [requestTypeId], references: [id])
+
+  name            String    @db.VarChar(100)
+  description     String?   @db.VarChar(500)
+  defaultData     Json
+  defaultPriority Priority?
+
+  isPublic    Boolean  @default(true)
+  practiceIds String[] @db.Uuid
+
+  createdById String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([tenantId, requestTypeId])
+  @@index([tenantId, isPublic])
+}
+
+// In-App Notifications
+model Notification {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  userId   String @db.Uuid
+  user     User   @relation("UserNotifications", fields: [userId], references: [id])
+
+  // Content
+  type    NotificationType
+  title   String           @db.VarChar(200)
+  message String
+
+  // Reference
+  requestId  String?  @db.Uuid
+  request    Request? @relation(fields: [requestId], references: [id])
+  entityType String?  @db.VarChar(50)
+  entityId   String?  @db.Uuid
+  actionUrl  String?  @db.VarChar(500)
+
+  // Status
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  // Delivery
+  emailSent   Boolean   @default(false)
+  emailSentAt DateTime?
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([userId, isRead])
+  @@index([tenantId, createdAt])
+  @@index([userId, type])
+}
+
+// User Notification Preferences
+model NotificationPreference {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user   User   @relation("NotificationPreferences", fields: [userId], references: [id])
+
+  eventType NotificationType
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, eventType, channel])
+}
+
+// Webhooks for External Integrations
+model Webhook {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name   String @db.VarChar(100)
+  url    String @db.VarChar(500)
+  secret String @db.VarChar(200)
+
+  events   WebhookEvent[]
+  isActive Boolean        @default(true)
+
+  // Retry config
+  maxRetries        Int @default(3)
+  retryDelaySeconds Int @default(60)
+
+  // Health
+  lastTriggeredAt     DateTime?
+  lastSuccessAt       DateTime?
+  consecutiveFailures Int       @default(0)
+
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  logs WebhookLog[]
+
+  @@index([tenantId, isActive])
+}
+
+// Webhook Delivery Logs
+model WebhookLog {
+  id        String  @id @default(uuid()) @db.Uuid
+  webhookId String  @db.Uuid
+  webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  event   WebhookEvent
+  payload Json
+
+  // Delivery
+  statusCode  Int?
+  response    String?
+  deliveredAt DateTime?
+
+  // Retries
+  attempt     Int       @default(1)
+  nextRetryAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([webhookId, createdAt])
+}
+
+// Archived Requests (for retention)
+model ArchivedRequest {
+  id             String   @id @db.Uuid
+  tenantId       String   @db.Uuid
+  originalData   Json
+  archivedAt     DateTime @default(now())
+  archivedReason String   @db.VarChar(100)
+
+  @@index([tenantId])
+  @@index([archivedAt])
+}
+
+// =============================================================================
+// REQUEST FLOW ENUMS
+// =============================================================================
+
+enum RequestCategory {
+  RESOURCE
+  PROJECT
+  CONTRACT
+  HR
+  FINANCE
+  ADMIN
+  OTHER
+}
+
+enum SlaCalculationType {
+  CLOCK_HOURS
+  BUSINESS_HOURS
+  BUSINESS_DAYS
+}
+
+enum RequestVisibility {
+  TENANT
+  PRACTICE
+  PARTICIPANTS
+  CONFIDENTIAL
+}
+
+enum RollbackPermission {
+  REQUESTER
+  APPROVERS
+  ADMIN_ONLY
+  NONE
+}
+
+enum ApprovalChainStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ApprovalChainScope {
+  TENANT
+  PRACTICE
+  PROJECT
+}
+
+enum ApproverType {
+  ROLE
+  USER
+  MANAGER
+  RESOURCE_MANAGER
+  PRACTICE_HEAD
+  PROJECT_MANAGER
+  CONTRACT_OWNER
+  CUSTOM
+}
+
+enum PracticeSource {
+  REQUESTER
+  RESOURCE
+  PROJECT
+}
+
+enum RoleAssignmentMode {
+  ANY
+  ALL
+  ROUND_ROBIN
+  LEAST_LOADED
+}
+
+enum ApprovalMode {
+  ANY
+  ALL
+  MAJORITY
+}
+
+enum ConflictResolution {
+  REJECTION_WINS
+  APPROVAL_WINS
+  FIRST_WINS
+  MAJORITY
+}
+
+enum ConditionOperator {
+  EQUALS
+  NOT_EQUALS
+  GREATER_THAN
+  LESS_THAN
+  GREATER_THAN_OR_EQUALS
+  LESS_THAN_OR_EQUALS
+  CONTAINS
+  NOT_CONTAINS
+  IN
+  NOT_IN
+  IS_NULL
+  IS_NOT_NULL
+}
+
+enum RuleActionType {
+  ADD_APPROVAL_CHAIN
+  ADD_APPROVAL_STEP
+  SKIP_STEP
+  OVERRIDE_PRIORITY
+  OVERRIDE_APPROVER
+  REQUIRE_ADDITIONAL_DOCUMENT
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  RETURNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+  BLOCKED
+  REVERSED
+}
+
+enum ApprovalActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+  DELEGATED
+  EXPIRED
+  ESCALATED
+  REASSIGNED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+  RETURNED
+  ABSTAINED
+}
+
+enum AttachmentScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  SCAN_FAILED
+}
+
+enum RequestAction {
+  CREATED
+  UPDATED
+  SUBMITTED
+  APPROVED
+  REJECTED
+  RETURNED
+  CANCELLED
+  COMPLETED
+  ON_HOLD
+  RESUMED
+  ESCALATED
+  REASSIGNED
+  DELEGATED
+  COMMENTED
+  ATTACHMENT_ADDED
+  ATTACHMENT_REMOVED
+  WATCHER_ADDED
+  WATCHER_REMOVED
+  ROLLBACK_INITIATED
+  ROLLBACK_COMPLETED
+  ROLLBACK_FAILED
+  PRIORITY_CHANGED
+  SLA_BREACHED
+}
+
+enum RollbackOperation {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+}
+
+enum RollbackStepStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum RollbackStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  PARTIAL_FAILED
+  FAILED
+}
+
+enum DelegationApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SlaBreachType {
+  RESPONSE_SLA
+  RESOLUTION_SLA
+  APPROVAL_STEP_SLA
+}
+
+enum HolidayType {
+  NATIONAL
+  REGIONAL
+  COMPANY
+  OPTIONAL
+  MAINTENANCE
+}
+
+enum NotificationType {
+  REQUEST_ASSIGNED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
+  REQUEST_RETURNED
+  REQUEST_COMMENTED
+  REQUEST_ESCALATED
+  REQUEST_COMPLETED
+  SLA_WARNING
+  SLA_BREACHED
+  DELEGATION_CREATED
+  DELEGATION_EXPIRING
+  DELEGATION_REVOKED
+  REMINDER
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SLACK
+  TEAMS
+}
+
+enum WebhookEvent {
+  REQUEST_CREATED
+  REQUEST_SUBMITTED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
+  REQUEST_COMPLETED
+  REQUEST_CANCELLED
+  SLA_BREACHED
+}

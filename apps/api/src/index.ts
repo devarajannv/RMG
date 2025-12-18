@@ -30,6 +30,7 @@ import { roleRoutes } from './modules/roles';
 import { documentRoutes } from './modules/documents';
 import { agentRoutes } from './modules/agent';
 import { aiMigrationRoutes } from './modules/ai-migration';
+import { requestRoutes, requestTypesRoutes, approvalChainRoutes, delegationRoutes, slaRoutes, notificationRoutes } from './modules/requests';
 
 const app = express();
 
@@ -127,6 +128,12 @@ app.use('/api/v1/roles', roleRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/agent', agentRoutes);
 app.use('/api/v1/ai-migration', aiMigrationRoutes);
+app.use('/api/v1/requests', requestRoutes);
+app.use('/api/v1/request-types', requestTypesRoutes);
+app.use('/api/v1/approval-chains', approvalChainRoutes);
+app.use('/api/v1/delegations', delegationRoutes);
+app.use('/api/v1/sla', slaRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // Error handling
 app.use(errorHandler);
