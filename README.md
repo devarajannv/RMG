@@ -9,6 +9,28 @@ Enterprise-grade platform for managing professional services workforce allocatio
 
 ---
 
+## 📚 Critical Documentation
+
+> **⚠️ AI Assistants: Read these files first!**
+
+| Document | Purpose | Location |
+|----------|---------|----------|
+| **ARCHITECTURE.md** | Source of truth for all decisions | `/ARCHITECTURE.md` |
+| **ALIGNMENT_TRACKER.md** | Implementation progress tracker | `/ALIGNMENT_TRACKER.md` |
+
+### The Writer + Scribe Model
+
+This product follows the **Writer + Scribe** architecture:
+
+- **Writer (Core Product):** Full-featured resource management that works independently
+- **Scribe (AI Layer):** AI acceleration that makes everything faster but is never required
+
+**Key Principle:** If AI APIs go down, users remain fully productive via traditional UI.
+
+See `ARCHITECTURE.md` for complete details.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites

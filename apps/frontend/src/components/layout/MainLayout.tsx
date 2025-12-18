@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Users,
@@ -15,33 +16,88 @@ import {
   Building2,
   Armchair,
   ChevronRight,
+  ChevronDown,
   Brain,
   PieChart,
   Database,
   X,
+  ClipboardList,
+  CheckSquare,
+  GitBranch,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/authStore';
-import { authApi } from '@/lib/api';
+import { authApi, api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getEnvironmentBadge } from '@/config/env';
 
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: Users, label: 'Resources', href: '/resources' },
-  { icon: FolderKanban, label: 'Projects', href: '/projects' },
-  { icon: Calendar, label: 'Allocations', href: '/allocations' },
-  { icon: Building2, label: 'Clients', href: '/clients' },
-  { icon: FileText, label: 'Contracts', href: '/contracts' },
-  { icon: Armchair, label: 'Bench Analysis', href: '/bench' },
-  { icon: Brain, label: 'Smart Search', href: '/smart-search' },
-  { icon: BarChart3, label: 'Reports', href: '/reports' },
-  { icon: Clock, label: 'Timesheets', href: '/timesheets' },
-  { icon: PieChart, label: 'Analytics', href: '/analytics' },
-  { icon: Database, label: 'Data Management', href: '/data-management' },
-  { icon: Settings, label: 'Settings', href: '/settings' },
+// Navigation structure - reorganized logically
+// Group 1: Daily Activities (things users do every day)
+// Group 2: Core Business (main business entities)
+// Group 3: Intelligence (AI & analytics)
+// Group 4: Administration (settings, data management)
+
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+interface NavItem {
+  icon: React.ElementType;
+  label: string;
+  href: string;
+  badge?: 'pending-approvals' | 'notifications';
+}
+
+const navSections: NavSection[] = [
+  {
+    // No title for first section - primary navigation
+    items: [
+      { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
+    ],
+  },
+  {
+    title: 'Daily Work',
+    items: [
+      { icon: ClipboardList, label: 'Requests', href: '/requests', badge: 'pending-approvals' },
+      { icon: Clock, label: 'Timesheets', href: '/timesheets' },
+      { icon: CheckSquare, label: 'My Approvals', href: '/requests?tab=pending-approvals', badge: 'pending-approvals' },
+    ],
+  },
+  {
+    title: 'Resource Management',
+    items: [
+      { icon: Users, label: 'Resources', href: '/resources' },
+      { icon: Armchair, label: 'Bench', href: '/bench' },
+      { icon: Calendar, label: 'Allocations', href: '/allocations' },
+    ],
+  },
+  {
+    title: 'Business',
+    items: [
+      { icon: Building2, label: 'Clients', href: '/clients' },
+      { icon: FolderKanban, label: 'Projects', href: '/projects' },
+      { icon: FileText, label: 'Contracts', href: '/contracts' },
+    ],
+  },
+  {
+    title: 'Intelligence',
+    items: [
+      { icon: Brain, label: 'Smart Search', href: '/smart-search' },
+      { icon: PieChart, label: 'Analytics', href: '/analytics' },
+      { icon: BarChart3, label: 'Reports', href: '/reports' },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      { icon: Database, label: 'Data Management', href: '/data-management' },
+      { icon: GitBranch, label: 'Workflows', href: '/workflows' },
+      { icon: Settings, label: 'Settings', href: '/settings' },
+    ],
+  },
 ];
 
 interface MainLayoutProps {
@@ -55,6 +111,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const envBadge = getEnvironmentBadge();
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+  // Fetch pending approvals count for badge
+  const { data: dashboardData } = useQuery({
+    queryKey: ['requests-dashboard-badge'],
+    queryFn: async () => {
+      try {
+        const response = await api.get<{ data: { pendingApprovals: number } }>('/requests/dashboard');
+        return response.data;
+      } catch {
+        return { pendingApprovals: 0 };
+      }
+    },
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // Refetch every minute
+  });
+
+  const pendingApprovals = dashboardData?.pendingApprovals || 0;
 
   const handleLogout = async () => {
     try {
@@ -80,6 +154,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   }, [handleSearch]);
 
+  const toggleSection = (title: string) => {
+    setCollapsedSections(prev => ({ ...prev, [title]: !prev[title] }));
+  };
+
   // Get user role from user object (roles is an array of role names)
   const userRole = user?.roles?.[0] || 'User';
 
@@ -100,29 +178,63 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.href || 
-                (item.href !== '/' && location.pathname.startsWith(item.href));
+            {navSections.map((section, sectionIndex) => {
+              const isCollapsed = section.title ? collapsedSections[section.title] : false;
+              
               return (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className={cn(
-                    'group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
-                    isActive
-                      ? 'bg-white/15 text-white shadow-lg backdrop-blur-sm'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                <div key={sectionIndex} className={section.title ? 'mt-4' : ''}>
+                  {section.title && (
+                    <button
+                      onClick={() => toggleSection(section.title!)}
+                      className="flex items-center justify-between w-full px-3 py-2 mb-1 text-xs font-semibold text-white/50 uppercase tracking-wider hover:text-white/70 transition-colors"
+                    >
+                      {section.title}
+                      <ChevronDown className={cn(
+                        "h-3 w-3 transition-transform",
+                        isCollapsed && "-rotate-90"
+                      )} />
+                    </button>
                   )}
-                >
-                  <item.icon className={cn(
-                    "h-5 w-5 transition-colors",
-                    isActive ? "text-[#F7941D]" : "text-white/60 group-hover:text-[#F7941D]"
-                  )} />
-                  <span className="flex-1">{item.label}</span>
-                  {isActive && (
-                    <ChevronRight className="h-4 w-4 text-[#F7941D]" />
-                  )}
-                </a>
+                  
+                  {!isCollapsed && section.items.map((item) => {
+                    const isActive = item.href === '/' 
+                      ? location.pathname === '/'
+                      : location.pathname.startsWith(item.href.split('?')[0]);
+                    
+                    // Get badge value
+                    let badgeValue = 0;
+                    if (item.badge === 'pending-approvals' && pendingApprovals > 0) {
+                      badgeValue = pendingApprovals;
+                    }
+                    
+                    return (
+                      <a
+                        key={item.label}
+                        href={item.href}
+                        className={cn(
+                          'group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200',
+                          isActive
+                            ? 'bg-white/15 text-white shadow-lg backdrop-blur-sm'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                        )}
+                      >
+                        <item.icon className={cn(
+                          "h-4 w-4 transition-colors",
+                          isActive ? "text-[#F7941D]" : "text-white/60 group-hover:text-[#F7941D]"
+                        )} />
+                        <span className="flex-1">{item.label}</span>
+                        {badgeValue > 0 && (
+                          <span className="px-2 py-0.5 text-xs font-bold bg-[#F7941D] text-white rounded-full">
+                            {badgeValue > 99 ? '99+' : badgeValue}
+                          </span>
+                        )}
+                        {isActive && !badgeValue && (
+                          <ChevronRight className="h-4 w-4 text-[#F7941D]" />
+                        )}
+                      </a>
+                    );
+                  })}
+                </div>
               );
             })}
           </nav>

@@ -1,0 +1,37 @@
+# RMGaaS Development Rules
+
+# ⚠️ CRITICAL: Read /ARCHITECTURE.md before any work
+
+## Product Model
+- Writer = Core Product (works without AI)
+- Scribe = AI Layer (optional accelerator)
+- Test: "If AI is down, can users work?" → Must be YES
+
+## AI Principles
+- AI is PRIMARY for onboarding & workflow creation
+- AI is OPTIONAL for daily operations
+- AI outputs → Traditional UI → User reviews → Submit
+- AI CANNOT: approve, bypass permissions, act without confirmation
+
+## Current Gaps (Priority Order)
+1. Request Flow UI (backend ready, no frontend)
+2. Workflow Builder (visual canvas needed)
+3. Permission System (frontend missing)
+4. Real-time Notifications (mock data only)
+5. Real AI Integration (currently simulated)
+
+## Tech Stack
+- Backend: Express + TypeScript + Prisma + PostgreSQL
+- Frontend: React + Vite + TanStack Query + Zustand + shadcn/ui
+- AI: Not yet implemented (all "AI" is pattern matching)
+
+## Key Files
+- /ARCHITECTURE.md - Source of truth
+- /ALIGNMENT_TRACKER.md - Progress tracker
+- /docs/ - Detailed specifications
+
+## Before Coding
+1. Read ARCHITECTURE.md
+2. Check ALIGNMENT_TRACKER.md
+3. Ensure change aligns with Writer+Scribe model
+4. Update tracker after milestones
