@@ -1,10 +1,37 @@
 # RMGaaS Development Progress
 
-> Last Updated: December 17, 2025
+> Last Updated: December 18, 2025
 
 ## 14-Day Development Plan Status
 
-### ✅ Phase 9: UI Bug Fixes (December 17, 2025)
+### ✅ Phase 11: Permission System & WebSocket (December 18, 2025)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| usePermissions hook | ✅ Complete | React Query based with caching |
+| Can/Cannot components | ✅ Complete | Permission gate components |
+| AdminOnly/ManagerOnly | ✅ Complete | Role-based gate components |
+| Navigation filtering | ✅ Complete | Sidebar filtered by permissions |
+| Page action gating | ✅ Complete | ResourcesPage, RequestsPage |
+| Test infrastructure | ✅ Complete | Permissions pre-populated |
+| WebSocket server | ✅ Complete | `ws` package, JWT auth |
+| WebSocket manager | ✅ Complete | User/tenant rooms, heartbeat |
+| useWebSocket hook | ✅ Complete | Auto-connect, reconnect |
+| useNotifications hook | ✅ Complete | High-level notification API |
+| NotificationPanel | ✅ Complete | Live updates, mark as read |
+| NotificationBell | ✅ Complete | Badge, connection indicator |
+| Service integration | ✅ Complete | notification.service emits events |
+
+**Files Created:**
+- `apps/api/src/lib/websocket.ts` - WebSocket manager singleton
+- `apps/frontend/src/hooks/useWebSocket.ts` - WebSocket hooks
+- `apps/frontend/src/hooks/usePermissions.ts` - Permission hook
+- `apps/frontend/src/components/permissions/Can.tsx` - Gate components
+- `apps/frontend/src/components/notifications/NotificationPanel.tsx` - UI
+
+---
+
+### ✅ Phase 10: Complete Frontend Test Coverage (December 17, 2025)
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -116,6 +143,8 @@
 | ContractDetailPage tests | ✅ Complete | 2 integration tests |
 
 **Total: 204 frontend tests passing across 18 test files**
+
+---
 
 ### ✅ Phase 9: Bug Fix & Functional Testing (December 17, 2025)
 

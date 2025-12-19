@@ -464,6 +464,7 @@ Every action is recorded in `RequestHistory`:
 ### Notifications
 - In-app notifications
 - Email notifications (configurable)
+- **Real-time WebSocket delivery** (NEW)
 - Per-user preferences
 - Notification types:
   - `REQUEST_ASSIGNED` - Request assigned to user
@@ -490,9 +491,11 @@ Every action is recorded in `RequestHistory`:
 - [x] TypeScript fixes - Schema alignment, proper types
 - [x] SLA Service - Business hours calculation, holiday calendar, breach detection
 - [x] Notification Service - In-app notifications, preferences, email support
-- [ ] Frontend Components - React UI (Next)
+- [x] Frontend Components - RequestsPage, RequestDetailPage, MyApprovals
+- [x] WebSocket Real-time - Live notifications via WebSocket
 
 ### Phase 3 (Planned)
+- [ ] Visual Workflow Builder - Drag-and-drop canvas
 - [ ] Parallel approval steps
 - [ ] Conditional routing
 - [ ] External approver support (email-based)

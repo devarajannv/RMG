@@ -8,6 +8,7 @@ import { Prisma, NotificationType, NotificationChannel } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
+import { wsManager, WS_EVENTS } from '../../lib/websocket';
 
 // ============================================================================
 // Types
@@ -77,7 +78,20 @@ export async function createNotification(input: CreateNotificationInput): Promis
     type: input.type 
   });
 
-  // TODO: Trigger real-time delivery (WebSocket/SSE)
+  // Send real-time notification via WebSocket
+  wsManager.sendToUser(input.userId, WS_EVENTS.NOTIFICATION, {
+    id: notification.id,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    actionUrl: notification.actionUrl,
+    createdAt: notification.createdAt,
+    isRead: false,
+  });
+
+  // Also send updated unread count
+  const unreadCount = await getUnreadCount(input.userId, input.tenantId);
+  wsManager.sendToUser(input.userId, WS_EVENTS.NOTIFICATION_COUNT, { unreadCount });
   // TODO: Queue email if user prefers email notifications
 
   return notification as unknown as Record<string, unknown>;
@@ -120,6 +134,22 @@ export async function createBulkNotifications(input: BulkNotificationInput): Pro
   });
 
   logger.info('Bulk notifications created', { count: result.count });
+
+  // Send real-time notifications via WebSocket to each user
+  for (const notification of notifications) {
+    wsManager.sendToUser(notification.userId, WS_EVENTS.NOTIFICATION, {
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      actionUrl: notification.actionUrl,
+      createdAt: new Date(),
+      isRead: false,
+    });
+
+    // Send updated unread count
+    const unreadCount = await getUnreadCount(notification.userId, input.tenantId);
+    wsManager.sendToUser(notification.userId, WS_EVENTS.NOTIFICATION_COUNT, { unreadCount });
+  }
 
   return result.count;
 }

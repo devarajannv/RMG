@@ -39,6 +39,8 @@ import {
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import MainLayout from '@/components/layout/MainLayout';
+import { PERMISSIONS } from '@/hooks/usePermissions';
+import { Can } from '@/components/permissions/Can';
 
 // ============================================================================
 // Types
@@ -490,10 +492,12 @@ export default function RequestsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Requests</h1>
             <p className="text-gray-500 mt-1">Manage and track all requests</p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Request
-          </Button>
+          <Can permission={PERMISSIONS.REQUESTS_CREATE}>
+            <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              New Request
+            </Button>
+          </Can>
         </div>
 
         {/* Stats Cards */}

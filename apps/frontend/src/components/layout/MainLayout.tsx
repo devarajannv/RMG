@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -10,7 +10,6 @@ import {
   Clock,
   Settings,
   LogOut,
-  Bell,
   Search,
   BarChart3,
   Building2,
@@ -32,6 +31,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { authApi, api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getEnvironmentBadge } from '@/config/env';
+import { usePermissions, PERMISSIONS } from '@/hooks/usePermissions';
+import { NotificationBell, NotificationPanel } from '@/components/notifications';
 
 // Navigation structure - reorganized logically
 // Group 1: Daily Activities (things users do every day)
@@ -42,6 +43,11 @@ import { getEnvironmentBadge } from '@/config/env';
 interface NavSection {
   title?: string;
   items: NavItem[];
+  /**
+   * Required permission(s) to see this entire section.
+   * If array, user needs ANY of the permissions.
+   */
+  permissions?: string | string[];
 }
 
 interface NavItem {
@@ -49,11 +55,26 @@ interface NavItem {
   label: string;
   href: string;
   badge?: 'pending-approvals' | 'notifications';
+  /**
+   * Required permission(s) to see this nav item.
+   * If array, user needs ANY of the permissions.
+   * If undefined, always visible.
+   */
+  permissions?: string | string[];
+  /**
+   * Required role(s) to see this nav item.
+   * If array, user needs ANY of the roles.
+   */
+  roles?: string | string[];
+  /**
+   * If true, only admins can see this item
+   */
+  adminOnly?: boolean;
 }
 
 const navSections: NavSection[] = [
   {
-    // No title for first section - primary navigation
+    // No title for first section - primary navigation (always visible)
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
     ],
@@ -61,41 +82,122 @@ const navSections: NavSection[] = [
   {
     title: 'Daily Work',
     items: [
-      { icon: ClipboardList, label: 'Requests', href: '/requests', badge: 'pending-approvals' },
-      { icon: Clock, label: 'Timesheets', href: '/timesheets' },
-      { icon: CheckSquare, label: 'My Approvals', href: '/requests?tab=pending-approvals', badge: 'pending-approvals' },
+      { 
+        icon: ClipboardList, 
+        label: 'Requests', 
+        href: '/requests', 
+        badge: 'pending-approvals',
+        permissions: [PERMISSIONS.REQUESTS_READ, PERMISSIONS.REQUESTS_CREATE],
+      },
+      { 
+        icon: Clock, 
+        label: 'Timesheets', 
+        href: '/timesheets',
+        permissions: [PERMISSIONS.TIMESHEETS_READ, PERMISSIONS.TIMESHEETS_CREATE],
+      },
+      { 
+        icon: CheckSquare, 
+        label: 'My Approvals', 
+        href: '/requests?tab=pending-approvals', 
+        badge: 'pending-approvals',
+        permissions: [PERMISSIONS.REQUESTS_APPROVE, PERMISSIONS.TIMESHEETS_APPROVE, PERMISSIONS.ALLOCATIONS_APPROVE],
+      },
     ],
   },
   {
     title: 'Resource Management',
+    permissions: [PERMISSIONS.RESOURCES_READ, PERMISSIONS.ALLOCATIONS_READ],
     items: [
-      { icon: Users, label: 'Resources', href: '/resources' },
-      { icon: Armchair, label: 'Bench', href: '/bench' },
-      { icon: Calendar, label: 'Allocations', href: '/allocations' },
+      { 
+        icon: Users, 
+        label: 'Resources', 
+        href: '/resources',
+        permissions: PERMISSIONS.RESOURCES_READ,
+      },
+      { 
+        icon: Armchair, 
+        label: 'Bench', 
+        href: '/bench',
+        permissions: PERMISSIONS.RESOURCES_READ,
+      },
+      { 
+        icon: Calendar, 
+        label: 'Allocations', 
+        href: '/allocations',
+        permissions: PERMISSIONS.ALLOCATIONS_READ,
+      },
     ],
   },
   {
     title: 'Business',
+    permissions: [PERMISSIONS.CLIENTS_READ, PERMISSIONS.PROJECTS_READ, PERMISSIONS.CONTRACTS_READ],
     items: [
-      { icon: Building2, label: 'Clients', href: '/clients' },
-      { icon: FolderKanban, label: 'Projects', href: '/projects' },
-      { icon: FileText, label: 'Contracts', href: '/contracts' },
+      { 
+        icon: Building2, 
+        label: 'Clients', 
+        href: '/clients',
+        permissions: PERMISSIONS.CLIENTS_READ,
+      },
+      { 
+        icon: FolderKanban, 
+        label: 'Projects', 
+        href: '/projects',
+        permissions: PERMISSIONS.PROJECTS_READ,
+      },
+      { 
+        icon: FileText, 
+        label: 'Contracts', 
+        href: '/contracts',
+        permissions: PERMISSIONS.CONTRACTS_READ,
+      },
     ],
   },
   {
     title: 'Intelligence',
+    permissions: [PERMISSIONS.ANALYTICS_READ, PERMISSIONS.REPORTS_READ],
     items: [
-      { icon: Brain, label: 'Smart Search', href: '/smart-search' },
-      { icon: PieChart, label: 'Analytics', href: '/analytics' },
-      { icon: BarChart3, label: 'Reports', href: '/reports' },
+      { 
+        icon: Brain, 
+        label: 'Smart Search', 
+        href: '/smart-search',
+        // Smart search is available to all authenticated users
+      },
+      { 
+        icon: PieChart, 
+        label: 'Analytics', 
+        href: '/analytics',
+        permissions: PERMISSIONS.ANALYTICS_READ,
+      },
+      { 
+        icon: BarChart3, 
+        label: 'Reports', 
+        href: '/reports',
+        permissions: PERMISSIONS.REPORTS_READ,
+      },
     ],
   },
   {
     title: 'Administration',
+    permissions: [PERMISSIONS.SETTINGS_READ, PERMISSIONS.ROLES_READ],
     items: [
-      { icon: Database, label: 'Data Management', href: '/data-management' },
-      { icon: GitBranch, label: 'Workflows', href: '/workflows' },
-      { icon: Settings, label: 'Settings', href: '/settings' },
+      { 
+        icon: Database, 
+        label: 'Data Management', 
+        href: '/data-management',
+        permissions: PERMISSIONS.SETTINGS_UPDATE,
+      },
+      { 
+        icon: GitBranch, 
+        label: 'Workflows', 
+        href: '/workflows',
+        permissions: [PERMISSIONS.SETTINGS_UPDATE, PERMISSIONS.ROLES_READ],
+      },
+      { 
+        icon: Settings, 
+        label: 'Settings', 
+        href: '/settings',
+        permissions: PERMISSIONS.SETTINGS_READ,
+      },
     ],
   },
 ];
@@ -113,6 +215,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
+  // Get user permissions
+  const { 
+    hasAnyPermission, 
+    hasAnyRole,
+    isAdmin,
+  } = usePermissions();
+
   // Fetch pending approvals count for badge
   const { data: dashboardData } = useQuery({
     queryKey: ['requests-dashboard-badge'],
@@ -129,6 +238,55 @@ export default function MainLayout({ children }: MainLayoutProps) {
   });
 
   const pendingApprovals = dashboardData?.pendingApprovals || 0;
+
+  // Filter navigation based on permissions
+  const filteredNavSections = useMemo(() => {
+    // Helper to check if user can see an item
+    const canSeeItem = (item: NavItem): boolean => {
+      // Admin can see everything
+      if (isAdmin) return true;
+      
+      // Check adminOnly flag
+      if (item.adminOnly) return false;
+      
+      // Check role requirements
+      if (item.roles) {
+        const roles = Array.isArray(item.roles) ? item.roles : [item.roles];
+        if (!hasAnyRole(roles)) return false;
+      }
+      
+      // Check permission requirements
+      if (item.permissions) {
+        const perms = Array.isArray(item.permissions) ? item.permissions : [item.permissions];
+        if (!hasAnyPermission(perms)) return false;
+      }
+      
+      // No restrictions - show item
+      return true;
+    };
+    
+    // Helper to check if user can see a section
+    const canSeeSection = (section: NavSection): boolean => {
+      // Admin can see everything
+      if (isAdmin) return true;
+      
+      // Check section-level permissions
+      if (section.permissions) {
+        const perms = Array.isArray(section.permissions) ? section.permissions : [section.permissions];
+        if (!hasAnyPermission(perms)) return false;
+      }
+      
+      return true;
+    };
+    
+    return navSections
+      .filter(section => canSeeSection(section))
+      .map(section => ({
+        ...section,
+        items: section.items.filter(item => canSeeItem(item)),
+      }))
+      .filter(section => section.items.length > 0); // Remove empty sections
+  }, [isAdmin, hasAnyPermission, hasAnyRole]);
 
   const handleLogout = async () => {
     try {
@@ -178,7 +336,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-            {navSections.map((section, sectionIndex) => {
+            {filteredNavSections.map((section, sectionIndex) => {
               const isCollapsed = section.title ? collapsedSections[section.title] : false;
               
               return (
@@ -289,53 +447,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </form>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="relative rounded-xl hover:bg-gray-100"
+              <NotificationBell 
                 onClick={() => setShowNotifications(!showNotifications)}
-              >
-                <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#F7941D] ring-2 ring-white" />
-              </Button>
-              {showNotifications && (
-                <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                  <div className="p-4 border-b border-gray-100">
-                    <h3 className="font-semibold text-gray-900">Notifications</h3>
-                  </div>
-                  <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
-                    <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg">
-                      <div className="w-2 h-2 mt-2 rounded-full bg-[#F7941D]" />
-                      <div>
-                        <p className="text-sm font-medium">New rolloff alert</p>
-                        <p className="text-xs text-gray-500">3 resources rolling off next week</p>
-                        <p className="text-xs text-gray-400 mt-1">2 hours ago</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg">
-                      <div className="w-2 h-2 mt-2 rounded-full bg-green-500" />
-                      <div>
-                        <p className="text-sm font-medium">Utilization target met</p>
-                        <p className="text-xs text-gray-500">Engineering practice achieved 85%</p>
-                        <p className="text-xs text-gray-400 mt-1">5 hours ago</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg opacity-60">
-                      <div className="w-2 h-2 mt-2 rounded-full bg-gray-300" />
-                      <div>
-                        <p className="text-sm">Timesheet reminder</p>
-                        <p className="text-xs text-gray-500">Week ending Dec 15 due</p>
-                        <p className="text-xs text-gray-400 mt-1">1 day ago</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-3 border-t border-gray-100">
-                    <Button variant="ghost" size="sm" className="w-full text-primary">
-                      View all notifications
-                    </Button>
-                  </div>
-                </div>
-              )}
+                isOpen={showNotifications}
+              />
+              <NotificationPanel 
+                isOpen={showNotifications}
+                onClose={() => setShowNotifications(false)}
+              />
             </div>
             <div className="h-8 w-px bg-gray-200"></div>
             <div className="text-right hidden sm:block">

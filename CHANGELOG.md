@@ -4,6 +4,189 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### December 19, 2025 - Workflow Builder (Visual Canvas)
+
+#### Added - Complete Visual Workflow Builder Page
+
+**Main Page** (`apps/frontend/src/pages/WorkflowBuilderPage.tsx` - ~1,437 lines)
+
+1. **Workflow List View**
+   - Displays all approval chains with status badges (Draft, Active, Archived, Deprecated)
+   - Shows step count, request count, and scope (Tenant/Practice/Global)
+   - Expandable cards to preview workflow steps
+   - Search by name/code and filter by status
+   - Actions: Edit, Delete, Duplicate, Activate/Deactivate, Archive
+
+2. **Workflow Editor**
+   - Create new workflows or edit existing ones
+   - Form validation for required fields (code, name, at least one step)
+   - Workflow details: Code (uppercase), Name, Description, Scope
+   - Save/Cancel with loading states
+
+3. **Drag-and-Drop Step Builder**
+   - Add, delete, and reorder approval steps using `motion/react` Reorder
+   - Visual step cards showing step number, name, approver type, and mode
+   - Settings button to open configuration panel
+   - Delete button per step
+
+4. **Step Configuration Panel (3 Tabs)**
+   - **Basic Tab:**
+     - Step name and instructions
+     - Approver type selection (Role/User/Dynamic) with visual cards
+     - Role/User dropdown based on approver type
+     - Approval mode (Any, All, Majority, First Response)
+   - **Advanced Tab:**
+     - Optional step toggle
+     - Allow delegation toggle
+     - Skip if unresolvable toggle
+     - Conflict resolution (Rejection Wins, Approval Wins, Majority Wins)
+   - **Timing & SLA Tab:**
+     - SLA hours setting
+     - Auto-approve after hours
+     - Reminder configuration (first after, interval, max reminders)
+     - Escalation settings (after hours, to role/user)
+
+**Tests** (`apps/frontend/src/pages/WorkflowBuilderPage.test.tsx` - 12 tests)
+- Renders workflow list
+- Shows search input and create button
+- Displays workflow status badge and step count
+- Opens editor when create clicked
+- Shows empty state when no workflows
+- Validates required fields
+- Adds new steps
+- Shows step configuration panel
+- Can cancel and return to list
+
+**App Integration** (`apps/frontend/src/App.tsx`)
+- Replaced `WorkflowsPlaceholder` with `WorkflowBuilderPage`
+- Route `/workflows` now renders full workflow builder
+
+**API Integration:**
+- Uses existing `/api/v1/approval-chains` endpoints
+- GET `/approval-chains` - List with filters
+- POST `/approval-chains` - Create with steps
+- PUT `/approval-chains/:id` - Update
+- DELETE `/approval-chains/:id` - Delete
+
+**Permission Integration:**
+- Create button wrapped in `<Can permission={PERMISSIONS.SETTINGS_UPDATE}>`
+- Edit/Delete actions permission-gated
+
+---
+
+### December 18, 2025 - Real-time Notifications (WebSocket)
+
+#### Added - WebSocket Infrastructure for Live Updates
+
+**Backend Changes:**
+1. **WebSocket Server** (`apps/api/src/lib/websocket.ts`)
+   - WebSocket server attached to Express HTTP server at `/ws` path
+   - JWT authentication on connection via URL query parameter
+   - Room-based message routing (per-user and per-tenant)
+   - Heartbeat mechanism (30s ping, 60s timeout for stale connections)
+   - Methods: `sendToUser()`, `sendToUsers()`, `broadcastToTenant()`, `isUserOnline()`
+   - 15+ event types defined in `WS_EVENTS` constant
+
+2. **JWT Enhancement** (`apps/api/src/lib/jwt.ts`)
+   - Added `verifyToken()` function for WebSocket authentication
+   - Returns `{ userId, tenantId }` or null if invalid
+
+3. **Server Integration** (`apps/api/src/index.ts`)
+   - HTTP server wrapper for WebSocket support
+   - WebSocket manager initialization on startup
+   - Graceful shutdown handling for WebSocket connections
+   - Added ws dependency (`ws` + `@types/ws`)
+
+4. **Notification Service Integration** (`apps/api/src/modules/requests/notification.service.ts`)
+   - Emits `NOTIFICATION` event when notification created
+   - Emits `NOTIFICATION_COUNT` event with updated unread count
+   - Supports both single and bulk notifications via WebSocket
+
+**Frontend Changes:**
+5. **WebSocket Hook** (`apps/frontend/src/hooks/useWebSocket.ts`)
+   - `useWebSocket()` - Low-level connection management with auto-reconnect
+   - `useNotifications()` - High-level hook for notification subscriptions
+   - Auto-connect when user is authenticated
+   - 5 reconnection attempts with 3s interval
+   - Event type constants matching backend
+
+6. **Notification Panel** (`apps/frontend/src/components/notifications/NotificationPanel.tsx`)
+   - Live notification feed with real-time updates
+   - Mark as read / Mark all read functionality
+   - Click to navigate to action URL
+   - Visual notification type styling (color + icon)
+   - `NotificationBell` component with animated unread badge
+   - Green dot indicator for WebSocket connection status
+
+7. **MainLayout Update** (`apps/frontend/src/components/layout/MainLayout.tsx`)
+   - Replaced mock notification panel with real `NotificationPanel`
+   - Replaced static bell icon with `NotificationBell` component
+
+**WebSocket Event Types:**
+- `notification` - New notification received
+- `notification:read` - Notification marked as read
+- `notification:count` - Unread count updated
+- `request:created`, `request:updated`, `request:status_changed`, `request:assigned`
+- `approval:required`, `approval:completed`, `approval:rejected`
+- `resource:updated`, `resource:allocation_changed`
+- `system:announcement`
+
+---
+
+### December 18, 2025 - Permission System (Frontend)
+
+#### Added - Comprehensive Frontend Permission System
+
+**Components Created:**
+1. **usePermissions Hook** (`apps/frontend/src/hooks/usePermissions.ts`)
+   - React Query based permission fetching with 5-minute caching
+   - `can` object with boolean flags for common permissions
+   - `hasPermission(permission)` - Check single permission
+   - `hasRole(role)` - Check user role
+   - `canAccessModule(module)` - Check module access
+   - 50+ permission constants defined (PERMISSIONS object)
+   - Helper functions exported for use outside React
+
+2. **Can/Cannot Components** (`apps/frontend/src/components/permissions/Can.tsx`)
+   - `<Can permission="...">` - Show children if permission granted
+   - `<Cannot permission="...">` - Show children if permission denied
+   - `<CanAccess anyPermission={[...]}/>` - Multiple permission check
+   - `<AdminOnly>`, `<ManagerOnly>` - Role-based gates
+   - `ifCan` HOC for wrapping components with permission checks
+
+**Files Updated:**
+3. **MainLayout Navigation** (`apps/frontend/src/components/layout/MainLayout.tsx`)
+   - NavItem interface extended with `permissions` and `roles` properties
+   - `filteredNavSections` filters navigation based on user permissions
+   - Workflow Builder requires admin role
+   - Settings requires settings:read permission
+
+4. **ResourcesPage** (`apps/frontend/src/pages/ResourcesPage.tsx`)
+   - Add Resource button wrapped in `<Can permission={PERMISSIONS.RESOURCES_CREATE}>`
+   - Edit/Delete actions permission-gated in dropdown menu
+
+5. **RequestsPage** (`apps/frontend/src/pages/RequestsPage.tsx`)
+   - New Request button wrapped in `<Can permission={PERMISSIONS.REQUESTS_CREATE}>`
+
+**Test Infrastructure:**
+6. **Test Utils** (`apps/frontend/src/test/utils.tsx`)
+   - QueryClient pre-populated with admin permissions for testing
+   - Ensures permission queries resolve immediately in tests
+
+7. **Test Setup** (`apps/frontend/src/test/setup.ts`)
+   - Auth store initialized with mock user before tests
+   - Prevents permission queries from failing
+
+8. **Mock Handlers** (`apps/frontend/src/test/mocks/handlers.ts`)
+   - Added permissions array to mock user response
+   - Added `/api/v1/auth/permissions` handler
+
+**Permission Format:** `module:action:scope`
+- Examples: `resources:create`, `resources:read:team`, `workflows:manage`
+- Scope levels: `own`, `team`, `practice`, `org`
+
+---
+
 ### December 17, 2025 - Inactive Resource Handling
 
 #### Added - Comprehensive Inactive/Former Employee Management

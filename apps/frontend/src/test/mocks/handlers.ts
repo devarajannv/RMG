@@ -19,6 +19,55 @@ const mockUser = {
   firstName: 'Test',
   lastName: 'User',
   role: 'ADMIN',
+  tenantId: 'tenant-1',
+  roles: ['Admin'],
+  permissions: [
+    // Full permissions for tests (admin user)
+    'resources:create',
+    'resources:read',
+    'resources:update',
+    'resources:delete',
+    'projects:create',
+    'projects:read',
+    'projects:update',
+    'projects:delete',
+    'allocations:create',
+    'allocations:read',
+    'allocations:update',
+    'allocations:delete',
+    'allocations:approve',
+    'timesheets:create',
+    'timesheets:read',
+    'timesheets:update',
+    'timesheets:approve',
+    'clients:create',
+    'clients:read',
+    'clients:update',
+    'clients:delete',
+    'contracts:create',
+    'contracts:read',
+    'contracts:update',
+    'contracts:delete',
+    'contracts:approve',
+    'reports:read',
+    'reports:export',
+    'analytics:read',
+    'settings:read',
+    'settings:update',
+    'roles:create',
+    'roles:read',
+    'roles:update',
+    'roles:delete',
+    'roles:assign',
+    'requests:create',
+    'requests:read',
+    'requests:update',
+    'requests:approve',
+    'documents:create',
+    'documents:read',
+    'documents:update',
+    'documents:delete',
+  ],
 };
 
 const mockResources = [
@@ -247,7 +296,17 @@ export const handlers = [
   }),
 
   http.get(`${API_BASE}/auth/me`, () => {
-    return HttpResponse.json({ data: mockUser });
+    return HttpResponse.json({ 
+      user: {
+        id: mockUser.id,
+        email: mockUser.email,
+        firstName: mockUser.firstName,
+        lastName: mockUser.lastName,
+        tenantId: mockUser.tenantId,
+        roles: mockUser.roles,
+        permissions: mockUser.permissions,
+      } 
+    });
   }),
 
   http.post(`${API_BASE}/auth/logout`, () => {

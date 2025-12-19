@@ -6,15 +6,63 @@
 import React, { ReactElement } from 'react';
 import { render, RenderOptions, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
+
+// Mock permissions for testing - full admin access
+const mockPermissions = [
+  'resources:create',
+  'resources:read',
+  'resources:update',
+  'resources:delete',
+  'projects:create',
+  'projects:read',
+  'projects:update',
+  'projects:delete',
+  'allocations:create',
+  'allocations:read',
+  'allocations:update',
+  'allocations:delete',
+  'allocations:approve',
+  'timesheets:create',
+  'timesheets:read',
+  'timesheets:update',
+  'timesheets:approve',
+  'clients:create',
+  'clients:read',
+  'clients:update',
+  'clients:delete',
+  'contracts:create',
+  'contracts:read',
+  'contracts:update',
+  'contracts:delete',
+  'contracts:approve',
+  'reports:read',
+  'reports:export',
+  'analytics:read',
+  'settings:read',
+  'settings:update',
+  'roles:create',
+  'roles:read',
+  'roles:update',
+  'roles:delete',
+  'roles:assign',
+  'requests:create',
+  'requests:read',
+  'requests:update',
+  'requests:approve',
+  'documents:create',
+  'documents:read',
+  'documents:update',
+  'documents:delete',
+];
 
 // ═══════════════════════════════════════════════════════════════════════
 // QUERY CLIENT FOR TESTS
 // ═══════════════════════════════════════════════════════════════════════
 
-export const createTestQueryClient = () =>
-  new QueryClient({
+export const createTestQueryClient = () => {
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
@@ -26,6 +74,15 @@ export const createTestQueryClient = () =>
       },
     },
   });
+  
+  // Pre-populate permissions query so Can components work immediately
+  client.setQueryData(['user-permissions'], {
+    permissions: mockPermissions,
+    roles: ['Admin'],
+  });
+  
+  return client;
+};
 
 // ═══════════════════════════════════════════════════════════════════════
 // PROVIDERS WRAPPER

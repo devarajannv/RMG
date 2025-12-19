@@ -1,10 +1,48 @@
 # RMGaaS Current State
 
-> Last Updated: December 17, 2025
+> Last Updated: December 19, 2025
 
 ## Product Overview
 
 RMGaaS (Resource Management as a Service) is a comprehensive resource management platform for NewVision Software Pvt. Ltd. The product has completed its initial 14-day development sprint and has now implemented the first 10 features from the feature expansion discussions.
+
+---
+
+## Recent Changes (December 19, 2025)
+
+### Workflow Builder (Visual Canvas)
+- ✅ Visual workflow list with status badges and step counts
+- ✅ Search and filter workflows by status
+- ✅ Create/Edit workflow form with validation
+- ✅ Drag-and-drop step reordering (motion/react Reorder)
+- ✅ Step configuration panel with 3 tabs (Basic, Advanced, Timing & SLA)
+- ✅ Approver types: Role, User, Dynamic
+- ✅ Approval modes: Any, All, Majority, First Response
+- ✅ SLA, auto-approve, reminders, and escalation configuration
+- ✅ 12 tests covering core functionality
+- ✅ Connected to existing `/api/v1/approval-chains` API
+
+---
+
+## Recent Changes (December 18, 2025)
+
+### Real-time Notifications (WebSocket)
+- ✅ WebSocket server at `/ws` with JWT authentication
+- ✅ Room-based message routing (user + tenant rooms)
+- ✅ Heartbeat mechanism for connection health
+- ✅ Auto-reconnection on client (5 attempts, 3s interval)
+- ✅ `useWebSocket` and `useNotifications` hooks
+- ✅ Live `NotificationPanel` component with real-time updates
+- ✅ `NotificationBell` with animated badge and connection indicator
+- ✅ Notification service emits WebSocket events
+
+### Frontend Permission System
+- ✅ `usePermissions` hook with React Query caching
+- ✅ `<Can>`, `<Cannot>`, `<AdminOnly>`, `<ManagerOnly>` gate components
+- ✅ 50+ permission constants defined
+- ✅ Navigation sidebar filtered by permissions
+- ✅ ResourcesPage and RequestsPage actions permission-gated
+- ✅ Test infrastructure updated with permissions
 
 ---
 
@@ -131,7 +169,7 @@ RMGaaS (Resource Management as a Service) is a comprehensive resource management
 
 ### Backend (`apps/api`)
 ```
-17 modules, 60+ files
+22 modules, 99+ endpoints
 ├── auth (including Microsoft SSO)
 ├── resources
 ├── projects
@@ -145,15 +183,18 @@ RMGaaS (Resource Management as a Service) is a comprehensive resource management
 ├── export
 ├── import
 ├── webhooks
-├── currency (NEW)
-├── roles (NEW)
-├── documents (NEW)
-└── agent (NEW)
+├── currency
+├── roles
+├── documents
+├── agent
+├── requests
+├── notifications
+└── approval-chains (workflow engine)
 ```
 
 ### Frontend (`apps/frontend`)
 ```
-17 pages
+20 pages
 ├── LoginPage (with Microsoft SSO)
 ├── DashboardPage
 ├── ResourcesPage / ResourceDetailPage
@@ -167,7 +208,9 @@ RMGaaS (Resource Management as a Service) is a comprehensive resource management
 ├── ReportsPage
 ├── AnalyticsPage
 ├── ExportImportPage (Data Management)
-└── SettingsPage
+├── SettingsPage
+├── RequestsPage / RequestDetailPage
+└── WorkflowBuilderPage (NEW)
 ```
 
 ### Database

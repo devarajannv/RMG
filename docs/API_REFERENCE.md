@@ -683,6 +683,63 @@ POST /webhooks/:id/test
 
 ---
 
+## WebSocket (Real-time Notifications)
+
+### Connection
+
+```
+WS /ws?token=<jwt_access_token>
+```
+
+Connect to the WebSocket server by passing the JWT access token as a query parameter. The server authenticates the connection and registers the client for real-time updates.
+
+**Connection Response:**
+```json
+{
+  "type": "connected",
+  "payload": {
+    "userId": "uuid",
+    "message": "WebSocket connection established"
+  }
+}
+```
+
+### Event Types
+
+| Event | Description | Payload |
+|-------|-------------|---------|
+| `notification` | New notification | `{ id, type, title, message, actionUrl, createdAt }` |
+| `notification:count` | Unread count updated | `{ unreadCount: number }` |
+| `notification:read` | Notification marked read | `{ id: string }` |
+| `request:created` | New request created | Request object |
+| `request:updated` | Request updated | Request object |
+| `request:status_changed` | Status changed | `{ requestId, oldStatus, newStatus }` |
+| `request:assigned` | Request assigned | `{ requestId, assigneeId }` |
+| `approval:required` | Approval needed | Approval step details |
+| `approval:completed` | Approval completed | Approval result |
+| `approval:rejected` | Approval rejected | Rejection details |
+
+### Client Messages
+
+| Message Type | Description |
+|--------------|-------------|
+| `ping` | Heartbeat (server responds with `pong`) |
+| `subscribe` | Subscribe to specific events |
+
+### Heartbeat
+
+The server sends ping frames every 30 seconds. If no response is received within 60 seconds, the connection is terminated.
+
+### Reconnection
+
+Recommended client behavior:
+- Auto-reconnect on disconnect
+- Maximum 5 attempts
+- 3 second interval between attempts
+- Exponential backoff optional
+
+---
+
 ## Pagination
 
 All list endpoints support pagination:
@@ -702,4 +759,3 @@ GET /resources?page=2&limit=50
   }
 }
 ```
-

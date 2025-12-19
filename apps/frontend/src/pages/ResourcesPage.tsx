@@ -39,6 +39,8 @@ import {
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
 import MainLayout from '../components/layout/MainLayout';
+import { usePermissions, PERMISSIONS } from '../hooks/usePermissions';
+import { Can } from '../components/permissions/Can';
 
 // Skill can be a string or an object from the API
 type SkillItem = string | {
@@ -413,6 +415,9 @@ function ResourceFormModal({
 export default function ResourcesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  // Get permissions
+  const { can } = usePermissions();
 
   // State
   const [searchTerm, setSearchTerm] = useState('');
@@ -687,14 +692,18 @@ export default function ResourcesPage() {
           <p className="text-gray-500">Manage your team members and their skills</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button onClick={() => setShowAddModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Resource
-          </Button>
+          <Can permission={PERMISSIONS.REPORTS_EXPORT}>
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </Can>
+          <Can permission={PERMISSIONS.RESOURCES_CREATE}>
+            <Button onClick={() => setShowAddModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Resource
+            </Button>
+          </Can>
         </div>
       </div>
 
@@ -891,7 +900,7 @@ export default function ResourcesPage() {
                   ? 'Try adjusting your search or filters'
                   : 'Get started by adding your first resource'}
               </p>
-              {!searchTerm && !Object.values(filters).some(Boolean) && (
+              {!searchTerm && !Object.values(filters).some(Boolean) && can.createResource && (
                 <Button onClick={() => setShowAddModal(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Resource
@@ -1041,18 +1050,24 @@ export default function ResourcesPage() {
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEditModal(resource)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => openDeleteDialog(resource)}
-                              destructive
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                            {can.updateResource && (
+                              <DropdownMenuItem onClick={() => openEditModal(resource)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {can.deleteResource && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => openDeleteDialog(resource)}
+                                  destructive
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>

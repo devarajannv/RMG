@@ -76,12 +76,12 @@ npm run dev
 
 ---
 
-## 📋 Feature Status (Day 12 of 14)
+## 📋 Feature Status (Writer 95% Complete)
 
 ### ✅ Completed Features
 
-| Day | Feature | Status |
-|-----|---------|--------|
+| Phase | Feature | Status |
+|-------|---------|--------|
 | 1-2 | Foundation & Setup | ✅ Complete |
 | 3-4 | Core Data Management (Resources, Projects, Clients) | ✅ Complete |
 | 5 | Allocation Management | ✅ Complete |
@@ -92,13 +92,21 @@ npm run dev
 | 10 | Intelligence Layer (Smart Matching) | ✅ Complete |
 | 11 | Advanced Analytics Dashboards | ✅ Complete |
 | 12 | Export/Import & Webhooks | ✅ Complete |
+| 13-14 | Testing & Production Deployment | ✅ Complete |
+| Post | Multi-Currency, Roles, Documents, AI Agent | ✅ Complete |
+| Post | Request Flow & Approvals | ✅ Complete |
+| Post | Real-time Notifications (WebSocket) | ✅ Complete |
+| Post | Frontend Permission System | ✅ Complete |
+| Post | **Workflow Builder (Visual Canvas)** | ✅ Complete |
 
-### 🔜 Upcoming
+### 🔜 Upcoming (Scribe - AI Layer)
 
-| Day | Feature |
-|-----|---------|
-| 13 | Testing & Documentation |
-| 14 | Production Deployment |
+| Feature | Description |
+|---------|-------------|
+| LLM Integration | Real LLM calls (replacing simulated) |
+| pgvector Search | Semantic search with embeddings |
+| Onboarding Agent | AI-guided user onboarding |
+| Workflow Agent | AI-assisted workflow creation |
 
 ---
 
@@ -109,35 +117,44 @@ rmgaas/
 ├── apps/
 │   ├── api/                    # Backend API (Express + TypeScript)
 │   │   ├── prisma/             # Database schema & migrations
-│   │   │   ├── schema.prisma   # Prisma schema
+│   │   │   ├── schema.prisma   # Prisma schema (55 models)
 │   │   │   ├── seed.ts         # Sample data seeder
 │   │   │   └── seed-csv.ts     # CSV import seeder
 │   │   └── src/
 │   │       ├── config/         # Environment configuration
-│   │       ├── lib/            # Utilities (prisma, jwt, password, redis)
+│   │       ├── lib/            # Utilities (prisma, jwt, password, redis, websocket)
 │   │       ├── middleware/     # Auth, error handling, logging
-│   │       └── modules/        # Feature modules
+│   │       └── modules/        # Feature modules (22 modules)
 │   │           ├── allocations/
 │   │           ├── analytics/
 │   │           ├── auth/
 │   │           ├── bench/
 │   │           ├── clients/
+│   │           ├── contracts/
+│   │           ├── currency/
 │   │           ├── dashboard/
+│   │           ├── documents/
 │   │           ├── export/
 │   │           ├── import/
 │   │           ├── intelligence/
 │   │           ├── projects/
+│   │           ├── requests/     # Includes approval-chains
 │   │           ├── resources/
+│   │           ├── roles/
 │   │           ├── timesheets/
 │   │           └── webhooks/
 │   └── frontend/               # Frontend (React + Vite)
 │       └── src/
 │           ├── components/     # UI components
+│           │   ├── agent/      # AI Agent widget & command palette
 │           │   ├── layout/     # MainLayout with sidebar
+│           │   ├── notifications/ # Real-time notification panel
+│           │   ├── permissions/   # Can/Cannot gate components
 │           │   └── ui/         # shadcn/ui components
 │           ├── config/         # Environment config
+│           ├── hooks/          # Custom hooks (usePermissions, useWebSocket)
 │           ├── lib/            # API client, utilities
-│           ├── pages/          # Route pages
+│           ├── pages/          # Route pages (20 pages)
 │           └── stores/         # Zustand state
 ├── packages/
 │   └── shared/                 # Shared TypeScript types
@@ -257,6 +274,27 @@ rmgaas/
 | PATCH | `/api/v1/webhooks/:id` | Update webhook |
 | DELETE | `/api/v1/webhooks/:id` | Delete webhook |
 | POST | `/api/v1/webhooks/:id/test` | Test webhook |
+
+### Notifications
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/notifications` | List user notifications |
+| GET | `/api/v1/notifications/unread-count` | Get unread count |
+| PUT | `/api/v1/notifications/:id/read` | Mark as read |
+| PUT | `/api/v1/notifications/mark-all-read` | Mark all as read |
+| GET | `/api/v1/notifications/preferences` | Get preferences |
+| PUT | `/api/v1/notifications/preferences` | Update preferences |
+
+### WebSocket
+| Protocol | Endpoint | Description |
+|----------|----------|-------------|
+| WS | `/ws?token=<jwt>` | Real-time notifications |
+
+**WebSocket Events:**
+- `notification` - New notification received
+- `notification:count` - Unread count updated
+- `request:created`, `request:updated`, `request:assigned`
+- `approval:required`, `approval:completed`
 
 ---
 

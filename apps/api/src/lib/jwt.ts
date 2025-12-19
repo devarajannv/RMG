@@ -150,3 +150,18 @@ export function decodeToken(token: string): unknown {
   return jwt.decode(token);
 }
 
+/**
+ * Verify access token and return userId and tenantId
+ * Used by WebSocket for authentication
+ */
+export function verifyToken(token: string): { userId: string; tenantId: string } | null {
+  try {
+    const decoded = verifyAccessToken(token);
+    return {
+      userId: decoded.sub,
+      tenantId: decoded.tenantId,
+    };
+  } catch {
+    return null;
+  }
+}

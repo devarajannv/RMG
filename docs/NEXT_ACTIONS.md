@@ -2,11 +2,39 @@
 
 > Prioritized roadmap for upcoming development
 > 
-> Last Updated: December 17, 2025
+> Last Updated: December 18, 2025
 
 ---
 
-## ✅ Recently Completed (Dec 17)
+## ✅ Recently Completed (Dec 18)
+
+### Permission System (Frontend)
+**Status:** ✅ Completed
+
+- [x] `usePermissions` hook with React Query caching
+- [x] `<Can>`, `<Cannot>` permission gate components
+- [x] `<AdminOnly>`, `<ManagerOnly>` role-based gates
+- [x] 50+ permission constants defined
+- [x] Navigation sidebar filtered by permissions
+- [x] ResourcesPage/RequestsPage actions permission-gated
+- [x] Test infrastructure updated for permissions
+
+### Real-time Notifications (WebSocket)
+**Status:** ✅ Completed
+
+- [x] WebSocket server (`ws` package) at `/ws`
+- [x] JWT authentication on connection
+- [x] Room-based message routing (user/tenant)
+- [x] Heartbeat mechanism (30s ping, 60s timeout)
+- [x] `useWebSocket` hook with auto-reconnect
+- [x] `useNotifications` high-level hook
+- [x] `NotificationPanel` with live updates
+- [x] `NotificationBell` with badge & connection indicator
+- [x] Notification service emits WebSocket events
+
+---
+
+## ✅ Previously Completed (Dec 17)
 
 ### Comprehensive Frontend Test Coverage
 **Status:** ✅ Completed
@@ -80,17 +108,31 @@
 
 ## Priority 1: Critical Enhancements
 
-### 1.1 RBAC Enhancements (Remaining)
-**Status:** 🟡 Partially Complete  
+### 1.1 Workflow Builder (Visual Canvas)
+**Status:** 🔴 Not Started  
+**Effort:** 5-7 days
+**Priority:** P0 - Blocking Writer completion
+
+- [ ] Visual drag-and-drop canvas
+- [ ] Step types: Approval, Notification, Condition, Delay
+- [ ] Approver selection (role/user/dynamic)
+- [ ] Condition builder (if/else based on fields)
+- [ ] Parallel and sequential paths
+- [ ] Preview and testing mode
+- [ ] Save as template
+
+### 1.2 RBAC Enhancements (Remaining)
+**Status:** ✅ Mostly Complete  
 **Effort:** 1-2 days
 
 - [x] Granular action permissions (30+ defined)
 - [x] Audit trail for permission changes
+- [x] Frontend permission gating (usePermissions, Can/Cannot)
+- [x] Navigation filtering by permissions
 - [ ] Hierarchical data isolation in queries
-- [ ] Settings access levels (view vs. modify)
 - [ ] Delegation/proxy permissions
 
-### 1.2 Role Management (Remaining)
+### 1.3 Role Management (Remaining)
 **Status:** 🟡 Partially Complete  
 **Effort:** 1 day
 

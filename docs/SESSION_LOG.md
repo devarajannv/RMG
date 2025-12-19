@@ -4,6 +4,101 @@
 
 ---
 
+## Session: December 18, 2025
+
+### Permission System (Frontend)
+
+**Goal:** Implement frontend permission gating to match backend RBAC
+
+**Implementation:**
+1. **usePermissions Hook** (`apps/frontend/src/hooks/usePermissions.ts`)
+   - React Query based with 5-minute caching
+   - Fetches from `/api/v1/auth/permissions`
+   - Returns `can` object with boolean flags
+   - 50+ permission constants (PERMISSIONS object)
+   - Helper functions: `hasPermission()`, `hasRole()`, `canAccessModule()`
+
+2. **Gate Components** (`apps/frontend/src/components/permissions/Can.tsx`)
+   - `<Can permission="...">` - Show if permitted
+   - `<Cannot permission="...">` - Show if denied
+   - `<CanAccess anyPermission={[...]}/>` - Multiple permission check
+   - `<AdminOnly>`, `<ManagerOnly>` - Role-based gates
+   - `ifCan` HOC for component wrapping
+
+3. **Navigation Filtering** (`MainLayout.tsx`)
+   - NavItem extended with `permissions` and `roles` properties
+   - Sidebar sections filtered based on user permissions
+   - Workflow Builder restricted to admin role
+
+4. **Page Action Gating**
+   - ResourcesPage: Add/Edit/Delete buttons permission-controlled
+   - RequestsPage: New Request button permission-controlled
+
+5. **Test Infrastructure Updates**
+   - Pre-populated permissions in QueryClient for tests
+   - Auth store initialized with mock user
+   - Mock handlers return permissions array
+
+---
+
+### Real-time Notifications (WebSocket)
+
+**Goal:** Replace static mock notifications with live WebSocket updates
+
+**Backend Implementation:**
+1. **WebSocket Server** (`apps/api/src/lib/websocket.ts`)
+   - WebSocket manager singleton using `ws` package
+   - Attached to Express HTTP server at `/ws`
+   - JWT authentication via URL query parameter
+   - Room-based routing: per-user and per-tenant
+   - Heartbeat mechanism: 30s ping, 60s timeout
+   - Methods: `sendToUser()`, `sendToUsers()`, `broadcastToTenant()`
+   - 15+ event types in `WS_EVENTS` constant
+
+2. **Server Integration** (`apps/api/src/index.ts`)
+   - HTTP server wrapper: `createServer(app)`
+   - WebSocket initialization: `wsManager.initialize(server)`
+   - Graceful shutdown handling
+
+3. **JWT Enhancement** (`apps/api/src/lib/jwt.ts`)
+   - Added `verifyToken()` for WebSocket auth
+
+4. **Notification Service** (`notification.service.ts`)
+   - `createNotification()` emits `NOTIFICATION` event
+   - Also emits `NOTIFICATION_COUNT` with updated count
+   - Bulk notifications supported
+
+**Frontend Implementation:**
+1. **useWebSocket Hook** (`apps/frontend/src/hooks/useWebSocket.ts`)
+   - Auto-connects when authenticated
+   - Auto-reconnects on disconnect (5 attempts, 3s interval)
+   - `subscribe(event, handler)` returns unsubscribe function
+   - `send(type, payload)` for outgoing messages
+
+2. **useNotifications Hook** (same file)
+   - Higher-level wrapper for notification events
+   - Returns `unreadCount`, `latestNotification`, `isConnected`
+   - Callbacks: `onNotification`, `onCountUpdate`
+
+3. **NotificationPanel** (`apps/frontend/src/components/notifications/NotificationPanel.tsx`)
+   - Live notification feed
+   - Fetches via API + real-time updates via WebSocket
+   - Mark as read / Mark all read
+   - Click to navigate to action URL
+   - Visual styling per notification type
+
+4. **NotificationBell** (same file)
+   - Animated badge with unread count
+   - Green dot = connected, gray = disconnected
+
+**Progress Update:**
+- Writer: 88% → 90% complete
+- Frontend Infrastructure: 75% → 85% complete
+- Real-time Notifications: ❌ → ✅ Complete
+- Permission System (Frontend): ❌ → ✅ Complete
+
+---
+
 ## Session: December 17, 2025
 
 ### Frontend Test Suite Rebuild

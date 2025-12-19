@@ -3,13 +3,35 @@
  */
 
 import '@testing-library/jest-dom';
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './mocks/server';
+import { useAuthStore } from '../stores/authStore';
+
+// Mock user for tests
+const mockUser = {
+  id: 'user-1',
+  email: 'test@example.com',
+  firstName: 'Test',
+  lastName: 'User',
+  tenantId: 'tenant-1',
+  roles: ['Admin'],
+};
 
 // Setup MSW server
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'warn' });
+});
+
+beforeEach(() => {
+  // Initialize auth store with mock user for tests
+  useAuthStore.setState({
+    user: mockUser,
+    accessToken: 'mock-jwt-token',
+    isAuthenticated: true,
+    isLoading: false,
+    hasHydrated: true,
+  });
 });
 
 afterEach(() => {
@@ -17,6 +39,14 @@ afterEach(() => {
   cleanup();
   // Reset handlers between tests
   server.resetHandlers();
+  // Reset auth store
+  useAuthStore.setState({
+    user: null,
+    accessToken: null,
+    isAuthenticated: false,
+    isLoading: false,
+    hasHydrated: true,
+  });
 });
 
 afterAll(() => {

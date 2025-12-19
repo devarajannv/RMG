@@ -41,13 +41,19 @@ describe('ResourcesPage', () => {
     it('displays Add Resource button', async () => {
       renderWithProviders(<ResourcesPage />);
       
-      expect(screen.getByRole('button', { name: /add resource/i })).toBeInTheDocument();
+      // Wait for permissions to load and button to appear
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /add resource/i })).toBeInTheDocument();
+      });
     });
 
     it('displays Export button', async () => {
       renderWithProviders(<ResourcesPage />);
       
-      expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument();
+      // Wait for permissions to load and button to appear
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument();
+      });
     });
 
     it('displays search input', async () => {

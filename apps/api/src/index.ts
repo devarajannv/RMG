@@ -4,11 +4,13 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
+import { createServer } from 'http';
 import { config } from './config/env';
 import { logger } from './lib/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { swaggerSpec } from './config/swagger';
+import { wsManager } from './lib/websocket';
 
 // Route imports
 import authRoutes from './modules/auth/auth.controller';
@@ -138,14 +140,30 @@ app.use('/api/v1/notifications', notificationRoutes);
 // Error handling
 app.use(errorHandler);
 
+// Create HTTP server
+const server = createServer(app);
+
+// Initialize WebSocket server
+wsManager.initialize(server);
+
 // Start server
 const PORT = config.port;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   logger.info(`🚀 RMGaaS API running on port ${PORT}`);
   logger.info(`📍 Environment: ${config.nodeEnv}`);
   logger.info(`🔗 API URL: ${config.apiUrl}`);
+  logger.info(`🔌 WebSocket available at ws://localhost:${PORT}/ws`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  wsManager.shutdown();
+  server.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
+  });
 });
 
 export default app;
-
-
+export { server };

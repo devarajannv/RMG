@@ -2,6 +2,8 @@
 
 > **Resource Management & Governance as a Service**  
 > A comprehensive guide for end users
+>
+> *Last Updated: December 18, 2025*
 
 ---
 
@@ -9,15 +11,16 @@
 
 1. [Getting Started](#getting-started)
 2. [Dashboard Overview](#dashboard-overview)
-3. [Resource Management](#resource-management)
-4. [Project Management](#project-management)
-5. [Allocation Management](#allocation-management)
-6. [Bench Management](#bench-management)
-7. [Smart Search](#smart-search)
-8. [Timesheets](#timesheets)
-9. [Analytics & Reports](#analytics--reports)
-10. [Data Export/Import](#data-exportimport)
-11. [FAQ](#faq)
+3. [Notifications](#notifications)
+4. [Resource Management](#resource-management)
+5. [Project Management](#project-management)
+6. [Allocation Management](#allocation-management)
+7. [Bench Management](#bench-management)
+8. [Smart Search](#smart-search)
+9. [Timesheets](#timesheets)
+10. [Analytics & Reports](#analytics--reports)
+11. [Data Export/Import](#data-exportimport)
+12. [FAQ](#faq)
 
 ---
 
@@ -77,6 +80,46 @@ The dashboard provides a high-level view of your organization's resource managem
 - View bench resources
 - Check upcoming rolloffs
 - See pending approvals
+
+---
+
+## Notifications
+
+### Real-time Notification Bell
+
+The notification bell in the top-right header shows your unread notifications:
+
+- **Orange badge**: Number of unread notifications
+- **Green dot**: Live updates enabled (WebSocket connected)
+- **Gray dot**: Connecting or reconnecting
+
+### Notification Panel
+
+Click the bell icon to open the notification panel:
+
+1. **View notifications**: Recent notifications with type icons
+2. **Mark as read**: Click a notification to mark it read
+3. **Mark all read**: Button to clear all unread
+4. **Navigate**: Click to go to relevant page
+
+### Notification Types
+
+| Type | Icon | Description |
+|------|------|-------------|
+| Request Assigned | 📋 | A request has been assigned to you |
+| Request Approved | ✅ | Your request was approved |
+| Request Rejected | ❌ | Your request was rejected |
+| Approval Required | ⏳ | A request needs your approval |
+| SLA Warning | ⚠️ | SLA deadline approaching |
+| SLA Breach | 🚨 | SLA has been breached |
+| Comment Added | 💬 | New comment on a request |
+
+### Live Updates
+
+Notifications are delivered in real-time via WebSocket:
+- No need to refresh the page
+- Immediate updates when events occur
+- Auto-reconnection if connection drops
 
 ---
 
