@@ -1,0 +1,488 @@
+/**
+ * Request Service - Comprehensive Tests
+ * Tests all request lifecycle operations
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as requestService from './request.service';
+
+// Mock dependencies
+vi.mock('../../lib/prisma', () => ({
+  default: {
+    requestType: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+    },
+    request: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+    },
+    requestHistory: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+    },
+    requestSequence: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    tenant: {
+      findUnique: vi.fn(),
+    },
+    approvalChain: {
+      findFirst: vi.fn(),
+    },
+    slaConfig: {
+      findFirst: vi.fn(),
+    },
+    $transaction: vi.fn().mockImplementation(async (cb) => cb({
+      requestSequence: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'seq-1', lastNumber: 1 }),
+        create: vi.fn().mockResolvedValue({ id: 'seq-1', lastNumber: 1 }),
+        update: vi.fn().mockResolvedValue({ id: 'seq-1', lastNumber: 2 }),
+      },
+    })),
+  },
+}));
+
+vi.mock('../../lib/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+import prisma from '../../lib/prisma';
+
+describe('Request Service - Comprehensive Tests', () => {
+  const mockTenantId = 'tenant-123';
+  const mockUserId = 'user-456';
+
+  const mockRequestType = {
+    code: 'RESOURCE_ONBOARDING',
+    name: 'Resource Onboarding',
+    description: 'Request to onboard a new resource',
+    isActive: true,
+    formSchema: { type: 'object', properties: {} },
+    requiredFields: ['resourceName', 'startDate'],
+    tenantConfigs: [{ tenantId: mockTenantId, isEnabled: true }],
+  };
+
+  const mockRequest = {
+    id: 'req-1',
+    requestNumber: 'TST-2025-00001',
+    tenantId: mockTenantId,
+    typeCode: 'RESOURCE_ONBOARDING',
+    title: 'Onboard John Doe',
+    description: 'New hire onboarding',
+    status: 'DRAFT',
+    priority: 'MEDIUM',
+    requestData: { resourceName: 'John Doe', startDate: '2025-01-15' },
+    requesterId: mockUserId,
+    submittedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    requester: { id: mockUserId, firstName: 'Test', lastName: 'User' },
+    type: mockRequestType,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.tenant.findUnique).mockResolvedValue({ id: mockTenantId, slug: 'test' } as never);
+  });
+
+  describe('createRequest', () => {
+    it('REQ-001: should create a new request as draft', async () => {
+      vi.mocked(prisma.requestType.findUnique).mockResolvedValue(mockRequestType as never);
+      vi.mocked(prisma.request.create).mockResolvedValue(mockRequest as never);
+
+      const input = {
+        typeCode: 'RESOURCE_ONBOARDING',
+        title: 'Onboard John Doe',
+        requestData: { resourceName: 'John Doe', startDate: '2025-01-15' },
+      };
+
+      const result = await requestService.createRequest(mockTenantId, mockUserId, input);
+
+      expect(result).toHaveProperty('id');
+      expect(prisma.request.create).toHaveBeenCalled();
+    });
+
+    it('REQ-002: should throw error for invalid request type', async () => {
+      vi.mocked(prisma.requestType.findUnique).mockResolvedValue(null);
+
+      const input = {
+        typeCode: 'INVALID_TYPE',
+        title: 'Test',
+        requestData: {},
+      };
+
+      await expect(requestService.createRequest(mockTenantId, mockUserId, input))
+        .rejects.toThrow('Invalid request type');
+    });
+
+    it('REQ-003: should throw error for disabled request type', async () => {
+      vi.mocked(prisma.requestType.findUnique).mockResolvedValue({
+        ...mockRequestType,
+        isActive: false,
+      } as never);
+
+      const input = {
+        typeCode: 'RESOURCE_ONBOARDING',
+        title: 'Test',
+        requestData: { resourceName: 'Test', startDate: '2025-01-15' },
+      };
+
+      await expect(requestService.createRequest(mockTenantId, mockUserId, input))
+        .rejects.toThrow('Request type is disabled');
+    });
+
+    it('REQ-004: should validate required fields', async () => {
+      vi.mocked(prisma.requestType.findUnique).mockResolvedValue(mockRequestType as never);
+
+      const input = {
+        typeCode: 'RESOURCE_ONBOARDING',
+        title: 'Test',
+        requestData: { resourceName: 'John' }, // Missing startDate
+      };
+
+      await expect(requestService.createRequest(mockTenantId, mockUserId, input))
+        .rejects.toThrow('Missing required field');
+    });
+
+    it('REQ-005: should set default priority to MEDIUM', async () => {
+      vi.mocked(prisma.requestType.findUnique).mockResolvedValue(mockRequestType as never);
+      vi.mocked(prisma.request.create).mockResolvedValue(mockRequest as never);
+
+      const input = {
+        typeCode: 'RESOURCE_ONBOARDING',
+        title: 'Test',
+        requestData: { resourceName: 'John', startDate: '2025-01-15' },
+      };
+
+      await requestService.createRequest(mockTenantId, mockUserId, input);
+
+      expect(prisma.request.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            priority: 'MEDIUM',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('getRequest', () => {
+    it('REQ-006: should return request by ID', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(mockRequest as never);
+
+      const result = await requestService.getRequest(mockTenantId, 'req-1', mockUserId);
+
+      expect(result).toBeTruthy();
+      expect(result?.id).toBe('req-1');
+    });
+
+    it('REQ-007: should return null for non-existent request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(null);
+
+      const result = await requestService.getRequest(mockTenantId, 'non-existent', mockUserId);
+
+      expect(result).toBeNull();
+    });
+
+    it('REQ-008: should include request type details', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(mockRequest as never);
+
+      const result = await requestService.getRequest(mockTenantId, 'req-1', mockUserId);
+
+      expect(result?.type).toBeTruthy();
+      expect(result?.type.code).toBe('RESOURCE_ONBOARDING');
+    });
+  });
+
+  describe('listRequests', () => {
+    it('REQ-009: should return paginated list of requests', async () => {
+      vi.mocked(prisma.request.findMany).mockResolvedValue([mockRequest] as never);
+      vi.mocked(prisma.request.count).mockResolvedValue(1);
+
+      const result = await requestService.listRequests(mockTenantId, mockUserId, {}, { page: 1, limit: 10 });
+
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('pagination');
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('REQ-010: should filter by status', async () => {
+      vi.mocked(prisma.request.findMany).mockResolvedValue([mockRequest] as never);
+      vi.mocked(prisma.request.count).mockResolvedValue(1);
+
+      await requestService.listRequests(
+        mockTenantId,
+        mockUserId,
+        { status: ['DRAFT', 'SUBMITTED'] },
+        {}
+      );
+
+      expect(prisma.request.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { in: ['DRAFT', 'SUBMITTED'] },
+          }),
+        })
+      );
+    });
+
+    it('REQ-011: should filter by type code', async () => {
+      vi.mocked(prisma.request.findMany).mockResolvedValue([mockRequest] as never);
+      vi.mocked(prisma.request.count).mockResolvedValue(1);
+
+      await requestService.listRequests(
+        mockTenantId,
+        mockUserId,
+        { typeCode: ['RESOURCE_ONBOARDING'] },
+        {}
+      );
+
+      expect(prisma.request.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            typeCode: { in: ['RESOURCE_ONBOARDING'] },
+          }),
+        })
+      );
+    });
+
+    it('REQ-012: should filter by priority', async () => {
+      vi.mocked(prisma.request.findMany).mockResolvedValue([mockRequest] as never);
+      vi.mocked(prisma.request.count).mockResolvedValue(1);
+
+      await requestService.listRequests(
+        mockTenantId,
+        mockUserId,
+        { priority: ['HIGH', 'CRITICAL'] },
+        {}
+      );
+
+      expect(prisma.request.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            priority: { in: ['HIGH', 'CRITICAL'] },
+          }),
+        })
+      );
+    });
+
+    it('REQ-013: should support search', async () => {
+      vi.mocked(prisma.request.findMany).mockResolvedValue([mockRequest] as never);
+      vi.mocked(prisma.request.count).mockResolvedValue(1);
+
+      await requestService.listRequests(
+        mockTenantId,
+        mockUserId,
+        {},
+        { search: 'John' }
+      );
+
+      expect(prisma.request.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.any(Array),
+          }),
+        })
+      );
+    });
+
+    it('REQ-014: should return correct pagination metadata', async () => {
+      vi.mocked(prisma.request.findMany).mockResolvedValue([mockRequest] as never);
+      vi.mocked(prisma.request.count).mockResolvedValue(25);
+
+      const result = await requestService.listRequests(
+        mockTenantId,
+        mockUserId,
+        {},
+        { page: 2, limit: 10 }
+      );
+
+      expect(result.pagination.page).toBe(2);
+      expect(result.pagination.limit).toBe(10);
+      expect(result.pagination.total).toBe(25);
+      expect(result.pagination.pages).toBe(3);
+    });
+  });
+
+  describe('updateRequest', () => {
+    it('REQ-015: should update draft request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(mockRequest as never);
+      vi.mocked(prisma.request.update).mockResolvedValue({
+        ...mockRequest,
+        title: 'Updated Title',
+      } as never);
+
+      const result = await requestService.updateRequest(
+        mockTenantId,
+        'req-1',
+        mockUserId,
+        { title: 'Updated Title' }
+      );
+
+      expect(result.title).toBe('Updated Title');
+    });
+
+    it('REQ-016: should throw error for non-existent request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(null);
+
+      await expect(requestService.updateRequest(
+        mockTenantId,
+        'non-existent',
+        mockUserId,
+        { title: 'Test' }
+      )).rejects.toThrow();
+    });
+
+    it('REQ-017: should not allow update of non-draft request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue({
+        ...mockRequest,
+        status: 'SUBMITTED',
+      } as never);
+
+      await expect(requestService.updateRequest(
+        mockTenantId,
+        'req-1',
+        mockUserId,
+        { title: 'Test' }
+      )).rejects.toThrow();
+    });
+  });
+
+  describe('submitRequest', () => {
+    it('REQ-018: should submit a draft request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(mockRequest as never);
+      vi.mocked(prisma.approvalChain.findFirst).mockResolvedValue({
+        id: 'chain-1',
+        steps: [{ stepOrder: 1, approverId: 'approver-1' }],
+      } as never);
+      vi.mocked(prisma.slaConfig.findFirst).mockResolvedValue({
+        id: 'sla-1',
+        responseTimeHours: 4,
+        resolutionTimeHours: 24,
+      } as never);
+      vi.mocked(prisma.request.update).mockResolvedValue({
+        ...mockRequest,
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+      } as never);
+
+      const result = await requestService.submitRequest(
+        mockTenantId,
+        'req-1',
+        mockUserId
+      );
+
+      expect(result.status).toBe('SUBMITTED');
+    });
+
+    it('REQ-019: should throw error for non-draft request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue({
+        ...mockRequest,
+        status: 'SUBMITTED',
+      } as never);
+
+      await expect(requestService.submitRequest(mockTenantId, 'req-1', mockUserId))
+        .rejects.toThrow();
+    });
+
+    it('REQ-020: should record history on submit', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(mockRequest as never);
+      vi.mocked(prisma.approvalChain.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.slaConfig.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.request.update).mockResolvedValue({
+        ...mockRequest,
+        status: 'SUBMITTED',
+      } as never);
+
+      await requestService.submitRequest(mockTenantId, 'req-1', mockUserId);
+
+      expect(prisma.requestHistory.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteRequest', () => {
+    it('REQ-021: should delete draft request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue(mockRequest as never);
+      vi.mocked(prisma.request.update).mockResolvedValue({
+        ...mockRequest,
+        deletedAt: new Date(),
+      } as never);
+
+      await requestService.deleteRequest(mockTenantId, 'req-1', mockUserId);
+
+      expect(prisma.request.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            deletedAt: expect.any(Date),
+          }),
+        })
+      );
+    });
+
+    it('REQ-022: should not allow deletion of submitted request', async () => {
+      vi.mocked(prisma.request.findFirst).mockResolvedValue({
+        ...mockRequest,
+        status: 'SUBMITTED',
+      } as never);
+
+      await expect(requestService.deleteRequest(mockTenantId, 'req-1', mockUserId))
+        .rejects.toThrow();
+    });
+  });
+
+  describe('getRequestHistory', () => {
+    const mockHistory = [
+      {
+        id: 'hist-1',
+        requestId: 'req-1',
+        action: 'CREATED',
+        fromStatus: null,
+        toStatus: 'DRAFT',
+        userId: mockUserId,
+        createdAt: new Date('2025-01-01'),
+        user: { firstName: 'Test', lastName: 'User' },
+      },
+      {
+        id: 'hist-2',
+        requestId: 'req-1',
+        action: 'SUBMITTED',
+        fromStatus: 'DRAFT',
+        toStatus: 'SUBMITTED',
+        userId: mockUserId,
+        createdAt: new Date('2025-01-02'),
+        user: { firstName: 'Test', lastName: 'User' },
+      },
+    ];
+
+    it('REQ-023: should return request history', async () => {
+      vi.mocked(prisma.requestHistory.findMany).mockResolvedValue(mockHistory as never);
+
+      const result = await requestService.getRequestHistory(mockTenantId, 'req-1');
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('REQ-024: should order history by creation date', async () => {
+      vi.mocked(prisma.requestHistory.findMany).mockResolvedValue(mockHistory as never);
+
+      await requestService.getRequestHistory(mockTenantId, 'req-1');
+
+      expect(prisma.requestHistory.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'desc' },
+        })
+      );
+    });
+  });
+});
