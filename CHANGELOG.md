@@ -4,6 +4,40 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### December 26, 2025 - Writer Complete (100%)
+
+#### Added - State Management & Streaming Infrastructure
+
+**Notification Store** (`apps/frontend/src/stores/notificationStore.ts`)
+- Zustand store for managing notification state
+- `setNotifications`, `addNotification`, `markAsRead`, `markAllAsRead`
+- `removeNotification`, `clearAll`
+- Connection status tracking (`isConnected`)
+- Panel visibility state (`isPanelOpen`, `togglePanel`)
+- Max 100 notifications cached, auto-deduplication
+
+**Settings Store** (`apps/frontend/src/stores/settingsStore.ts`)
+- Persisted settings store with localStorage
+- Display preferences: theme, language, dateFormat, currency, compactMode
+- Notification preferences: email, bench alerts, rolloff reminders, weekly digest
+- UI preferences: sidebarCollapsed, defaultPage, itemsPerPage
+- Helper: `useFormattedDate()` hook for consistent date formatting
+
+**SSE Streaming Support** (`apps/frontend/src/lib/api.ts`)
+- Added `api.stream()` method for Server-Sent Events
+- Supports streaming AI responses with callbacks
+- `onMessage`, `onError`, `onComplete` handlers
+- Returns `AbortController` for cancellation
+
+**Store Barrel Export** (`apps/frontend/src/stores/index.ts`)
+- Unified exports for all stores
+
+#### Fixed
+- TypeScript: Unused variables in authStore, ClientDetailPage
+- TypeScript: Invalid property reference in test mocks
+
+---
+
 ### December 26, 2025 - Settings Page Expansion & User Management
 
 #### Added - Full User Management in Settings

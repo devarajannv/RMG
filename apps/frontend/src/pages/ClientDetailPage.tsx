@@ -67,7 +67,7 @@ export default function ClientDetailPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'contracts' | 'projects'>('overview');
 
   // Currency state
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [, setCurrencies] = useState<Currency[]>([]);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [baseCurrency] = useState<string>('INR');

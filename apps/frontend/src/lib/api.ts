@@ -141,6 +141,86 @@ export const api = {
 
   delete: <T>(endpoint: string, options?: ApiOptions) =>
     request<T>(endpoint, { ...options, method: 'DELETE' }),
+
+  /**
+   * Stream a response using Server-Sent Events (SSE)
+   * Used for streaming AI responses
+   */
+  stream: (
+    endpoint: string,
+    data: unknown,
+    callbacks: {
+      onMessage: (chunk: string) => void;
+      onError?: (error: Error) => void;
+      onComplete?: () => void;
+    }
+  ): AbortController => {
+    const controller = new AbortController();
+    const token = useAuthStore.getState().accessToken;
+
+    fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+      signal: controller.signal,
+      credentials: 'include',
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new ApiError(
+            'Stream request failed',
+            response.status,
+            'STREAM_ERROR'
+          );
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                callbacks.onComplete?.();
+                return;
+              }
+              try {
+                const parsed = JSON.parse(data);
+                callbacks.onMessage(parsed.content || parsed.text || data);
+              } catch {
+                callbacks.onMessage(data);
+              }
+            }
+          }
+        }
+
+        callbacks.onComplete?.();
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          callbacks.onError?.(error);
+        }
+      });
+
+    return controller;
+  },
 };
 
 // Auth API

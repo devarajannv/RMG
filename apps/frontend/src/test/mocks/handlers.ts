@@ -501,7 +501,7 @@ export const handlers = [
           total: mockProjects.length,
           active: mockProjects.filter(p => p.status === 'ACTIVE').length,
           pipeline: mockProjects.filter(p => p.status === 'PIPELINE').length,
-          atRisk: mockProjects.filter(p => p.healthStatus === 'RED').length,
+          atRisk: mockProjects.filter(p => p.status === 'ON_HOLD').length, // Use status for at-risk
         },
         allocations: {
           active: 2,
