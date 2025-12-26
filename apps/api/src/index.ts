@@ -33,6 +33,9 @@ import { documentRoutes } from './modules/documents';
 import { agentRoutes } from './modules/agent';
 import { aiMigrationRoutes } from './modules/ai-migration';
 import { requestRoutes, requestTypesRoutes, approvalChainRoutes, delegationRoutes, slaRoutes, notificationRoutes } from './modules/requests';
+import { userRoutes } from './modules/users';
+import { auditRoutes } from './modules/audit';
+import { organizationRoutes } from './modules/organization';
 
 const app = express();
 
@@ -127,6 +130,7 @@ app.use('/api/v1/import', bulkImportRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
 app.use('/api/v1/currency', currencyRoutes);
 app.use('/api/v1/roles', roleRoutes);
+app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/agent', agentRoutes);
 app.use('/api/v1/ai-migration', aiMigrationRoutes);
@@ -136,6 +140,8 @@ app.use('/api/v1/approval-chains', approvalChainRoutes);
 app.use('/api/v1/delegations', delegationRoutes);
 app.use('/api/v1/sla', slaRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/audit-logs', auditRoutes);
+app.use('/api/v1/organization', organizationRoutes);
 
 // Error handling
 app.use(errorHandler);

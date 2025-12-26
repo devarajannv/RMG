@@ -61,6 +61,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
@@ -81,6 +82,7 @@ type ConflictResolution = 'REJECTION_WINS' | 'APPROVAL_WINS' | 'MAJORITY_WINS';
 interface Role {
   id: string;
   name: string;
+  description?: string;
 }
 
 interface User {
@@ -908,7 +910,8 @@ function WorkflowEditor({ chain, isNew, roles, users, onBack, onSave }: Workflow
                         key={`${step.stepOrder}-${index}`}
                         value={step}
                         className={cn(
-                          'bg-white border rounded-lg p-3 cursor-grab active:cursor-grabbing',
+                          'bg-white border rounded-lg p-3 cursor-grab active:cursor-grabbing shadow-sm',
+                          'hover:shadow-md transition-shadow',
                           selectedStepIndex === index
                             ? 'border-primary ring-2 ring-primary/20'
                             : 'border-gray-200 hover:border-gray-300',
@@ -916,9 +919,12 @@ function WorkflowEditor({ chain, isNew, roles, users, onBack, onSave }: Workflow
                             ? 'border-red-300'
                             : ''
                         )}
+                        whileDrag={{ scale: 1.02, boxShadow: '0 8px 20px rgba(0,0,0,0.15)' }}
                       >
                         <div className="flex items-center gap-3">
-                          <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <div className="p-1 -ml-1 rounded hover:bg-gray-100 cursor-grab active:cursor-grabbing" title="Drag to reorder">
+                            <GripVertical className="w-4 h-4 text-gray-400" />
+                          </div>
                           <span className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
                             {index + 1}
                           </span>
@@ -988,6 +994,18 @@ function WorkflowEditor({ chain, isNew, roles, users, onBack, onSave }: Workflow
                       </Reorder.Item>
                     ))}
                   </Reorder.Group>
+                )}
+                
+                {formData.steps.length > 0 && formData.steps.length < 2 && (
+                  <p className="text-xs text-gray-400 text-center mt-3">
+                    💡 Add more steps, then drag to reorder
+                  </p>
+                )}
+                
+                {formData.steps.length >= 2 && (
+                  <p className="text-xs text-gray-400 text-center mt-3">
+                    💡 Drag steps to reorder the approval sequence
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -1125,46 +1143,38 @@ function StepConfigPanel({ step, index, roles, users, errors, onUpdate }: StepCo
           {step.approverType === 'ROLE' && (
             <div>
               <Label>Select Role *</Label>
-              <Select
+              <SearchableSelect
+                options={roles.map((role) => ({
+                  value: role.id,
+                  label: role.name,
+                  description: role.description || undefined,
+                }))}
                 value={step.approverRoleId || ''}
-                onValueChange={(v) => onUpdate({ approverRoleId: v })}
-              >
-                <SelectTrigger
-                  className={cn(errors[`step_${index}_approver`] && 'border-red-500')}
-                >
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => onUpdate({ approverRoleId: v })}
+                placeholder="Select a role"
+                searchPlaceholder="Search roles..."
+                error={!!errors[`step_${index}_approver`]}
+                emptyMessage="No roles found"
+              />
             </div>
           )}
 
           {step.approverType === 'USER' && (
             <div>
               <Label>Select User *</Label>
-              <Select
+              <SearchableSelect
+                options={users.map((user) => ({
+                  value: user.id,
+                  label: `${user.firstName} ${user.lastName}`,
+                  description: user.email,
+                }))}
                 value={step.approverUserId || ''}
-                onValueChange={(v) => onUpdate({ approverUserId: v })}
-              >
-                <SelectTrigger
-                  className={cn(errors[`step_${index}_approver`] && 'border-red-500')}
-                >
-                  <SelectValue placeholder="Select a user" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => onUpdate({ approverUserId: v })}
+                placeholder="Select a user"
+                searchPlaceholder="Search users..."
+                error={!!errors[`step_${index}_approver`]}
+                emptyMessage="No users found"
+              />
             </div>
           )}
 

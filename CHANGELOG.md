@@ -4,6 +4,68 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### December 26, 2025 - Settings Page Expansion & User Management
+
+#### Added - Full User Management in Settings
+
+**Backend User Service** (`apps/api/src/modules/users/user.service.ts`)
+- `listUsers(tenantId, includeInactive)` - List users with roles and pagination
+- `getUserById(userId, tenantId)` - Get single user with full details
+- `createUser(tenantId, data)` - Create user with password hashing and role assignment
+- `updateUser(userId, tenantId, data)` - Update user info
+- `deleteUser(userId, tenantId)` - Soft delete user
+- `toggleUserStatus(userId, tenantId)` - Toggle active/inactive status
+- `assignRoleToUser(userId, roleId, assignedBy)` - Assign role to user
+- `removeRoleFromUser(userId, roleId)` - Remove role from user
+- `resetUserPassword(userId, tenantId, newPassword)` - Admin password reset
+
+**Backend User Routes** (`apps/api/src/modules/users/user.routes.ts`)
+- `GET /users` - List all users (with `?includeInactive=true` option)
+- `GET /users/:id` - Get single user
+- `POST /users` - Create user (requires `users:create` permission)
+- `PUT /users/:id` - Update user (requires `users:update` permission)
+- `DELETE /users/:id` - Delete user (requires `users:delete` permission)
+- `PATCH /users/:id/status` - Toggle user status
+- `POST /users/:id/roles` - Assign role to user
+- `DELETE /users/:id/roles/:roleId` - Remove role from user
+- `POST /users/:id/reset-password` - Reset user password
+
+**Frontend Settings Page Expansion** (`apps/frontend/src/pages/SettingsPage.tsx`)
+- **Users Tab**: Full CRUD for user management
+  - Add User button with modal form
+  - Edit user (name, email, password, status, roles)
+  - Delete user with confirmation dialog
+  - Toggle active/inactive status (click on status badge)
+  - Role management modal (assign/remove roles)
+  - Reset password dialog
+  - Search users by name/email
+  - Shows user avatar, email, roles, and status
+
+- **Audit Logs Tab**: View system audit trail
+  - Paginated audit log entries
+  - Filter by entity type and action
+  - Shows user, action, entity, timestamp
+  - Expandable details for changes/metadata
+
+- **Organization Tab**: Dynamic organization stats
+  - Tenant information (name, code, status, created date)
+  - User counts (total, active, inactive)
+  - Resource counts (total, active, on bench)
+  - Project counts (total, active, completed)
+  - Client counts (total, active)
+  - Storage/document count
+
+**New API Modules Created:**
+- `apps/api/src/modules/audit/` - Audit log service, controller, routes
+- `apps/api/src/modules/organization/` - Organization stats service, controller, routes
+
+**New Frontend Components:**
+- `UserFormModal` - Create/edit user form with role checkboxes
+- Reset Password Dialog
+- User Role Management Modal
+
+---
+
 ### December 19, 2025 - Workflow Builder (Visual Canvas)
 
 #### Added - Complete Visual Workflow Builder Page

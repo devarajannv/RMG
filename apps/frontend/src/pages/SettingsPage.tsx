@@ -6,8 +6,9 @@ import MainLayout from '@/components/layout/MainLayout';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Edit2, Shield, DollarSign, Users } from 'lucide-react';
+import { Plus, Trash2, Edit2, Shield, DollarSign, Users, Search, FileText, ChevronLeft, ChevronRight, Building2, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter, ConfirmDialog } from '@/components/ui/dialog';
+import { cn, formatDate } from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -86,7 +87,46 @@ interface RoleFormData {
   permissions: string[];
 }
 
-type TabType = 'profile' | 'notifications' | 'display' | 'security' | 'organization' | 'currency' | 'roles';
+interface UserListItem {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  roles?: { role: Role }[];
+}
+
+interface UserFormData {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  roleIds: string[];
+}
+
+interface AuditLogEntry {
+  id: string;
+  userId: string | null;
+  user?: { firstName: string; lastName: string; email: string } | null;
+  entityType: string;
+  entityId: string;
+  action: string;
+  changes: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  timestamp: string;
+}
+
+interface OrganizationStats {
+  tenant: { id: string; name: string; code: string; status: string; createdAt: string };
+  users: { total: number; active: number; inactive: number };
+  resources: { total: number; active: number; inactive: number; onBench: number };
+  projects: { total: number; active: number; completed: number };
+  clients: { total: number; active: number };
+  storage: { documentsCount: number };
+}
+
+type TabType = 'profile' | 'notifications' | 'display' | 'security' | 'organization' | 'currency' | 'roles' | 'users' | 'audit';
 
 // ============================================================================
 // Available Permissions
@@ -539,6 +579,186 @@ function RoleFormModal({
 }
 
 // ============================================================================
+// User Form Modal
+// ============================================================================
+
+function UserFormModal({
+  isOpen,
+  onClose,
+  user,
+  roles,
+  onSave,
+  isSaving,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  user?: UserListItem;
+  roles: Role[];
+  onSave: (data: UserFormData) => void;
+  isSaving: boolean;
+}) {
+  const [formData, setFormData] = useState<UserFormData>({
+    email: '',
+    firstName: '',
+    lastName: '',
+    password: '',
+    status: 'ACTIVE',
+    roleIds: [],
+  });
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        password: '', // Don't show existing password
+        status: user.status as 'ACTIVE' | 'INACTIVE',
+        roleIds: user.roles?.map((r) => r.role.id) || [],
+      });
+    } else {
+      setFormData({
+        email: '',
+        firstName: '',
+        lastName: '',
+        password: '',
+        status: 'ACTIVE',
+        roleIds: [],
+      });
+    }
+  }, [user, isOpen]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // For updates, don't send password if empty
+    const dataToSend = user && !formData.password 
+      ? { ...formData, password: undefined } as unknown as UserFormData
+      : formData;
+    onSave(dataToSend);
+  };
+
+  const toggleRole = (roleId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      roleIds: prev.roleIds.includes(roleId)
+        ? prev.roleIds.filter((id) => id !== roleId)
+        : [...prev.roleIds, roleId],
+    }));
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{user ? 'Edit User' : 'Create User'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <DialogBody className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">First Name *</label>
+                <Input
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  required
+                  placeholder="John"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Last Name *</label>
+                <Input
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  required
+                  placeholder="Doe"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Email *</label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                placeholder="john.doe@company.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Password {user ? '(leave blank to keep existing)' : '*'}
+              </label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required={!user}
+                  placeholder={user ? '••••••••' : 'Minimum 8 characters'}
+                  minLength={user ? 0 : 8}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 px-2"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Status</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE' })}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Roles</label>
+              <div className="space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                {roles.map((role) => (
+                  <label key={role.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.roleIds.includes(role.id)}
+                      onChange={() => toggleRole(role.id)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm">{role.name}</span>
+                    {role.description && (
+                      <span className="text-xs text-gray-500">- {role.description}</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? 'Saving...' : user ? 'Update User' : 'Create User'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -591,6 +811,24 @@ export default function SettingsPage() {
   const [editingRole, setEditingRole] = useState<Role | undefined>();
   const [deletingRole, setDeletingRole] = useState<Role | null>(null);
 
+  // User management state
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleModalOpen, setUserRoleModalOpen] = useState(false);
+  const [selectedUserForRole, setSelectedUserForRole] = useState<UserListItem | null>(null);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserListItem | undefined>();
+  const [deletingUser, setDeletingUser] = useState<UserListItem | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserListItem | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
+  // Audit log state
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditEntityFilter, setAuditEntityFilter] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState('');
+
+  // 2FA state
+  const [show2FAModal, setShow2FAModal] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -617,11 +855,62 @@ export default function SettingsPage() {
   const { data: roles = [] } = useQuery<Role[]>({
     queryKey: ['roles'],
     queryFn: async () => {
-      const res = await api.get<Role[]>('/roles');
-      return res as unknown as Role[];
+      const res = await api.get<{ data: Role[] }>('/roles');
+      return res.data || [];
     },
-    enabled: activeTab === 'roles',
+    enabled: activeTab === 'roles' || activeTab === 'users',
   });
+
+  // Users query
+  const { data: users = [] } = useQuery<UserListItem[]>({
+    queryKey: ['users-list'],
+    queryFn: async () => {
+      const res = await api.get<{ data: UserListItem[] }>('/users?includeInactive=true');
+      return res.data || [];
+    },
+    enabled: activeTab === 'users',
+  });
+
+  // Organization stats query
+  const { data: orgStats } = useQuery<OrganizationStats>({
+    queryKey: ['organization-stats'],
+    queryFn: async () => {
+      const res = await api.get<{ data: OrganizationStats }>('/organization/stats');
+      return res.data;
+    },
+    enabled: activeTab === 'organization',
+  });
+
+  // Audit logs query
+  const { data: auditData } = useQuery({
+    queryKey: ['audit-logs', auditPage, auditEntityFilter, auditActionFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(auditPage), limit: '20' });
+      if (auditEntityFilter) params.append('entityType', auditEntityFilter);
+      if (auditActionFilter) params.append('action', auditActionFilter);
+      const res = await api.get<{ data: AuditLogEntry[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/audit-logs?${params}`);
+      return res;
+    },
+    enabled: activeTab === 'audit',
+  });
+
+  // Audit entity types
+  const { data: auditEntityTypes = [] } = useQuery<string[]>({
+    queryKey: ['audit-entity-types'],
+    queryFn: async () => {
+      const res = await api.get<{ data: string[] }>('/audit-logs/entity-types');
+      return res.data || [];
+    },
+    enabled: activeTab === 'audit',
+  });
+
+  // Filtered users
+  const filteredUsers = users.filter(
+    (u) =>
+      u.firstName.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.lastName.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(userSearch.toLowerCase())
+  );
 
   // Seed currencies mutation
   const seedCurrenciesMutation = useMutation({
@@ -779,6 +1068,105 @@ export default function SettingsPage() {
     },
   });
 
+  // User mutations
+  const createUserMutation = useMutation({
+    mutationFn: async (data: UserFormData) => {
+      await api.post('/users', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      setUserModalOpen(false);
+      setEditingUser(undefined);
+      showMessage('success', 'User created successfully!');
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to create user';
+      showMessage('error', message);
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<UserFormData> }) => {
+      await api.put(`/users/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      setUserModalOpen(false);
+      setEditingUser(undefined);
+      showMessage('success', 'User updated successfully!');
+    },
+    onError: () => {
+      showMessage('error', 'Failed to update user');
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/users/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      setDeletingUser(null);
+      showMessage('success', 'User deleted successfully!');
+    },
+    onError: () => {
+      showMessage('error', 'Failed to delete user');
+    },
+  });
+
+  const toggleUserStatusMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.patch(`/users/${id}/status`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      showMessage('success', 'User status updated!');
+    },
+    onError: () => {
+      showMessage('error', 'Failed to update user status');
+    },
+  });
+
+  const resetUserPasswordMutation = useMutation({
+    mutationFn: async ({ id, newPassword }: { id: string; newPassword: string }) => {
+      await api.post(`/users/${id}/reset-password`, { newPassword });
+    },
+    onSuccess: () => {
+      setResetPasswordUser(null);
+      setNewPassword('');
+      showMessage('success', 'Password reset successfully!');
+    },
+    onError: () => {
+      showMessage('error', 'Failed to reset password');
+    },
+  });
+
+  const assignUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, roleId }: { userId: string; roleId: string }) => {
+      await api.post(`/users/${userId}/roles`, { roleId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      showMessage('success', 'Role assigned successfully!');
+    },
+    onError: () => {
+      showMessage('error', 'Failed to assign role');
+    },
+  });
+
+  const removeUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, roleId }: { userId: string; roleId: string }) => {
+      await api.delete(`/users/${userId}/roles/${roleId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      showMessage('success', 'Role removed successfully!');
+    },
+    onError: () => {
+      showMessage('error', 'Failed to remove role');
+    },
+  });
+
   // Profile update mutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data: UserProfile) => {
@@ -875,9 +1263,11 @@ export default function SettingsPage() {
     { id: 'notifications', label: 'Notifications', icon: '🔔' },
     { id: 'display', label: 'Display', icon: '🎨' },
     { id: 'security', label: 'Security', icon: '🔒' },
-    { id: 'currency', label: 'Currency', icon: '💰' },
+    { id: 'users', label: 'Users', icon: '👥' },
     { id: 'roles', label: 'Roles', icon: '🛡️' },
+    { id: 'currency', label: 'Currency', icon: '💰' },
     { id: 'organization', label: 'Organization', icon: '🏢' },
+    { id: 'audit', label: 'Audit Logs', icon: '📋' },
   ];
 
   return (
@@ -1135,7 +1525,31 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-500 mb-3">
                       Add an extra layer of security to your account
                     </p>
-                    <Button variant="outline">Enable 2FA</Button>
+                    <Button variant="outline" onClick={() => setShow2FAModal(true)}>
+                      Enable 2FA
+                    </Button>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-medium text-gray-900 mb-2">Active Sessions</h3>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Manage devices where you&apos;re currently logged in
+                    </p>
+                    <div className="space-y-2 mb-3">
+                      <div className="flex items-center justify-between p-2 bg-white rounded border">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">💻</span>
+                          <div>
+                            <p className="text-sm font-medium">Current Session</p>
+                            <p className="text-xs text-gray-500">This device • Active now</p>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Active</span>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                      Sign out all other sessions
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1417,52 +1831,411 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {activeTab === 'users' && (
+              <div className="space-y-6">
+                <Card className="shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      User Management
+                    </CardTitle>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditingUser(undefined);
+                        setUserModalOpen(true);
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add User
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Search users..."
+                          value={userSearch}
+                          onChange={(e) => setUserSearch(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    {filteredUsers.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No users found</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => {
+                            setEditingUser(undefined);
+                            setUserModalOpen(true);
+                          }}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add First User
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredUsers.map((u) => (
+                          <div
+                            key={u.id}
+                            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                                <span className="text-primary font-medium">
+                                  {u.firstName[0]}{u.lastName[0]}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium">{u.firstName} {u.lastName}</p>
+                                <p className="text-sm text-gray-500">{u.email}</p>
+                                {u.roles && u.roles.length > 0 && (
+                                  <div className="flex gap-1 mt-1">
+                                    {u.roles.map((r) => (
+                                      <span
+                                        key={r.role.id}
+                                        className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded"
+                                      >
+                                        {r.role.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => toggleUserStatusMutation.mutate(u.id)}
+                                disabled={toggleUserStatusMutation.isPending}
+                                className={cn(
+                                  'text-xs px-3 py-1 rounded cursor-pointer border-0 transition-colors',
+                                  u.status === 'ACTIVE' 
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                )}
+                              >
+                                {u.status}
+                              </button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Manage Roles"
+                                onClick={() => {
+                                  setSelectedUserForRole(u);
+                                  setUserRoleModalOpen(true);
+                                }}
+                              >
+                                <Shield className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Edit User"
+                                onClick={() => {
+                                  setEditingUser(u);
+                                  setUserModalOpen(true);
+                                }}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Reset Password"
+                                onClick={() => setResetPasswordUser(u)}
+                              >
+                                🔐
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700"
+                                title="Delete User"
+                                onClick={() => setDeletingUser(u)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             {activeTab === 'organization' && (
               <Card className="shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-lg">Organization Settings</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Building2 className="w-5 h-5" />
+                    Organization Overview
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl">🏢</span>
-                      <div>
-                        <h3 className="font-bold text-gray-900">NewVision Software</h3>
-                        <p className="text-sm text-gray-600">Enterprise Plan • Active</p>
+                  {orgStats ? (
+                    <>
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl">🏢</span>
+                          <div>
+                            <h3 className="font-bold text-gray-900">{orgStats.tenant.name}</h3>
+                            <p className="text-sm text-gray-600">
+                              Code: {orgStats.tenant.code} • Status: {orgStats.tenant.status}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Created: {formatDate(orgStats.tenant.createdAt)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">Total Users</p>
-                      <p className="text-2xl font-bold text-primary">127</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Total Users</p>
+                          <p className="text-2xl font-bold text-primary">{orgStats.users.total}</p>
+                          <p className="text-xs text-gray-500">{orgStats.users.active} active</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Resources</p>
+                          <p className="text-2xl font-bold text-green-600">{orgStats.resources.active}</p>
+                          <p className="text-xs text-gray-500">{orgStats.resources.onBench} on bench</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Projects</p>
+                          <p className="text-2xl font-bold text-blue-600">{orgStats.projects.active}</p>
+                          <p className="text-xs text-gray-500">{orgStats.projects.total} total</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Clients</p>
+                          <p className="text-2xl font-bold text-purple-600">{orgStats.clients.active}</p>
+                          <p className="text-xs text-gray-500">{orgStats.clients.total} total</p>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500 mb-2">Storage</p>
+                        <p className="text-lg font-medium">{orgStats.storage.documentsCount} documents</p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Loading organization data...</p>
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">Active Resources</p>
-                      <p className="text-2xl font-bold text-green-600">245</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">Active Projects</p>
-                      <p className="text-2xl font-bold text-blue-600">38</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">Storage Used</p>
-                      <p className="text-2xl font-bold text-amber-600">2.4 GB</p>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
                     <p className="text-sm text-amber-800">
                       <strong>Admin Only:</strong> Organization settings can only be modified by administrators.
-                      Contact your admin for changes.
                     </p>
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {activeTab === 'audit' && (
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Audit Logs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4 mb-4">
+                    <select
+                      value={auditEntityFilter}
+                      onChange={(e) => { setAuditEntityFilter(e.target.value); setAuditPage(1); }}
+                      className="border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">All Entities</option>
+                      {auditEntityTypes.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={auditActionFilter}
+                      onChange={(e) => { setAuditActionFilter(e.target.value); setAuditPage(1); }}
+                      className="border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">All Actions</option>
+                      <option value="CREATE">Create</option>
+                      <option value="UPDATE">Update</option>
+                      <option value="DELETE">Delete</option>
+                      <option value="LOGIN">Login</option>
+                      <option value="LOGOUT">Logout</option>
+                      <option value="APPROVE">Approve</option>
+                      <option value="REJECT">Reject</option>
+                    </select>
+                  </div>
+
+                  {auditData?.data && auditData.data.length > 0 ? (
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="text-left p-3 font-medium">Timestamp</th>
+                              <th className="text-left p-3 font-medium">User</th>
+                              <th className="text-left p-3 font-medium">Action</th>
+                              <th className="text-left p-3 font-medium">Entity</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {auditData.data.map((log) => (
+                              <tr key={log.id} className="hover:bg-gray-50">
+                                <td className="p-3 text-gray-500">
+                                  {formatDate(log.timestamp)}
+                                </td>
+                                <td className="p-3">
+                                  {log.user ? `${log.user.firstName} ${log.user.lastName}` : 'System'}
+                                </td>
+                                <td className="p-3">
+                                  <span className={cn(
+                                    'text-xs px-2 py-0.5 rounded',
+                                    log.action === 'CREATE' && 'bg-green-100 text-green-700',
+                                    log.action === 'UPDATE' && 'bg-blue-100 text-blue-700',
+                                    log.action === 'DELETE' && 'bg-red-100 text-red-700',
+                                    log.action === 'LOGIN' && 'bg-purple-100 text-purple-700',
+                                    !['CREATE', 'UPDATE', 'DELETE', 'LOGIN'].includes(log.action) && 'bg-gray-100 text-gray-700'
+                                  )}>
+                                    {log.action}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-mono text-xs">
+                                  {log.entityType}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {auditData.pagination && auditData.pagination.totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                          <p className="text-sm text-gray-500">
+                            Page {auditData.pagination.page} of {auditData.pagination.totalPages} ({auditData.pagination.total} total)
+                          </p>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAuditPage((p) => Math.max(1, p - 1))}
+                              disabled={auditPage === 1}
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAuditPage((p) => Math.min(auditData.pagination.totalPages, p + 1))}
+                              disabled={auditPage >= auditData.pagination.totalPages}
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>No audit logs found</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
+
+        {/* 2FA Setup Modal */}
+        <Dialog open={show2FAModal} onOpenChange={setShow2FAModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Two-Factor Authentication</DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-amber-800">Coming Soon</p>
+                      <p className="text-sm text-amber-700">
+                        Two-factor authentication will be available in a future update. 
+                        This will add an extra layer of security using authenticator apps like 
+                        Google Authenticator or Authy.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="font-medium">How it will work:</h4>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <p>1. Install an authenticator app on your phone</p>
+                    <p>2. Scan a QR code to link your account</p>
+                    <p>3. Enter a 6-digit code from the app each time you log in</p>
+                  </div>
+                </div>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShow2FAModal(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* User Role Assignment Modal */}
+        <Dialog open={userRoleModalOpen} onOpenChange={setUserRoleModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Manage User Roles</DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              {selectedUserForRole && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="font-medium">{selectedUserForRole.firstName} {selectedUserForRole.lastName}</p>
+                    <p className="text-sm text-gray-500">{selectedUserForRole.email}</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Roles</label>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Role assignment is managed through the Roles tab. 
+                      Use the &quot;Assign Role&quot; endpoint in the API to assign roles to users.
+                    </p>
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-800">
+                        <strong>API Endpoint:</strong> POST /api/v1/roles/assign
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        {`{ "userId": "${selectedUserForRole.id}", "roleId": "<role-id>" }`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setUserRoleModalOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Currency Form Modal */}
         <CurrencyFormModal
@@ -1566,6 +2339,158 @@ export default function SettingsPage() {
           variant="danger"
           loading={deleteRoleMutation.isPending}
         />
+
+        {/* User Form Modal */}
+        <UserFormModal
+          isOpen={userModalOpen}
+          onClose={() => {
+            setUserModalOpen(false);
+            setEditingUser(undefined);
+          }}
+          user={editingUser}
+          roles={roles}
+          onSave={(data) => {
+            if (editingUser) {
+              updateUserMutation.mutate({ id: editingUser.id, data });
+            } else {
+              createUserMutation.mutate(data);
+            }
+          }}
+          isSaving={createUserMutation.isPending || updateUserMutation.isPending}
+        />
+
+        {/* Delete User Confirmation */}
+        <ConfirmDialog
+          open={!!deletingUser}
+          onOpenChange={(open) => !open && setDeletingUser(null)}
+          onConfirm={() => {
+            if (deletingUser) {
+              deleteUserMutation.mutate(deletingUser.id);
+            }
+          }}
+          title="Delete User"
+          description={`Are you sure you want to delete "${deletingUser?.firstName} ${deletingUser?.lastName}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          variant="danger"
+          loading={deleteUserMutation.isPending}
+        />
+
+        {/* Reset Password Dialog */}
+        <Dialog open={!!resetPasswordUser} onOpenChange={(open) => !open && setResetPasswordUser(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset Password</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Set a new password for <strong>{resetPasswordUser?.firstName} {resetPasswordUser?.lastName}</strong>
+              </p>
+              <div>
+                <label className="block text-sm font-medium mb-1">New Password *</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  minLength={8}
+                />
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setResetPasswordUser(null);
+                  setNewPassword('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (resetPasswordUser && newPassword.length >= 8) {
+                    resetUserPasswordMutation.mutate({
+                      id: resetPasswordUser.id,
+                      newPassword,
+                    });
+                  }
+                }}
+                disabled={newPassword.length < 8 || resetUserPasswordMutation.isPending}
+              >
+                {resetUserPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* User Role Management Modal */}
+        <Dialog open={userRoleModalOpen} onOpenChange={(open) => !open && setUserRoleModalOpen(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Manage Roles</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              {selectedUserForRole && (
+                <>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <span className="text-primary font-medium">
+                        {selectedUserForRole.firstName[0]}{selectedUserForRole.lastName[0]}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium">{selectedUserForRole.firstName} {selectedUserForRole.lastName}</p>
+                      <p className="text-sm text-gray-500">{selectedUserForRole.email}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Assigned Roles</label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
+                      {roles.map((role) => {
+                        const isAssigned = selectedUserForRole.roles?.some((r) => r.role.id === role.id);
+                        return (
+                          <div key={role.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                            <div>
+                              <p className="text-sm font-medium">{role.name}</p>
+                              <p className="text-xs text-gray-500">{role.description}</p>
+                            </div>
+                            <Button
+                              variant={isAssigned ? 'destructive' : 'outline'}
+                              size="sm"
+                              disabled={assignUserRoleMutation.isPending || removeUserRoleMutation.isPending}
+                              onClick={() => {
+                                if (isAssigned) {
+                                  removeUserRoleMutation.mutate({
+                                    userId: selectedUserForRole.id,
+                                    roleId: role.id,
+                                  });
+                                } else {
+                                  assignUserRoleMutation.mutate({
+                                    userId: selectedUserForRole.id,
+                                    roleId: role.id,
+                                  });
+                                }
+                              }}
+                            >
+                              {isAssigned ? 'Remove' : 'Assign'}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setUserRoleModalOpen(false)}>
+                Done
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

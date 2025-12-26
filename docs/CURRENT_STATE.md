@@ -1,10 +1,26 @@
 # RMGaaS Current State
 
-> Last Updated: December 19, 2025
+> Last Updated: December 26, 2025
 
 ## Product Overview
 
 RMGaaS (Resource Management as a Service) is a comprehensive resource management platform for NewVision Software Pvt. Ltd. The product has completed its initial 14-day development sprint and has now implemented the first 10 features from the feature expansion discussions.
+
+---
+
+## Recent Changes (December 26, 2025)
+
+### Settings Page Expansion & User Management
+- ✅ Full User Management CRUD in Settings → Users tab
+- ✅ Add/Edit/Delete users with modal forms
+- ✅ Toggle user active/inactive status
+- ✅ Role assignment/removal per user
+- ✅ Admin password reset functionality
+- ✅ Audit Logs tab with filtering and pagination
+- ✅ Organization tab with dynamic stats (users, resources, projects, clients)
+- ✅ New backend modules: `/api/v1/users` (full CRUD), `/api/v1/audit-logs`, `/api/v1/organization/stats`
+- ✅ SearchableSelect component for workflow step configuration
+- ✅ Permission wildcard fix (`*`, `module:*`, `module:action:*`)
 
 ---
 

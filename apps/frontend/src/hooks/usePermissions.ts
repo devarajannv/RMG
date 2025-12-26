@@ -140,14 +140,24 @@ export const PERMISSIONS = {
 /**
  * Check if a specific permission is in the permissions array
  * Handles hierarchical permissions (e.g., resources:read includes resources:read:own)
+ * Handles wildcard permissions (e.g., '*' matches everything, 'resources:*' matches all resource permissions)
  */
 export function hasPermission(permissions: string[], permission: string): boolean {
+  // Wildcard - has all permissions
+  if (permissions.includes('*')) return true;
+  
   // Exact match
   if (permissions.includes(permission)) return true;
   
+  // Check for module-level wildcard (e.g., 'resources:*' matches 'resources:read')
+  const parts = permission.split(':');
+  if (parts.length >= 2) {
+    const moduleWildcard = `${parts[0]}:*`;
+    if (permissions.includes(moduleWildcard)) return true;
+  }
+  
   // Check for broader permission
   // e.g., if user has 'resources:read', they implicitly have 'resources:read:own'
-  const parts = permission.split(':');
   if (parts.length === 3) {
     const broaderPermission = `${parts[0]}:${parts[1]}`;
     if (permissions.includes(broaderPermission)) return true;
