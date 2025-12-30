@@ -32,7 +32,7 @@ import { roleRoutes } from './modules/roles';
 import { documentRoutes } from './modules/documents';
 import { agentRoutes } from './modules/agent';
 import { aiMigrationRoutes } from './modules/ai-migration';
-import { requestRoutes, requestTypesRoutes, approvalChainRoutes, delegationRoutes, slaRoutes, notificationRoutes } from './modules/requests';
+import { requestRoutes, requestTypesRoutes, approvalChainRoutes, delegationRoutes, slaRoutes, notificationRoutes, triggerRoutes, inboundWebhookRoutes } from './modules/requests';
 import { userRoutes } from './modules/users';
 import { auditRoutes } from './modules/audit';
 import { organizationRoutes } from './modules/organization';
@@ -140,6 +140,8 @@ app.use('/api/v1/approval-chains', approvalChainRoutes);
 app.use('/api/v1/delegations', delegationRoutes);
 app.use('/api/v1/sla', slaRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/triggers', triggerRoutes);
+app.use('/api/v1/webhooks/inbound', inboundWebhookRoutes);  // Public endpoint for receiving webhooks
 app.use('/api/v1/audit-logs', auditRoutes);
 app.use('/api/v1/organization', organizationRoutes);
 

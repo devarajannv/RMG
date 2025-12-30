@@ -61,6 +61,10 @@ model Tenant {
   holidays                 Holiday[]
   webhooks                 Webhook[]
 
+  // Trigger Relations (NEW)
+  requestTriggers  RequestTrigger[]
+  inboundWebhooks  InboundWebhook[]
+
   @@index([status])
   @@index([tier])
 }
@@ -1430,6 +1434,24 @@ model TenantRequestTypeConfig {
   approvalChainId String?        @db.Uuid
   approvalChain   ApprovalChain? @relation(fields: [approvalChainId], references: [id])
 
+  // Field Schema & Validation (NEW)
+  requiredFields   String[] // Field names required for this request type
+  fieldValidations Json?    // JSON schema for field validation rules
+
+  // Auto-assignment (NEW)
+  autoAssignToRequester Boolean @default(false) // Auto-assign to requester if no chain
+  requiresApproval      Boolean @default(true)  // If false, auto-approve on submit
+
+  // Post-Workflow Actions (NEW)
+  onApprovalActions  Json? // [{"type": "CREATE_DOCUMENT", "template": "..."}]
+  onRejectionActions Json? // [{"type": "NOTIFY_WEBHOOK", "url": "..."}]
+
+  // Escalation Policy (NEW)
+  escalationPolicy Json? // {"afterHours": 24, "escalateTo": "PRACTICE_HEAD"}
+
+  // Relations
+  triggers RequestTrigger[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1478,6 +1500,7 @@ model ApprovalChain {
   steps         ApprovalStep[]
   tenantConfigs TenantRequestTypeConfig[]
   requests      Request[]
+  triggers      RequestTrigger[]  // Triggers that override to use this chain
 
   @@unique([tenantId, code, version])
   @@index([tenantId, status])
@@ -1683,6 +1706,7 @@ model Request {
   slaBreachEvents   SlaBreachEvent[]
   notifications     Notification[]
   lock              RequestLock?
+  triggerExecutions TriggerExecution[]  // If created by a trigger
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -2145,7 +2169,199 @@ model NotificationPreference {
   @@unique([userId, eventType, channel])
 }
 
-// Webhooks for External Integrations
+// =============================================================================
+// REQUEST TRIGGERS (Event → Request Pipeline)
+// =============================================================================
+
+// RequestTrigger: Defines how external events create requests
+model RequestTrigger {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identity
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+
+  // Trigger Source
+  sourceType TriggerSourceType
+  webhookId  String?           @db.Uuid // Link to inbound webhook config
+  webhook    InboundWebhook?   @relation(fields: [webhookId], references: [id])
+
+  // Event Filtering
+  eventType   String  @db.VarChar(100) // e.g., "deal.closed", "invoice.paid"
+  eventFilter Json?   // JSON conditions: {"properties.stage": "won", "properties.amount": {"$gte": 50000}}
+
+  // Target Request Configuration
+  requestTypeConfigId String                  @db.Uuid
+  requestTypeConfig   TenantRequestTypeConfig @relation(fields: [requestTypeConfigId], references: [id])
+
+  // Field Mapping (external payload → request fields)
+  fieldMapping Json // {"title": "$.deal.name", "metadata.dealValue": "$.deal.amount"}
+
+  // Default Values
+  defaultPriority Priority @default(MEDIUM)
+  defaultMetadata Json?    // Static metadata to merge
+
+  // Optional Workflow Override
+  approvalChainId String?        @db.Uuid
+  approvalChain   ApprovalChain? @relation(fields: [approvalChainId], references: [id])
+
+  // Execution Control
+  isActive           Boolean @default(true)
+  requireConfirmation Boolean @default(false) // If true, creates draft for review
+  deduplicationKey   String? @db.VarChar(200) // JSONPath to use for dedup, e.g., "$.deal.id"
+  deduplicationHours Int?    // Window for deduplication
+
+  // Audit
+  createdById String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  executions TriggerExecution[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([tenantId, sourceType, eventType])
+}
+
+// Inbound Webhook Configuration (for receiving external events)
+model InboundWebhook {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identity
+  name        String               @db.VarChar(100)
+  source      InboundWebhookSource // HUBSPOT, SALESFORCE, STRIPE, CUSTOM
+  description String?              @db.VarChar(500)
+
+  // Security
+  secretKey       String  @db.VarChar(200) // For signature validation
+  signatureHeader String? @db.VarChar(100) // Header containing signature
+  signatureAlgo   String? @db.VarChar(50)  // hmac-sha256, etc.
+
+  // Endpoint
+  endpointPath String @unique @db.VarChar(100) // /webhooks/inbound/{endpointPath}
+
+  // Status
+  isActive            Boolean   @default(true)
+  lastReceivedAt      DateTime?
+  totalEventsReceived Int       @default(0)
+
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  triggers RequestTrigger[]
+  events   InboundWebhookEvent[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([endpointPath])
+}
+
+// Inbound Webhook Event Log
+model InboundWebhookEvent {
+  id        String         @id @default(uuid()) @db.Uuid
+  webhookId String         @db.Uuid
+  webhook   InboundWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  // Event Data
+  eventType String @db.VarChar(100)
+  payload   Json
+  headers   Json?
+
+  // Processing
+  status     TriggerEventStatus @default(PENDING)
+  processedAt DateTime?
+  errorMessage String?           @db.VarChar(1000)
+
+  // Signature Validation
+  signatureValid Boolean?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  executions TriggerExecution[]
+
+  @@index([webhookId, createdAt])
+  @@index([status])
+}
+
+// Trigger Execution Log (audit trail)
+model TriggerExecution {
+  id        String         @id @default(uuid()) @db.Uuid
+  triggerId String         @db.Uuid
+  trigger   RequestTrigger @relation(fields: [triggerId], references: [id])
+
+  // Source Event (if from webhook)
+  webhookEventId String?              @db.Uuid
+  webhookEvent   InboundWebhookEvent? @relation(fields: [webhookEventId], references: [id])
+
+  // Input
+  inputPayload Json
+  matchedFilter Boolean @default(true)
+
+  // Output
+  status    TriggerExecutionStatus
+  requestId String?                @db.Uuid // Created request ID if successful
+  request   Request?               @relation(fields: [requestId], references: [id])
+
+  // Details
+  mappedFields Json?                 // Result of field mapping
+  errorMessage String? @db.VarChar(1000)
+  skippedReason String? @db.VarChar(500) // Why trigger was skipped (dedup, filter, etc.)
+
+  // Timing
+  executedAt DateTime @default(now())
+  durationMs Int?
+
+  @@index([triggerId, executedAt])
+  @@index([requestId])
+}
+
+// Enums for Request Triggers
+enum TriggerSourceType {
+  WEBHOOK     // External webhook (HubSpot, Salesforce, etc.)
+  MANUAL      // User-initiated from UI
+  SCHEDULED   // Cron/scheduled job
+  API         // Direct API call
+  INTERNAL    // Internal system event
+}
+
+enum InboundWebhookSource {
+  HUBSPOT
+  SALESFORCE
+  STRIPE
+  JIRA
+  SLACK
+  TEAMS
+  CUSTOM
+}
+
+enum TriggerEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  SKIPPED
+}
+
+enum TriggerExecutionStatus {
+  SUCCESS           // Request created
+  SKIPPED_FILTER    // Event didn't match filter
+  SKIPPED_DUPLICATE // Deduplication prevented
+  SKIPPED_INACTIVE  // Trigger was inactive
+  FAILED_MAPPING    // Field mapping failed
+  FAILED_VALIDATION // Request validation failed
+  FAILED_ERROR      // Unexpected error
+}
+
+// Webhooks for External Integrations (Outbound)
 model Webhook {
   id       String @id @default(uuid()) @db.Uuid
   tenantId String @db.Uuid

@@ -4,6 +4,90 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### December 30, 2025 - Request Trigger Pipeline Complete
+
+#### Added - Event-to-Request Automation System
+
+**Request Triggers** - Complete pipeline for automating request creation from external events
+
+**Prisma Schema Additions** (`apps/api/prisma/schema.prisma`)
+- `RequestTrigger` model: Maps external events to request creation
+  - Source types: WEBHOOK, MANUAL, SCHEDULED, API, INTERNAL
+  - Event filtering with JSON conditions ($eq, $gt, $in, $exists, etc.)
+  - JSONPath-based field mapping from payload to request fields
+  - Deduplication support with configurable time window
+  - Optional approval chain override
+  
+- `InboundWebhook` model: Configuration for receiving external webhooks
+  - Supports: HUBSPOT, SALESFORCE, STRIPE, JIRA, SLACK, TEAMS, CUSTOM
+  - HMAC signature validation
+  - Unique endpoint paths per webhook
+  
+- `InboundWebhookEvent` model: Audit log of received events
+- `TriggerExecution` model: Tracks trigger execution results
+
+- Enhanced `TenantRequestTypeConfig`:
+  - `requiredFields` - Field names required for this request type
+  - `fieldValidations` - JSON schema for field validation
+  - `autoAssignToRequester` - Auto-assign if no chain
+  - `requiresApproval` - Toggle approval requirement
+  - `onApprovalActions` - Post-approval action configuration
+  - `onRejectionActions` - Post-rejection action configuration
+  - `escalationPolicy` - Escalation rules
+
+**Trigger Service** (`apps/api/src/modules/requests/trigger.service.ts`)
+- `createInboundWebhook()` - Create webhook with generated secret and endpoint
+- `processWebhookEvent()` - Main entry point for external webhook processing
+- `executeTrigger()` - Execute single trigger against payload
+- `validateWebhookSignature()` - HMAC signature validation
+- `evaluateEventFilter()` - JSON filter evaluation ($eq, $gt, $gte, $lt, $lte, $ne, $in, $nin, $exists)
+- `mapFields()` - JSONPath field mapping ($.path.to.field, array indexing)
+- `checkDuplication()` - Deduplication check within time window
+- Full CRUD for triggers and inbound webhooks
+
+**Post-Approval Actions** (`apps/api/src/modules/requests/post-approval-actions.service.ts`)
+- `executePostApprovalActions()` - Execute configured actions after approval/rejection
+- Action types: NOTIFY_WEBHOOK, CREATE_DOCUMENT, UPDATE_EXTERNAL, SEND_EMAIL, CREATE_TASK, LOG_AUDIT
+- Template variable resolution (${requestNumber}, ${requesterName}, etc.)
+- Async execution (non-blocking)
+
+**API Endpoints** (`apps/api/src/modules/requests/trigger.routes.ts`)
+- `POST /api/v1/triggers` - Create trigger
+- `GET /api/v1/triggers` - List triggers (with filters)
+- `GET /api/v1/triggers/:triggerId` - Get trigger details
+- `PATCH /api/v1/triggers/:triggerId` - Update trigger
+- `DELETE /api/v1/triggers/:triggerId` - Delete trigger
+- `GET /api/v1/triggers/:triggerId/executions` - Execution history
+- `POST /api/v1/triggers/:triggerId/execute` - Manual execution (testing)
+- `POST /api/v1/triggers/webhooks` - Create inbound webhook
+- `GET /api/v1/triggers/webhooks` - List inbound webhooks
+- `POST /api/v1/webhooks/inbound/:endpointPath` - **Public endpoint** for receiving webhooks
+
+**HubSpot Example Flow:**
+```
+1. HubSpot sends POST to /api/v1/webhooks/inbound/{endpointPath}
+2. System validates signature, logs event
+3. Finds matching triggers for event type "deal.closed"
+4. Applies event filter: {"properties.stage": "won"}
+5. Maps fields: {"title": "$.deal.name", "metadata.value": "$.deal.amount"}
+6. Creates Request with configured RequestType
+7. Workflow starts → Approvers notified
+8. On approval → Post-approval actions execute
+```
+
+**Tests** (`apps/api/src/modules/requests/trigger.service.test.ts`)
+- 33 comprehensive tests covering:
+  - Webhook creation with source-specific headers
+  - Trigger CRUD operations
+  - Event filter evaluation (all operators)
+  - JSONPath field mapping
+  - Deduplication logic
+  - Signature validation
+  - Manual trigger execution
+  - Execution history
+
+---
+
 ### December 30, 2025 - Workflow Integration Complete
 
 #### Added - Request & Approval Workflow Integration

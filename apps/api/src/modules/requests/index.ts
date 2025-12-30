@@ -9,6 +9,8 @@ import approvalChainRoutes from './approval-chain.routes';
 import delegationRoutes from './delegation.routes';
 import slaRoutes from './sla.routes';
 import notificationRoutes from './notification.routes';
+import triggerRoutes from './trigger.routes';
+import inboundWebhookRoutes from './inbound-webhook.routes';
 
 export { 
   requestRoutes, 
@@ -16,9 +18,12 @@ export {
   approvalChainRoutes, 
   delegationRoutes, 
   slaRoutes,
-  notificationRoutes 
+  notificationRoutes,
+  triggerRoutes,
+  inboundWebhookRoutes
 };
 export * as requestService from './request.service';
 export * as approvalChainService from './approval-chain.service';
 export * as slaService from './sla.service';
 export * as notificationService from './notification.service';
+export * as triggerService from './trigger.service';

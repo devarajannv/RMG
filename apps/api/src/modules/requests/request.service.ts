@@ -12,6 +12,7 @@ import {
   findApprovalChainForRequestType,
 } from './approval-chain.service';
 import { createNotification, notifyApprovalDecision } from './notification.service';
+import { executePostApprovalActions, buildActionContext } from './post-approval-actions.service';
 
 // ============================================================================
 // Types
@@ -1022,6 +1023,11 @@ export async function approveRequest(
       logger.info(`Request fully approved, handler: ${request.type.onApprovalHandler}`, { requestId });
       // TODO: Trigger execution handler asynchronously
     }
+
+    // Execute post-approval actions (async, don't block response)
+    buildActionContext(tenantId, requestId, 'APPROVED', userId, input.comments)
+      .then(context => executePostApprovalActions(context))
+      .catch(err => logger.error('Post-approval actions failed', { requestId, error: err }));
   }
 
   return updated as unknown as Record<string, unknown>;
@@ -1136,6 +1142,11 @@ export async function rejectRequest(
   } catch (err) {
     logger.error('Failed to send rejection notification', { requestId, error: err });
   }
+
+  // Execute post-rejection actions (async, don't block response)
+  buildActionContext(tenantId, requestId, 'REJECTED', userId, input.comments)
+    .then(context => executePostApprovalActions(context))
+    .catch(err => logger.error('Post-rejection actions failed', { requestId, error: err }));
 
   return updated as unknown as Record<string, unknown>;
 }

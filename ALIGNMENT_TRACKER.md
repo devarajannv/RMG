@@ -20,9 +20,9 @@ OVERALL                   █████████████████░
 ### Backend Test Suite
 | Metric | Count | Status |
 |--------|-------|--------|
-| Total Tests | 1,397 | ✅ |
-| Passing | 1,397 | 100% |
-| Test Files | 42 | ✅ |
+| Total Tests | 1,425 | ✅ |
+| Passing | 1,425 | 100% |
+| Test Files | 43 | ✅ |
 | Modules Covered | 22/22 | 100% |
 
 ### Comprehensive Test Coverage Added
@@ -37,6 +37,7 @@ The following modules now have comprehensive tests:
 8. ✅ **SLA** - 16 tests for SLA calculations
 9. ✅ **AI Migration** - 27 tests for data import
 10. ✅ **Workflow Integration** - 18 tests for request-approval integration
+11. ✅ **Request Triggers** - 33 tests for event-to-request pipeline
 
 ---
 
