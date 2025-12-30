@@ -406,8 +406,37 @@ export async function updateResource(
     }
   }
 
-  // Warn if setting status to INACTIVE/NOTICE while having active allocations
-  if (input.status && input.status !== 'ACTIVE' && existing.status === 'ACTIVE') {
+  // AUTO-CASCADE: When dateOfExit is set, automatically handle allocations
+  // This is GOD LEVEL - no manual cleanup required
+  if (input.dateOfExit && (!existing.dateOfExit || input.dateOfExit.getTime() !== existing.dateOfExit.getTime())) {
+    const { executeResourceExitCascade } = await import('./resource-exit-cascade.service.js');
+    const cascadeResult = await executeResourceExitCascade(
+      tenantId,
+      resourceId,
+      input.dateOfExit,
+      {
+        performedBy: userId,
+        exitReason: input.exitReason,
+        skipNotification: false,
+      }
+    );
+
+    if (!cascadeResult.success && cascadeResult.errors?.length) {
+      logger.warn('Resource exit cascade had errors', {
+        resourceId,
+        errors: cascadeResult.errors,
+      });
+    }
+
+    logger.info('Resource exit cascade completed', {
+      resourceId,
+      allocationsEnded: cascadeResult.allocationsEnded,
+      projectsAffected: cascadeResult.projectsAffected,
+    });
+  }
+
+  // If changing status to INACTIVE without exit date, still warn about allocations
+  if (input.status && input.status !== 'ACTIVE' && existing.status === 'ACTIVE' && !input.dateOfExit) {
     const activeAllocations = await prisma.allocation.count({
       where: {
         resourceId,
@@ -420,7 +449,7 @@ export async function updateResource(
     
     if (activeAllocations > 0) {
       throw new ApiError(
-        `Cannot mark resource as ${input.status}. They have ${activeAllocations} active/upcoming allocation(s). Please end or reassign their allocations first.`,
+        `Cannot mark resource as ${input.status}. They have ${activeAllocations} active/upcoming allocation(s). Set a dateOfExit to auto-cascade, or manually end allocations first.`,
         400,
         'RESOURCE_HAS_ACTIVE_ALLOCATIONS'
       );

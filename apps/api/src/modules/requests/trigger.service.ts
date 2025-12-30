@@ -7,6 +7,8 @@
  * - InboundWebhook: Configuration for receiving external webhooks
  * - TriggerExecution: Audit log of trigger executions
  * - Field Mapping: JSONPath-based extraction from event payloads
+ * 
+ * Note: Pure business logic is in trigger.logic.ts for testability
  */
 
 import {
@@ -23,6 +25,16 @@ import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
 import { submitRequest } from './request.service';
 import * as crypto from 'crypto';
+
+// Import pure functions from logic module (tested without mocks)
+import {
+  getValueByPath,
+  mapFields as mapFieldsLogic,
+  evaluateEventFilter as evaluateFilterLogic,
+  validateWebhookSignature as validateSignatureLogic,
+  getDefaultSignatureHeader as getDefaultHeaderLogic,
+  validateFieldMapping as validateMappingLogic,
+} from './trigger.logic';
 
 // ============================================================================
 // Types
@@ -133,22 +145,10 @@ export async function createInboundWebhook(
 
 /**
  * Get default signature header for known webhook sources
+ * Delegates to pure function in trigger.logic.ts
  */
 function getDefaultSignatureHeader(source: InboundWebhookSource): string {
-  switch (source) {
-    case 'HUBSPOT':
-      return 'X-HubSpot-Signature-v3';
-    case 'SALESFORCE':
-      return 'X-Salesforce-Signature';
-    case 'STRIPE':
-      return 'Stripe-Signature';
-    case 'JIRA':
-      return 'X-Hub-Signature';
-    case 'SLACK':
-      return 'X-Slack-Signature';
-    default:
-      return 'X-Webhook-Signature';
-  }
+  return getDefaultHeaderLogic(source as any);
 }
 
 /**
@@ -384,23 +384,12 @@ export async function createRequestTrigger(
 
 /**
  * Validate field mapping structure
+ * Delegates to pure function in trigger.logic.ts
  */
 function validateFieldMapping(mapping: Record<string, string>): void {
-  const requiredFields = ['title'];
-  const missingFields = requiredFields.filter((f) => !mapping[f]);
-  
-  if (missingFields.length > 0) {
-    throw new ApiError(400, `Field mapping missing required fields: ${missingFields.join(', ')}`);
-  }
-
-  // Validate JSONPath syntax (basic check)
-  for (const [field, path] of Object.entries(mapping)) {
-    if (typeof path !== 'string') {
-      throw new ApiError(400, `Invalid mapping for field '${field}': must be a string`);
-    }
-    if (!path.startsWith('$.') && !path.startsWith('$[') && path !== '$') {
-      throw new ApiError(400, `Invalid JSONPath for field '${field}': must start with $`);
-    }
+  const result = validateMappingLogic(mapping);
+  if (!result.valid) {
+    throw new ApiError(400, result.errors.join('; '));
   }
 }
 
@@ -568,6 +557,7 @@ export async function deleteRequestTrigger(
 
 /**
  * Validate webhook signature
+ * Delegates to pure function in trigger.logic.ts
  */
 export function validateWebhookSignature(
   payload: string,
@@ -575,25 +565,8 @@ export function validateWebhookSignature(
   secretKey: string,
   algorithm: string
 ): boolean {
-  try {
-    const expectedSignature = crypto
-      .createHmac(algorithm.replace('hmac-', ''), secretKey)
-      .update(payload)
-      .digest('hex');
-
-    // Handle different signature formats (e.g., "sha256=xxx" or just "xxx")
-    const actualSignature = signature.includes('=')
-      ? signature.split('=')[1]
-      : signature;
-
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature),
-      Buffer.from(actualSignature)
-    );
-  } catch (error) {
-    logger.warn({ error }, 'Signature validation error');
-    return false;
-  }
+  const result = validateSignatureLogic(payload, signature, secretKey, algorithm);
+  return result.valid;
 }
 
 /**
@@ -859,58 +832,13 @@ async function logExecution(
 
 /**
  * Evaluate event filter against payload
- * Supports simple equality, $gt, $gte, $lt, $lte, $ne, $in, $nin, $exists
+ * Delegates to pure function in trigger.logic.ts
  */
 function evaluateEventFilter(
   payload: Record<string, unknown>,
   filter: Record<string, unknown>
 ): boolean {
-  for (const [path, condition] of Object.entries(filter)) {
-    const value = getValueByPath(payload, path);
-
-    if (typeof condition === 'object' && condition !== null) {
-      // Operator-based condition
-      const ops = condition as Record<string, unknown>;
-      for (const [op, expected] of Object.entries(ops)) {
-        switch (op) {
-          case '$eq':
-            if (value !== expected) return false;
-            break;
-          case '$ne':
-            if (value === expected) return false;
-            break;
-          case '$gt':
-            if (typeof value !== 'number' || value <= (expected as number)) return false;
-            break;
-          case '$gte':
-            if (typeof value !== 'number' || value < (expected as number)) return false;
-            break;
-          case '$lt':
-            if (typeof value !== 'number' || value >= (expected as number)) return false;
-            break;
-          case '$lte':
-            if (typeof value !== 'number' || value > (expected as number)) return false;
-            break;
-          case '$in':
-            if (!Array.isArray(expected) || !expected.includes(value)) return false;
-            break;
-          case '$nin':
-            if (!Array.isArray(expected) || expected.includes(value)) return false;
-            break;
-          case '$exists':
-            if ((expected && value === undefined) || (!expected && value !== undefined)) return false;
-            break;
-          default:
-            logger.warn({ op }, 'Unknown filter operator');
-        }
-      }
-    } else {
-      // Simple equality
-      if (value !== condition) return false;
-    }
-  }
-
-  return true;
+  return evaluateFilterLogic(payload, filter);
 }
 
 /**
@@ -949,74 +877,13 @@ async function checkDuplication(
 
 /**
  * Map fields from payload using JSONPath-like expressions
+ * Delegates to pure function in trigger.logic.ts
  */
 function mapFields(
   payload: Record<string, unknown>,
   mapping: Record<string, string>
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-
-  for (const [targetField, sourcePath] of Object.entries(mapping)) {
-    const value = getValueByPath(payload, sourcePath);
-    if (value !== undefined) {
-      // Handle nested target fields (e.g., "metadata.dealValue")
-      setValueByPath(result, targetField, value);
-    }
-  }
-
-  return result;
-}
-
-/**
- * Get value from object by JSONPath-like path
- * Supports: $.field, $.nested.field, $[0], $.array[0].field
- */
-function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
-  // Remove leading $. or $
-  let cleanPath = path;
-  if (cleanPath.startsWith('$.')) {
-    cleanPath = cleanPath.slice(2);
-  } else if (cleanPath.startsWith('$')) {
-    cleanPath = cleanPath.slice(1);
-  }
-
-  if (!cleanPath) {
-    return obj;
-  }
-
-  // Split by dots and brackets
-  const parts = cleanPath.split(/\.|\[|\]/).filter(Boolean);
-  
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current === null || current === undefined) {
-      return undefined;
-    }
-    if (typeof current !== 'object') {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-
-  return current;
-}
-
-/**
- * Set value in object by path
- */
-function setValueByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split('.');
-  let current = obj;
-
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    if (!(part in current)) {
-      current[part] = {};
-    }
-    current = current[part] as Record<string, unknown>;
-  }
-
-  current[parts[parts.length - 1]] = value;
+  return mapFieldsLogic(payload, mapping);
 }
 
 // ============================================================================

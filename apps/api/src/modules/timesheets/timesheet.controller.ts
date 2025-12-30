@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { parseISO } from 'date-fns';
 import * as timesheetService from './timesheet.service';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 
 const router = Router();
 
@@ -72,15 +72,29 @@ function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => P
 // Get timesheet entries with filters
 router.get(
   '/',
+  authorize('timesheet:read'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
     const { resourceId, projectId, startDate, endDate, status, page, limit } = req.query;
 
+    // Security: If user doesn't have timesheet:read:all, only allow their own or direct reports
+    const userId = req.user!.id;
+    const hasReadAll = req.user!.permissions.includes('timesheet:read:all') || 
+                       req.user!.permissions.includes('timesheet:*') ||
+                       req.user!.permissions.includes('*');
+    
+    let effectiveResourceId = resourceId as string;
+    if (!hasReadAll && !resourceId) {
+      // Get user's linked resource ID or their direct reports
+      const linkedResource = await timesheetService.getLinkedResourceForUser(tenantId, userId);
+      effectiveResourceId = linkedResource?.id;
+    }
+
     const result = await timesheetService.getTimesheetEntries({
       tenantId,
-      resourceId: resourceId as string,
+      resourceId: effectiveResourceId,
       projectId: projectId as string,
       startDate: startDate ? parseISO(startDate as string) : undefined,
       endDate: endDate ? parseISO(endDate as string) : undefined,
@@ -96,6 +110,7 @@ router.get(
 // Get weekly timesheet view
 router.get(
   '/weekly',
+  authorize('timesheet:read'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
@@ -104,6 +119,17 @@ router.get(
 
     if (!resourceId) {
       return res.status(400).json({ error: 'resourceId is required' });
+    }
+
+    // Security: Verify user can access this resource's timesheet
+    const canAccess = await timesheetService.canAccessResourceTimesheet(
+      tenantId,
+      req.user!.id,
+      resourceId as string,
+      req.user!.permissions
+    );
+    if (!canAccess) {
+      return res.status(403).json({ error: 'Access denied to this timesheet' });
     }
 
     const week = weekStart ? parseISO(weekStart as string) : new Date();
@@ -120,11 +146,24 @@ router.get(
 // Create a single timesheet entry
 router.post(
   '/',
+  authorize('timesheet:write'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
     const validated = createEntrySchema.parse(req.body);
+    
+    // Security: Verify user can create timesheet for this resource
+    const canAccess = await timesheetService.canAccessResourceTimesheet(
+      tenantId,
+      req.user!.id,
+      validated.resourceId,
+      req.user!.permissions
+    );
+    if (!canAccess) {
+      return res.status(403).json({ error: 'Cannot create timesheet for this resource' });
+    }
+
     const result = await timesheetService.createTimesheetEntry({
       tenantId,
       resourceId: validated.resourceId,
@@ -145,13 +184,25 @@ router.post(
 // Update a timesheet entry
 router.put(
   '/:id',
+  authorize('timesheet:write'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
     const { id } = req.params;
-    const validated = updateEntrySchema.parse(req.body);
+    
+    // Security: Verify user can modify this timesheet entry
+    const canModify = await timesheetService.canModifyTimesheetEntry(
+      tenantId,
+      req.user!.id,
+      id,
+      req.user!.permissions
+    );
+    if (!canModify) {
+      return res.status(403).json({ error: 'Cannot modify this timesheet entry' });
+    }
 
+    const validated = updateEntrySchema.parse(req.body);
     const result = await timesheetService.updateTimesheetEntry(id, tenantId, validated);
     res.json({ data: result });
   })
@@ -160,11 +211,24 @@ router.put(
 // Delete a timesheet entry
 router.delete(
   '/:id',
+  authorize('timesheet:write'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
     const { id } = req.params;
+    
+    // Security: Verify user can delete this timesheet entry
+    const canModify = await timesheetService.canModifyTimesheetEntry(
+      tenantId,
+      req.user!.id,
+      id,
+      req.user!.permissions
+    );
+    if (!canModify) {
+      return res.status(403).json({ error: 'Cannot delete this timesheet entry' });
+    }
+
     await timesheetService.deleteTimesheetEntry(id, tenantId);
     res.status(204).send();
   })
@@ -173,11 +237,24 @@ router.delete(
 // Save weekly timesheet (bulk)
 router.post(
   '/weekly/save',
+  authorize('timesheet:write'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
     const validated = saveWeeklySchema.parse(req.body);
+    
+    // Security: Verify user can save timesheet for this resource
+    const canAccess = await timesheetService.canAccessResourceTimesheet(
+      tenantId,
+      req.user!.id,
+      validated.resourceId,
+      req.user!.permissions
+    );
+    if (!canAccess) {
+      return res.status(403).json({ error: 'Cannot save timesheet for this resource' });
+    }
+
     const result = await timesheetService.saveWeeklyTimesheet(
       tenantId,
       validated.resourceId,
@@ -192,11 +269,24 @@ router.post(
 // Submit timesheet
 router.post(
   '/submit',
+  authorize('timesheet:write'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
     const validated = submitTimesheetSchema.parse(req.body);
+    
+    // Security: Verify user can submit timesheet for this resource
+    const canAccess = await timesheetService.canAccessResourceTimesheet(
+      tenantId,
+      req.user!.id,
+      validated.resourceId,
+      req.user!.permissions
+    );
+    if (!canAccess) {
+      return res.status(403).json({ error: 'Cannot submit timesheet for this resource' });
+    }
+
     const result = await timesheetService.submitTimesheet(
       tenantId,
       validated.resourceId,
@@ -210,6 +300,7 @@ router.post(
 // Get pending approvals
 router.get(
   '/pending-approvals',
+  authorize('timesheet:approve'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     const userId = req.user?.id;
@@ -224,12 +315,25 @@ router.get(
 // Approve timesheet
 router.post(
   '/approve',
+  authorize('timesheet:approve'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     const userId = req.user?.id;
     if (!tenantId || !userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const { periodId } = approveRejectSchema.parse(req.body);
+    
+    // Security: Verify user can approve this timesheet
+    const canApprove = await timesheetService.canApproveTimesheet(
+      tenantId,
+      userId,
+      periodId,
+      req.user!.permissions
+    );
+    if (!canApprove) {
+      return res.status(403).json({ error: 'Cannot approve this timesheet' });
+    }
+
     const result = await timesheetService.approveTimesheet(tenantId, periodId, userId);
     res.json({ data: result, message: 'Timesheet approved' });
   })
@@ -238,6 +342,7 @@ router.post(
 // Reject timesheet
 router.post(
   '/reject',
+  authorize('timesheet:approve'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     const userId = req.user?.id;
@@ -248,6 +353,17 @@ router.post(
       return res.status(400).json({ error: 'Rejection reason is required' });
     }
 
+    // Security: Verify user can reject this timesheet
+    const canApprove = await timesheetService.canApproveTimesheet(
+      tenantId,
+      userId,
+      periodId,
+      req.user!.permissions
+    );
+    if (!canApprove) {
+      return res.status(403).json({ error: 'Cannot reject this timesheet' });
+    }
+
     const result = await timesheetService.rejectTimesheet(tenantId, periodId, userId, reason);
     res.json({ data: result, message: 'Timesheet rejected' });
   })
@@ -256,11 +372,25 @@ router.post(
 // Get timesheet statistics
 router.get(
   '/stats',
+  authorize('timesheet:read'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
     const { resourceId, startDate, endDate } = req.query;
+
+    // Security: If specific resource, verify access
+    if (resourceId) {
+      const canAccess = await timesheetService.canAccessResourceTimesheet(
+        tenantId,
+        req.user!.id,
+        resourceId as string,
+        req.user!.permissions
+      );
+      if (!canAccess) {
+        return res.status(403).json({ error: 'Access denied to this resource timesheet stats' });
+      }
+    }
 
     const result = await timesheetService.getTimesheetStats(
       tenantId,

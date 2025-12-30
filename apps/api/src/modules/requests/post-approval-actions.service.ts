@@ -18,6 +18,8 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 import * as crypto from 'crypto';
+import { executeEntityHandler, hasHandler, HandlerContext } from './entity-handlers';
+
 
 // ============================================================================
 // Types
@@ -75,6 +77,8 @@ export interface ActionResult {
 export async function executePostApprovalActions(
   context: ActionExecutionContext
 ): Promise<ActionResult[]> {
+  const results: ActionResult[] = [];
+  
   // Get tenant request type config
   const request = await prisma.request.findUnique({
     where: { id: context.requestId },
@@ -88,6 +92,68 @@ export async function executePostApprovalActions(
     return [];
   }
 
+  // ========================================================================
+  // STEP 1: Execute Entity Handler (creates/modifies business entities)
+  // This is the PRIMARY action - e.g., creating an allocation for RESOURCE_ALLOCATION
+  // ========================================================================
+  
+  if (context.decision === 'APPROVED' && request.type.onApprovalHandler) {
+    const handlerName = request.type.onApprovalHandler;
+    
+    if (hasHandler(handlerName)) {
+      const startTime = Date.now();
+      
+      const handlerContext: HandlerContext = {
+        tenantId: context.tenantId,
+        requestId: context.requestId,
+        requestNumber: context.requestNumber,
+        requestData: context.requestData,
+        requesterId: context.requesterId,
+        approvedById: context.approvedById!,
+      };
+      
+      const handlerResult = await executeEntityHandler(handlerName, handlerContext);
+      
+      results.push({
+        actionType: 'CREATE_ENTITY' as any,
+        actionName: handlerName,
+        success: handlerResult.success,
+        error: handlerResult.error,
+        result: handlerResult.details,
+        durationMs: Date.now() - startTime,
+      });
+      
+      // Update request with created entity reference
+      if (handlerResult.success && handlerResult.entityId) {
+        await prisma.request.update({
+          where: { id: context.requestId },
+          data: {
+            resultEntityType: handlerResult.entityType,
+            resultEntityId: handlerResult.entityId,
+            executionNotes: `Entity created: ${handlerResult.entityType} ${handlerResult.entityId}`,
+          },
+        });
+        
+        logger.info('Entity created from request approval', {
+          requestId: context.requestId,
+          requestNumber: context.requestNumber,
+          entityType: handlerResult.entityType,
+          entityId: handlerResult.entityId,
+        });
+      }
+    } else {
+      logger.warn('Entity handler not implemented', {
+        handlerName,
+        requestId: context.requestId,
+      });
+    }
+  }
+
+  // ========================================================================
+  // STEP 2: Execute Configured Actions (webhooks, emails, documents, etc.)
+  // These are SECONDARY actions configured per tenant
+  // ========================================================================
+  
   // Get tenant config for this request type
   const tenantConfig = await prisma.tenantRequestTypeConfig.findUnique({
     where: {
@@ -103,45 +169,36 @@ export async function executePostApprovalActions(
     ? tenantConfig?.onApprovalActions
     : tenantConfig?.onRejectionActions;
 
-  if (!actionsJson) {
-    logger.debug('No post-approval actions configured', {
-      requestId: context.requestId,
-      decision: context.decision,
-    });
-    return [];
-  }
-
-  const actions = actionsJson as PostApprovalAction[];
-  if (!Array.isArray(actions) || actions.length === 0) {
-    return [];
-  }
-
-  logger.info(`Executing ${actions.length} post-${context.decision.toLowerCase()} actions`, {
-    requestId: context.requestId,
-    requestNumber: context.requestNumber,
-  });
-
-  // Execute actions
-  const results: ActionResult[] = [];
-
-  for (const action of actions) {
-    const result = await executeAction(action, context);
-    results.push(result);
-
-    if (!result.success) {
-      logger.error('Post-approval action failed', {
+  if (actionsJson) {
+    const actions = actionsJson as unknown as PostApprovalAction[];
+    if (Array.isArray(actions) && actions.length > 0) {
+      logger.info(`Executing ${actions.length} post-${context.decision.toLowerCase()} actions`, {
         requestId: context.requestId,
-        actionType: action.type,
-        error: result.error,
+        requestNumber: context.requestNumber,
       });
+
+      for (const action of actions) {
+        const result = await executeAction(action, context);
+        results.push(result);
+
+        if (!result.success) {
+          logger.error('Post-approval action failed', {
+            requestId: context.requestId,
+            actionType: action.type,
+            error: result.error,
+          });
+        }
+      }
     }
   }
 
   // Log summary
-  const successCount = results.filter(r => r.success).length;
-  logger.info(`Post-approval actions completed: ${successCount}/${results.length} successful`, {
-    requestId: context.requestId,
-  });
+  if (results.length > 0) {
+    const successCount = results.filter(r => r.success).length;
+    logger.info(`Post-approval actions completed: ${successCount}/${results.length} successful`, {
+      requestId: context.requestId,
+    });
+  }
 
   return results;
 }
@@ -318,7 +375,8 @@ async function executeUpdateExternalAction(
 ): Promise<Record<string, unknown>> {
   const system = config.system as string;
   const action = config.action as string;
-  const mapping = config.mapping as Record<string, string>;
+  // Mapping will be used when external system integrations are implemented
+  // const mapping = config.mapping as Record<string, string>;
 
   if (!system || !action) {
     throw new Error('System and action are required');
@@ -350,8 +408,9 @@ async function executeSendEmailAction(
 ): Promise<Record<string, unknown>> {
   const to = config.to as string | string[];
   const template = config.template as string;
-  const subject = config.subject as string;
-  const body = config.body as string;
+  // Subject and body will be used when email service is implemented
+  // const subject = config.subject as string;
+  // const body = config.body as string;
 
   if (!to) {
     throw new Error('Email recipient is required');
@@ -402,7 +461,8 @@ async function executeCreateTaskAction(
   const title = config.title as string;
   const assignTo = config.assignTo as string;
   const dueInDays = (config.dueInDays as number) || 7;
-  const description = config.description as string;
+  // Description will be used when task system is implemented
+  // const description = config.description as string;
 
   if (!title || !assignTo) {
     throw new Error('Task title and assignTo are required');
@@ -451,12 +511,15 @@ async function executeLogAuditAction(
   const category = (config.category as string) || 'POST_APPROVAL_ACTION';
   const details = (config.details as Record<string, unknown>) || {};
 
+  // Use appropriate AuditAction enum value based on decision
+  const auditAction = context.decision === 'APPROVED' ? 'APPROVE' : 'REJECT';
+
   // Create audit log entry
   await prisma.auditLog.create({
     data: {
       tenantId: context.tenantId,
       userId: context.decision === 'APPROVED' ? context.approvedById! : context.rejectedById!,
-      action: `REQUEST_${context.decision}`,
+      action: auditAction,
       entityType: 'Request',
       entityId: context.requestId,
       changes: {
@@ -465,9 +528,7 @@ async function executeLogAuditAction(
         decision: context.decision,
         comments: context.comments,
         ...details,
-      } as Prisma.JsonValue,
-      ipAddress: '',
-      userAgent: 'PostApprovalActionExecutor',
+      } as Prisma.InputJsonValue,
     },
   });
 

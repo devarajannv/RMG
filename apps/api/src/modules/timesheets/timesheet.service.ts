@@ -687,3 +687,188 @@ export async function getTimesheetStats(tenantId: string, resourceId?: string, s
   };
 }
 
+// ============================================================================
+// Security & Access Control
+// ============================================================================
+
+/**
+ * Get the resource linked to a user account
+ */
+export async function getLinkedResourceForUser(tenantId: string, userId: string) {
+  // First check if user has a linked resource (same email)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+
+  if (!user) return null;
+
+  const resource = await prisma.resource.findFirst({
+    where: {
+      tenantId,
+      email: user.email,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+
+  return resource;
+}
+
+/**
+ * Check if user can access a resource's timesheet
+ * Rules:
+ * 1. Admin (timesheet:*) can access all
+ * 2. User can access their own linked resource
+ * 3. Manager can access their direct reports
+ * 4. timesheet:read:all permission grants read access to all
+ */
+export async function canAccessResourceTimesheet(
+  tenantId: string,
+  userId: string,
+  resourceId: string,
+  permissions: string[]
+): Promise<boolean> {
+  // Admin or all-access permission
+  if (
+    permissions.includes('*') ||
+    permissions.includes('timesheet:*') ||
+    permissions.includes('timesheet:read:all') ||
+    permissions.includes('timesheet:write:all')
+  ) {
+    return true;
+  }
+
+  // Check if user is linked to this resource
+  const linkedResource = await getLinkedResourceForUser(tenantId, userId);
+  if (linkedResource?.id === resourceId) {
+    return true;
+  }
+
+  // Check if user is the manager of this resource
+  const resource = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { managerId: true },
+  });
+
+  if (resource?.managerId) {
+    // Check if the manager resource is linked to this user
+    const managerResource = await prisma.resource.findUnique({
+      where: { id: resource.managerId },
+      select: { email: true },
+    });
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    if (managerResource?.email === user?.email) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check if user can modify a specific timesheet entry
+ * Rules:
+ * 1. Admin can modify all
+ * 2. Entry owner can modify if status is DRAFT
+ * 3. Manager can modify if status is DRAFT
+ */
+export async function canModifyTimesheetEntry(
+  tenantId: string,
+  userId: string,
+  entryId: string,
+  permissions: string[]
+): Promise<boolean> {
+  // Admin access
+  if (
+    permissions.includes('*') ||
+    permissions.includes('timesheet:*') ||
+    permissions.includes('timesheet:write:all')
+  ) {
+    return true;
+  }
+
+  // Get the entry
+  const entry = await prisma.timesheetEntry.findUnique({
+    where: { id: entryId },
+    select: {
+      tenantId: true,
+      resourceId: true,
+      status: true,
+    },
+  });
+
+  if (!entry || entry.tenantId !== tenantId) {
+    return false;
+  }
+
+  // Can only modify draft entries (unless admin)
+  if (entry.status !== 'DRAFT') {
+    return false;
+  }
+
+  // Check if user can access this resource's timesheet
+  return canAccessResourceTimesheet(tenantId, userId, entry.resourceId, permissions);
+}
+
+/**
+ * Check if user can approve a timesheet period
+ * Rules:
+ * 1. Admin can approve all
+ * 2. Manager of the resource can approve
+ * 3. Anyone with timesheet:approve:all permission
+ */
+export async function canApproveTimesheet(
+  tenantId: string,
+  userId: string,
+  periodId: string,
+  permissions: string[]
+): Promise<boolean> {
+  // Admin or all-approve access
+  if (
+    permissions.includes('*') ||
+    permissions.includes('timesheet:*') ||
+    permissions.includes('timesheet:approve:all')
+  ) {
+    return true;
+  }
+
+  // Get the period and resource
+  const period = await prisma.timesheetPeriod.findUnique({
+    where: { id: periodId },
+    select: {
+      tenantId: true,
+      resource: {
+        select: { id: true, managerId: true },
+      },
+    },
+  });
+
+  if (!period || period.tenantId !== tenantId) {
+    return false;
+  }
+
+  // Check if user is the manager
+  if (period.resource.managerId) {
+    const managerResource = await prisma.resource.findUnique({
+      where: { id: period.resource.managerId },
+      select: { email: true },
+    });
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    if (managerResource?.email === user?.email) {
+      return true;
+    }
+  }
+
+  return false;
+}

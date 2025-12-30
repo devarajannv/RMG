@@ -4,6 +4,113 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### December 30, 2025 - Contract Lifecycle UI & Budget Analytics
+
+#### Added - Contract Lifecycle Components (Frontend)
+
+**7 GOD-Level React Components** (~2,800 lines total)
+
+1. **ContractDocuments** (`apps/frontend/src/components/contracts/ContractDocuments.tsx`)
+   - Drag & drop file upload with validation
+   - Document categorization (Contract, Amendment, SOW, Invoice, etc.)
+   - Preview dialog for PDFs and images
+   - Version tracking
+   - Permission-gated actions with `<Can>` component
+
+2. **ContractMilestones** (`apps/frontend/src/components/contracts/ContractMilestones.tsx`)
+   - Visual timeline with status indicators
+   - Milestone types: Deliverable, Payment, Review, Kickoff, Completion
+   - Due date tracking with urgency alerts
+   - Payment milestone amounts with INR/USD formatting
+   - Progress tracking with completion percentage
+
+3. **ContractBudgetPanel** (`apps/frontend/src/components/contracts/ContractBudgetPanel.tsx`)
+   - Real-time budget vs actual tracking
+   - Health indicators: Healthy, At Risk, Critical
+   - Progress bars for hours and cost utilization
+   - Gross margin calculation
+   - Project breakdown with individual budget status
+   - Alert display from budget tracking service
+
+4. **ContractRenewalDialog** (`apps/frontend/src/components/contracts/ContractRenewalDialog.tsx`)
+   - 4-step wizard: Type → Term → Value → Confirm
+   - Renewal types: Extend, New Term, Amendment
+   - Term presets: 6mo, 1yr, 2yr, 3yr
+   - Value adjustment: percentage or custom
+   - Auto-renew toggle
+
+5. **ContractAuditHistory** (`apps/frontend/src/components/contracts/ContractAuditHistory.tsx`)
+   - Complete audit trail display
+   - Action filtering (Create, Update, Delete, Status Change, etc.)
+   - Before/after value comparison
+   - User attribution with timestamps
+   - CSV export capability
+
+6. **ContractStatusTimeline** (`apps/frontend/src/components/contracts/ContractStatusTimeline.tsx`)
+   - Visual lifecycle progression
+   - Status: Draft → Pending → Active → Renewed/Expired/Terminated
+   - Key dates panel
+   - Valid next actions display
+
+7. **ContractQuickActions** (`apps/frontend/src/components/contracts/ContractQuickActions.tsx`)
+   - Context-aware action buttons
+   - Permission-gated with confirmation dialogs
+   - Three variants: full, compact, dropdown
+   - Actions: Activate, Renew, Terminate, Edit, Duplicate, Export, Delete
+
+#### Added - Budget Tracking Analytics Service (Backend)
+
+**Budget Tracking Service** (`apps/api/src/modules/analytics/budget-tracking.service.ts`)
+- 1,064 lines of pure TypeScript
+- 14 pure functions with comprehensive JSDoc
+
+**Core Functions:**
+- `calculateBudgetMetrics()` - Main aggregation from allocations + timesheets
+- `calculateVariance()` - Budget vs actual variance calculation
+- `calculateBurnRate()` - Utilization percentage
+- `determineBudgetHealth()` - Status: HEALTHY | AT_RISK | CRITICAL
+- `generateBudgetAlerts()` - Alert generation with thresholds
+- `projectCompletion()` - Projected end date based on burn rate
+- `calculateGrossMargin()` - Revenue minus cost as percentage
+
+**Aggregation Functions:**
+- `aggregateActualsFromTimesheets()` - Sum hours/cost from timesheets
+- `aggregateAllocationsForProject()` - Sum budget from allocations
+- `getProjectBudgetStatus()` - Single project status
+- `getContractBudgetSummary()` - Contract-level aggregation
+- `getTenantBudgetOverview()` - Tenant-wide dashboard
+- `getBudgetTrends()` - Period-over-period analysis
+- `compareBudgetVsActualByDimension()` - Breakdown by department/client/manager
+
+**Tests** (`apps/api/src/modules/analytics/budget-tracking.service.test.ts`)
+- 60 comprehensive tests
+- Edge cases: zero budgets, empty data, negative variances
+- Alert generation for all threshold levels
+- Projection accuracy validation
+
+#### Added - Webhook Config Persistence (Backend)
+
+**Enhanced Webhook Service** (`apps/api/src/modules/webhooks/webhook.service.ts`)
+- Database persistence for webhook configurations
+- WebhookConfig, WebhookDelivery, WebhookRetry models
+- Event-based webhook dispatching
+
+**Features:**
+- Create/Update/Delete webhook configurations
+- Secret key generation and signature validation
+- Retry queue with exponential backoff
+- Delivery history with success/failure tracking
+- Batch event processing
+
+**Tests** (`apps/api/src/modules/webhooks/webhook.service.comprehensive.test.ts`)
+- 58 comprehensive tests
+- CRUD operations
+- Event matching logic
+- Retry mechanism
+- Signature validation
+
+---
+
 ### December 30, 2025 - Request Trigger Pipeline Complete
 
 #### Added - Event-to-Request Automation System

@@ -26,11 +26,16 @@ export const PERMISSIONS = {
   'allocations:delete': { module: 'allocations', action: 'delete', description: 'Delete allocations' },
   'allocations:approve': { module: 'allocations', action: 'approve', description: 'Approve allocations' },
   
-  // Timesheets
+  // Timesheets (plural - legacy)
   'timesheets:create': { module: 'timesheets', action: 'create', description: 'Create timesheets' },
   'timesheets:read': { module: 'timesheets', action: 'read', description: 'View timesheets' },
   'timesheets:update': { module: 'timesheets', action: 'update', description: 'Update timesheets' },
   'timesheets:approve': { module: 'timesheets', action: 'approve', description: 'Approve timesheets' },
+  
+  // Timesheet (singular - current)
+  'timesheet:read': { module: 'timesheet', action: 'read', description: 'View timesheets' },
+  'timesheet:write': { module: 'timesheet', action: 'write', description: 'Create/update timesheets' },
+  'timesheet:approve': { module: 'timesheet', action: 'approve', description: 'Approve/reject timesheets' },
   
   // Clients
   'clients:create': { module: 'clients', action: 'create', description: 'Create clients' },
@@ -57,12 +62,24 @@ export const PERMISSIONS = {
   'settings:read': { module: 'settings', action: 'read', description: 'View settings' },
   'settings:update': { module: 'settings', action: 'update', description: 'Update settings' },
   
-  // Roles
+  // Roles (plural - legacy)
   'roles:create': { module: 'roles', action: 'create', description: 'Create roles' },
   'roles:read': { module: 'roles', action: 'read', description: 'View roles' },
   'roles:update': { module: 'roles', action: 'update', description: 'Update roles' },
   'roles:delete': { module: 'roles', action: 'delete', description: 'Delete roles' },
   'roles:assign': { module: 'roles', action: 'assign', description: 'Assign roles to users' },
+  
+  // Role (singular - current)
+  'role:read': { module: 'role', action: 'read', description: 'View roles' },
+  'role:write': { module: 'role', action: 'write', description: 'Create/update roles' },
+  'role:delete': { module: 'role', action: 'delete', description: 'Delete roles' },
+  'role:assign': { module: 'role', action: 'assign', description: 'Assign/revoke roles' },
+  'role:admin': { module: 'role', action: 'admin', description: 'Full role administration' },
+  'role:audit': { module: 'role', action: 'audit', description: 'View role assignment audit' },
+  
+  // Audit (sensitive - admin only)
+  'audit:read': { module: 'audit', action: 'read', description: 'View audit logs (admin only)' },
+  'audit:export': { module: 'audit', action: 'export', description: 'Export audit logs (admin only)' },
   
   // CTC (Sensitive)
   'ctc:read:own': { module: 'ctc', action: 'read', scope: 'OWN', description: 'View own CTC' },
