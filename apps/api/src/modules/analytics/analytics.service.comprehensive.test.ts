@@ -20,6 +20,7 @@ vi.mock('../../lib/prisma', () => ({
     allocation: {
       findMany: vi.fn(),
       groupBy: vi.fn(),
+      count: vi.fn(),
     },
     client: {
       count: vi.fn(),
@@ -140,8 +141,8 @@ describe('Analytics Service - Comprehensive Tests', () => {
         code: 'ENG',
         targetUtilization: 80,
         resources: [
-          { status: 'ACTIVE', benchSince: null },
-          { status: 'ACTIVE', benchSince: new Date() },
+          { status: 'ACTIVE', benchSince: null, capacity: 100, allocations: [{ percentage: 80, isBillable: true }], skills: [{ skill: { name: 'React' } }] },
+          { status: 'ACTIVE', benchSince: new Date(), capacity: 100, allocations: [], skills: [] },
         ],
       },
       {
@@ -149,7 +150,7 @@ describe('Analytics Service - Comprehensive Tests', () => {
         name: 'Design',
         code: 'DES',
         targetUtilization: 75,
-        resources: [{ status: 'ACTIVE', benchSince: null }],
+        resources: [{ status: 'ACTIVE', benchSince: null, capacity: 100, allocations: [{ percentage: 60, isBillable: true }], skills: [] }],
       },
     ];
 
@@ -202,13 +203,14 @@ describe('Analytics Service - Comprehensive Tests', () => {
 
   describe('getFinancialMetrics', () => {
     const mockBenchResources = [
-      { benchSince: new Date('2024-01-01'), costPerHour: 1000 },
-      { benchSince: new Date('2024-06-01'), costPerHour: 1200 },
+      { benchSince: new Date('2024-01-01'), costPerHour: { toNumber: () => 1000 } },
+      { benchSince: new Date('2024-06-01'), costPerHour: { toNumber: () => 1200 } },
     ];
 
     it('ANLYT-011: should calculate monthly bench cost', async () => {
       vi.mocked(prisma.resource.findMany).mockResolvedValue(mockBenchResources as never);
       vi.mocked(prisma.allocation.groupBy).mockResolvedValue([]);
+      vi.mocked(prisma.allocation.count).mockResolvedValue(0);
       vi.mocked(prisma.practice.findMany).mockResolvedValue([]);
 
       const result = await analyticsService.getFinancialMetrics(mockTenantId);
@@ -219,6 +221,7 @@ describe('Analytics Service - Comprehensive Tests', () => {
     it('ANLYT-012: should calculate projected quarterly cost', async () => {
       vi.mocked(prisma.resource.findMany).mockResolvedValue(mockBenchResources as never);
       vi.mocked(prisma.allocation.groupBy).mockResolvedValue([]);
+      vi.mocked(prisma.allocation.count).mockResolvedValue(0);
       vi.mocked(prisma.practice.findMany).mockResolvedValue([]);
 
       const result = await analyticsService.getFinancialMetrics(mockTenantId);
@@ -231,6 +234,7 @@ describe('Analytics Service - Comprehensive Tests', () => {
     it('ANLYT-013: should return cost breakdown by practice', async () => {
       vi.mocked(prisma.resource.findMany).mockResolvedValue([]);
       vi.mocked(prisma.allocation.groupBy).mockResolvedValue([]);
+      vi.mocked(prisma.allocation.count).mockResolvedValue(0);
       vi.mocked(prisma.practice.findMany).mockResolvedValue([
         { name: 'Engineering', code: 'ENG' },
       ] as never);
@@ -243,6 +247,7 @@ describe('Analytics Service - Comprehensive Tests', () => {
     it('ANLYT-014: should return projections', async () => {
       vi.mocked(prisma.resource.findMany).mockResolvedValue([]);
       vi.mocked(prisma.allocation.groupBy).mockResolvedValue([]);
+      vi.mocked(prisma.allocation.count).mockResolvedValue(0);
       vi.mocked(prisma.practice.findMany).mockResolvedValue([]);
 
       const result = await analyticsService.getFinancialMetrics(mockTenantId);
@@ -325,8 +330,8 @@ describe('Analytics Service - Comprehensive Tests', () => {
         type: 'OFFICE',
         isOnshore: true,
         resources: [
-          { status: 'ACTIVE', benchSince: null },
-          { status: 'ACTIVE', benchSince: new Date() },
+          { status: 'ACTIVE', benchSince: null, capacity: 100, allocations: [{ percentage: 80, isBillable: true }] },
+          { status: 'ACTIVE', benchSince: new Date(), capacity: 100, allocations: [] },
         ],
       },
       {
@@ -335,7 +340,7 @@ describe('Analytics Service - Comprehensive Tests', () => {
         code: 'BLR',
         type: 'OFFICE',
         isOnshore: false,
-        resources: [{ status: 'ACTIVE', benchSince: null }],
+        resources: [{ status: 'ACTIVE', benchSince: null, capacity: 100, allocations: [{ percentage: 60, isBillable: true }] }],
       },
     ];
 

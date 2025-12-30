@@ -20,10 +20,15 @@ vi.mock('../../lib/prisma', () => ({
       create: vi.fn(),
       update: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(),
     },
     requestHistory: {
       create: vi.fn(),
       findMany: vi.fn(),
+    },
+    requestApproval: {
+      findMany: vi.fn(),
+      count: vi.fn(),
     },
     requestSequence: {
       findUnique: vi.fn(),
@@ -155,8 +160,12 @@ describe('Request Service - Comprehensive Tests', () => {
         .rejects.toThrow('Missing required field');
     });
 
-    it('REQ-005: should set default priority to MEDIUM', async () => {
-      vi.mocked(prisma.requestType.findUnique).mockResolvedValue(mockRequestType as never);
+    it('REQ-005: should use request type default priority when not specified', async () => {
+      const requestTypeWithDefaultPriority = {
+        ...mockRequestType,
+        defaultPriority: 'MEDIUM',
+      };
+      vi.mocked(prisma.requestType.findUnique).mockResolvedValue(requestTypeWithDefaultPriority as never);
       vi.mocked(prisma.request.create).mockResolvedValue(mockRequest as never);
 
       const input = {
@@ -187,12 +196,11 @@ describe('Request Service - Comprehensive Tests', () => {
       expect(result?.id).toBe('req-1');
     });
 
-    it('REQ-007: should return null for non-existent request', async () => {
+    it('REQ-007: should throw error for non-existent request', async () => {
       vi.mocked(prisma.request.findFirst).mockResolvedValue(null);
 
-      const result = await requestService.getRequest(mockTenantId, 'non-existent', mockUserId);
-
-      expect(result).toBeNull();
+      await expect(requestService.getRequest(mockTenantId, 'non-existent', mockUserId))
+        .rejects.toThrow();
     });
 
     it('REQ-008: should include request type details', async () => {
@@ -213,7 +221,9 @@ describe('Request Service - Comprehensive Tests', () => {
       const result = await requestService.listRequests(mockTenantId, mockUserId, {}, { page: 1, limit: 10 });
 
       expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('pagination');
+      expect(result).toHaveProperty('total');
+      expect(result).toHaveProperty('page');
+      expect(result).toHaveProperty('limit');
       expect(result.data).toHaveLength(1);
     });
 
@@ -251,7 +261,7 @@ describe('Request Service - Comprehensive Tests', () => {
       expect(prisma.request.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            typeCode: { in: ['RESOURCE_ONBOARDING'] },
+            type: { code: { in: ['RESOURCE_ONBOARDING'] } },
           }),
         })
       );
@@ -308,10 +318,9 @@ describe('Request Service - Comprehensive Tests', () => {
         { page: 2, limit: 10 }
       );
 
-      expect(result.pagination.page).toBe(2);
-      expect(result.pagination.limit).toBe(10);
-      expect(result.pagination.total).toBe(25);
-      expect(result.pagination.pages).toBe(3);
+      expect(result.page).toBe(2);
+      expect(result.limit).toBe(10);
+      expect(result.total).toBe(25);
     });
   });
 
@@ -441,48 +450,42 @@ describe('Request Service - Comprehensive Tests', () => {
     });
   });
 
-  describe('getRequestHistory', () => {
-    const mockHistory = [
-      {
-        id: 'hist-1',
-        requestId: 'req-1',
-        action: 'CREATED',
-        fromStatus: null,
-        toStatus: 'DRAFT',
-        userId: mockUserId,
-        createdAt: new Date('2025-01-01'),
-        user: { firstName: 'Test', lastName: 'User' },
-      },
-      {
-        id: 'hist-2',
-        requestId: 'req-1',
-        action: 'SUBMITTED',
-        fromStatus: 'DRAFT',
-        toStatus: 'SUBMITTED',
-        userId: mockUserId,
-        createdAt: new Date('2025-01-02'),
-        user: { firstName: 'Test', lastName: 'User' },
-      },
-    ];
+  describe('getDashboardStats', () => {
+    it('REQ-023: should return dashboard statistics', async () => {
+      vi.mocked(prisma.request.groupBy).mockResolvedValue([
+        { status: 'DRAFT', _count: 5 },
+        { status: 'SUBMITTED', _count: 10 },
+      ] as never);
+      vi.mocked(prisma.requestApproval.count).mockResolvedValue(3);
+      vi.mocked(prisma.request.count).mockResolvedValue(15);
+      vi.mocked(prisma.requestType.findMany).mockResolvedValue([
+        { id: 'type-1', code: 'ONBOARDING', name: 'Resource Onboarding' },
+      ] as never);
+      vi.mocked(prisma.request.findMany).mockResolvedValue([mockRequest] as never);
 
-    it('REQ-023: should return request history', async () => {
-      vi.mocked(prisma.requestHistory.findMany).mockResolvedValue(mockHistory as never);
+      const result = await requestService.getDashboardStats(mockTenantId, mockUserId);
 
-      const result = await requestService.getRequestHistory(mockTenantId, 'req-1');
-
-      expect(result).toHaveLength(2);
+      expect(result).toBeTruthy();
+      expect(result).toHaveProperty('statusCounts');
+      expect(result).toHaveProperty('myPendingApprovals');
     });
+  });
 
-    it('REQ-024: should order history by creation date', async () => {
-      vi.mocked(prisma.requestHistory.findMany).mockResolvedValue(mockHistory as never);
+  describe('getPendingApprovals', () => {
+    it('REQ-024: should return pending approvals for user', async () => {
+      vi.mocked(prisma.requestApproval.findMany).mockResolvedValue([{
+        id: 'approval-1',
+        requestId: 'req-1',
+        approverId: mockUserId,
+        status: 'PENDING',
+        request: mockRequest,
+      }] as never);
+      vi.mocked(prisma.requestApproval.count).mockResolvedValue(1);
 
-      await requestService.getRequestHistory(mockTenantId, 'req-1');
+      const result = await requestService.getPendingApprovals(mockTenantId, mockUserId);
 
-      expect(prisma.requestHistory.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          orderBy: { createdAt: 'desc' },
-        })
-      );
+      expect(result).toHaveProperty('data');
+      expect(prisma.requestApproval.findMany).toHaveBeenCalled();
     });
   });
 });

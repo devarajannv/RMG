@@ -4,6 +4,60 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### December 30, 2025 - Workflow Integration Complete
+
+#### Added - Request & Approval Workflow Integration
+
+**Request-Workflow Integration** (`apps/api/src/modules/requests/request.service.ts`)
+- `submitRequest()` now creates `RequestApproval` records for step 1 approvers
+- Calls `resolveApproversForRequest()` to determine dynamic approvers
+- Sends `REQUEST_ASSIGNED` notifications to pending approvers
+- Auto-approves when no approval chain exists or `requiresApproval=false`
+- Sets request status to `PENDING_APPROVAL` with `currentStepOrder=1`
+
+- `approveRequest()` now advances multi-step approval workflows
+- Updates approval record status to `APPROVED`
+- Creates new `RequestApproval` records for next step approvers
+- Advances `currentStepOrder` when current step is complete
+- Sets status to `APPROVED` when all steps complete
+- Notifies requester and triggers execution handlers on final approval
+
+- `rejectRequest()` terminates workflow properly
+- Sets all remaining pending approvals to `SKIPPED`
+- Notifies requester of rejection with comments
+
+**Approval Chain Resolver** (`apps/api/src/modules/requests/approval-chain.service.ts`)
+- Updated `ResolvedApprover` interface with `stepName` and `approverType`
+- Supports dynamic approver resolution: MANAGER, ROLE, USER, PROJECT_MANAGER, PRACTICE_HEAD, RESOURCE_MANAGER
+- Applies delegation rules when approver has active delegation
+- Returns complete approver metadata for `RequestApproval` records
+
+**New Test Suite** (`apps/api/src/modules/requests/workflow-integration.test.ts`)
+- 18 comprehensive integration tests covering:
+  - Submit creates RequestApproval records
+  - Manager approver resolution
+  - Notification delivery to approvers
+  - Auto-approve scenarios
+  - Multi-step progression
+  - Final approval marking
+  - Self-approval blocking
+  - Delegation support
+  - Rejection workflow termination
+  - Role-based approver resolution
+  - Error handling
+
+#### Fixed
+- `RequestApproval.create` now uses correct schema fields: `stepName`, `assignedVia`, `assignmentReason`
+- Removed invalid `isDelegated` field (delegation tracked via `delegatedFromId`)
+- Added missing `resource` relation include in request queries
+- Fixed notification function calls to use `createNotification()` and `notifyApprovalDecision()`
+
+#### Test Results
+- **1,397 API tests passing** (all existing + 18 new workflow tests)
+- **42 test files** with 100% module coverage
+
+---
+
 ### December 26, 2025 - Writer Complete (100%)
 
 #### Added - State Management & Streaming Infrastructure

@@ -54,6 +54,11 @@ describe('Dashboard Service - Comprehensive Tests', () => {
     beforeEach(() => {
       vi.mocked(prisma.resource.groupBy).mockResolvedValue(mockResourceStats as never);
       vi.mocked(prisma.resource.count).mockResolvedValue(8);
+      vi.mocked(prisma.resource.findMany).mockResolvedValue([
+        { capacity: 100, allocations: [{ percentage: 80, isBillable: true }] },
+        { capacity: 100, allocations: [{ percentage: 60, isBillable: true }] },
+        { capacity: 100, allocations: [] },
+      ] as never);
       vi.mocked(prisma.project.groupBy).mockResolvedValue(mockProjectStats as never);
       vi.mocked(prisma.allocation.count)
         .mockResolvedValueOnce(100) // active
@@ -168,7 +173,7 @@ describe('Dashboard Service - Comprehensive Tests', () => {
         designation: 'Senior Developer',
         band: 'B4',
         benchSince: new Date('2024-06-01'),
-        costPerHour: 1000,
+        costPerHour: { toNumber: () => 1000 }, // Prisma Decimal mock
         practice: { name: 'Engineering' },
         skills: [{ skill: { name: 'React' } }, { skill: { name: 'Node.js' } }],
         allocations: [{ project: { name: 'Project X' }, endDate: new Date('2024-05-31') }],
@@ -191,16 +196,16 @@ describe('Dashboard Service - Comprehensive Tests', () => {
         name: 'Engineering',
         targetUtilization: 80,
         resources: [
-          { status: 'ACTIVE', benchSince: null },
-          { status: 'ACTIVE', benchSince: null },
-          { status: 'ACTIVE', benchSince: new Date() },
+          { status: 'ACTIVE', benchSince: null, capacity: 100, allocations: [{ percentage: 80, isBillable: true }] },
+          { status: 'ACTIVE', benchSince: null, capacity: 100, allocations: [{ percentage: 60, isBillable: true }] },
+          { status: 'ACTIVE', benchSince: new Date(), capacity: 100, allocations: [] },
         ],
       },
       {
         id: 'p2',
         name: 'Design',
         targetUtilization: 75,
-        resources: [{ status: 'ACTIVE', benchSince: null }],
+        resources: [{ status: 'ACTIVE', benchSince: null, capacity: 100, allocations: [{ percentage: 100, isBillable: true }] }],
       },
     ];
 

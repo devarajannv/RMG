@@ -67,6 +67,8 @@ export interface ResolvedApprover {
   userId: string;
   stepId: string;
   stepOrder: number;
+  stepName: string;
+  approverType: ApproverType;
   reason: string;
   isDelegated?: boolean;
   delegatedFromId?: string;
@@ -703,6 +705,8 @@ async function resolveStepApprovers(
           userId: step.approverUserId,
           stepId: step.id,
           stepOrder: step.stepOrder,
+          stepName: step.name,
+          approverType: step.approverType,
           reason: `Assigned approver for step: ${step.name}`,
         });
       }
@@ -722,6 +726,8 @@ async function resolveStepApprovers(
               userId: ru.user.id,
               stepId: step.id,
               stepOrder: step.stepOrder,
+              stepName: step.name,
+              approverType: step.approverType,
               reason: `Role: ${step.approverRole?.name || 'Unknown'}`,
             });
           }
@@ -737,6 +743,8 @@ async function resolveStepApprovers(
           userId: managerId,
           stepId: step.id,
           stepOrder: step.stepOrder,
+          stepName: step.name,
+          approverType: step.approverType,
           reason: 'Direct Manager',
         });
       }
@@ -750,6 +758,8 @@ async function resolveStepApprovers(
           userId: pmId,
           stepId: step.id,
           stepOrder: step.stepOrder,
+          stepName: step.name,
+          approverType: step.approverType,
           reason: 'Project Manager',
         });
       }
@@ -776,6 +786,8 @@ async function resolveStepApprovers(
           userId: practiceLeadId,
           stepId: step.id,
           stepOrder: step.stepOrder,
+          stepName: step.name,
+          approverType: step.approverType,
           reason: 'Practice Lead',
         });
       }
@@ -789,6 +801,8 @@ async function resolveStepApprovers(
           userId: resourceMgrId,
           stepId: step.id,
           stepOrder: step.stepOrder,
+          stepName: step.name,
+          approverType: step.approverType,
           reason: 'Resource Manager',
         });
       }
@@ -802,6 +816,8 @@ async function resolveStepApprovers(
         userId: step.fallbackUserId,
         stepId: step.id,
         stepOrder: step.stepOrder,
+        stepName: step.name,
+        approverType: step.fallbackType,
         reason: 'Fallback Approver',
       });
     }

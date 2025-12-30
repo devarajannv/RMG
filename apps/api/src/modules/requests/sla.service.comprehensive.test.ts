@@ -30,6 +30,9 @@ vi.mock('../../lib/prisma', () => ({
       findMany: vi.fn(),
       create: vi.fn(),
     },
+    slaBreachEvent: {
+      count: vi.fn(),
+    },
     request: {
       findMany: vi.fn(),
       update: vi.fn(),
@@ -249,24 +252,21 @@ describe('SLA Service - Comprehensive Tests', () => {
   });
 
   describe('calculateBusinessHours', () => {
-    const defaultConfig = {
-      businessHours: [
-        { dayOfWeek: 1, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
-        { dayOfWeek: 2, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
-        { dayOfWeek: 3, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
-        { dayOfWeek: 4, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
-        { dayOfWeek: 5, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
-      ],
-      holidays: [] as Date[],
-      timezone: 'UTC',
-    };
+    const businessHours = [
+      { dayOfWeek: 1, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
+      { dayOfWeek: 2, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
+      { dayOfWeek: 3, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
+      { dayOfWeek: 4, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
+      { dayOfWeek: 5, startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
+    ];
+    const holidays: Date[] = [];
 
     it('SLA-012: should calculate hours within same day', () => {
       // Monday 10am to Monday 4pm = 6 hours
       const start = new Date('2025-01-06T10:00:00Z'); // Monday
       const end = new Date('2025-01-06T16:00:00Z'); // Same Monday
 
-      const result = slaService.calculateBusinessHours(defaultConfig, start, end);
+      const result = slaService.calculateBusinessHours(start, end, businessHours, holidays);
 
       expect(result).toBeGreaterThanOrEqual(0);
     });
@@ -276,7 +276,7 @@ describe('SLA Service - Comprehensive Tests', () => {
       const start = new Date('2025-01-03T17:00:00Z'); // Friday
       const end = new Date('2025-01-06T10:00:00Z'); // Monday
 
-      const result = slaService.calculateBusinessHours(defaultConfig, start, end);
+      const result = slaService.calculateBusinessHours(start, end, businessHours, holidays);
 
       // Should be less than 9 hours (one business day)
       expect(result).toBeLessThan(9 * 60); // In minutes
@@ -285,7 +285,7 @@ describe('SLA Service - Comprehensive Tests', () => {
     it('SLA-014: should return 0 for identical times', () => {
       const start = new Date('2025-01-06T10:00:00Z');
 
-      const result = slaService.calculateBusinessHours(defaultConfig, start, start);
+      const result = slaService.calculateBusinessHours(start, start, businessHours, holidays);
 
       expect(result).toBe(0);
     });
@@ -304,6 +304,17 @@ describe('SLA Service - Comprehensive Tests', () => {
 
   describe('getSlaComplianceReport', () => {
     it('SLA-016: should return compliance report', async () => {
+      vi.mocked(prisma.businessHoursConfig.findFirst).mockResolvedValue({
+        id: 'config-1',
+        tenantId: mockTenantId,
+        startHour: 9,
+        startMinute: 0,
+        endHour: 18,
+        endMinute: 0,
+        workDays: [1, 2, 3, 4, 5],
+        timezone: 'UTC',
+      } as never);
+      vi.mocked(prisma.holiday.findMany).mockResolvedValue([]);
       vi.mocked(prisma.request.findMany).mockResolvedValue([
         {
           id: 'r1',
@@ -311,18 +322,26 @@ describe('SLA Service - Comprehensive Tests', () => {
           firstResponseAt: new Date(),
           responseDeadline: new Date(),
           completedAt: new Date(),
+          submittedAt: new Date(),
+          resolvedAt: new Date(),
+          type: { code: 'TEST' },
+          priority: 'MEDIUM',
         },
       ] as never);
       vi.mocked(prisma.slaBreachLog.findMany).mockResolvedValue([]);
 
-      const result = await slaService.getSlaComplianceReport(mockTenantId, {
-        startDate: new Date('2025-01-01'),
-        endDate: new Date('2025-01-31'),
-      });
+      // Mock slaBreachEvent.count for the compliance check
+      const slaBreachEventMock = prisma as unknown as { slaBreachEvent: { count: ReturnType<typeof vi.fn> } };
+      slaBreachEventMock.slaBreachEvent.count.mockResolvedValue(0);
+
+      const startDate = new Date('2025-01-01');
+      const endDate = new Date('2025-01-31');
+      
+      const result = await slaService.getSlaComplianceReport(mockTenantId, startDate, endDate);
 
       expect(result).toHaveProperty('totalRequests');
-      expect(result).toHaveProperty('onTimeCount');
-      expect(result).toHaveProperty('breachedCount');
+      expect(result).toHaveProperty('completedOnTime');
+      expect(result).toHaveProperty('completedLate');
     });
   });
 });

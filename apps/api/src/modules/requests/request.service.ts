@@ -7,6 +7,11 @@ import { Prisma, RequestStatus, Priority, RequestAction } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
+import {
+  resolveApproversForRequest,
+  findApprovalChainForRequestType,
+} from './approval-chain.service';
+import { createNotification, notifyApprovalDecision } from './notification.service';
 
 // ============================================================================
 // Types
@@ -595,6 +600,9 @@ export async function submitRequest(
           tenantConfigs: { where: { tenantId } },
         },
       },
+      resource: {
+        select: { id: true, practiceId: true },
+      },
     },
   });
 
@@ -651,16 +659,76 @@ export async function submitRequest(
   // Get approval chain
   const approvalChainId = tenantConfig?.approvalChainId;
   let approvalChainVersion: number | null = null;
+  let createdApprovals: { approverId: string; stepOrder: number }[] = [];
 
-  if (request.type.requiresApproval && approvalChainId) {
-    const chain = await prisma.approvalChain.findUnique({
-      where: { id: approvalChainId },
-      select: { version: true },
-    });
-    approvalChainVersion = chain?.version || null;
-    newStatus = 'PENDING_APPROVAL';
+  if (request.type.requiresApproval) {
+    // Find the appropriate approval chain
+    let chainId = approvalChainId;
+    
+    if (!chainId) {
+      // Try to find a chain for this request type
+      const chain = await findApprovalChainForRequestType(
+        tenantId,
+        request.type.id,
+        request.resource?.practiceId || undefined
+      );
+      if (chain) {
+        chainId = (chain as { id: string }).id;
+      }
+    }
 
-    // TODO: Create approval records based on chain steps
+    if (chainId) {
+      const chain = await prisma.approvalChain.findUnique({
+        where: { id: chainId },
+        select: { id: true, version: true, status: true },
+      });
+      
+      if (chain && chain.status === 'PUBLISHED') {
+        approvalChainVersion = chain.version;
+        newStatus = 'PENDING_APPROVAL';
+
+        // Resolve approvers for this request
+        const resolvedApprovers = await resolveApproversForRequest(tenantId, requestId, chainId);
+
+        // Create RequestApproval records for step 1
+        const step1Approvers = resolvedApprovers.filter(a => a.stepOrder === 1);
+        
+        for (const approver of step1Approvers) {
+          await prisma.requestApproval.create({
+            data: {
+              requestId,
+              stepId: approver.stepId,
+              stepOrder: approver.stepOrder,
+              stepName: approver.stepName,
+              approverId: approver.userId,
+              assignedVia: approver.approverType,
+              assignmentReason: approver.reason,
+              status: 'PENDING',
+              delegatedFromId: approver.delegatedFromId,
+            },
+          });
+          createdApprovals.push({
+            approverId: approver.userId,
+            stepOrder: approver.stepOrder,
+          });
+        }
+
+        // Update chainId to use the resolved one
+        if (!approvalChainId) {
+          // Will update the request with the found chain
+        }
+      } else if (!chain) {
+        logger.warn(`Approval chain ${chainId} not found, submitting without approval`, { requestId });
+        newStatus = 'APPROVED';
+      } else {
+        logger.warn(`Approval chain ${chainId} not published, submitting without approval`, { requestId });
+        newStatus = 'APPROVED';
+      }
+    } else {
+      // No approval chain configured - auto-approve
+      logger.info(`No approval chain configured for request type ${request.type.code}, auto-approving`, { requestId });
+      newStatus = 'APPROVED';
+    }
   }
 
   const updated = await prisma.request.update({
@@ -689,10 +757,37 @@ export async function submitRequest(
     tenantId,
     userId,
     newStatus,
+    approversCreated: createdApprovals.length,
   });
 
-  // TODO: Create notifications for approvers
-  // TODO: If auto-approved, trigger execution handler
+  // Send notifications to approvers
+  if (createdApprovals.length > 0) {
+    for (const approval of createdApprovals) {
+      try {
+        await createNotification({
+          userId: approval.approverId,
+          tenantId,
+          type: 'REQUEST_ASSIGNED',
+          title: `Approval required: ${request.requestNumber}`,
+          message: `Request "${request.title}" requires your approval (Step ${approval.stepOrder})`,
+          requestId,
+          actionUrl: `/requests/${requestId}`,
+        });
+      } catch (err) {
+        logger.error('Failed to send approval notification', { 
+          requestId, 
+          approverId: approval.approverId,
+          error: err 
+        });
+      }
+    }
+  }
+
+  // If auto-approved (no approval required or no chain), trigger execution handler
+  if (newStatus === 'APPROVED' && request.type.onApprovalHandler) {
+    logger.info(`Request auto-approved, handler: ${request.type.onApprovalHandler}`, { requestId });
+    // TODO: Trigger execution handler asynchronously
+  }
 
   return updated as unknown as Record<string, unknown>;
 }
@@ -710,6 +805,11 @@ export async function approveRequest(
     where: { id: requestId, tenantId, deletedAt: null },
     include: {
       type: true,
+      approvalChain: {
+        include: {
+          steps: { orderBy: { stepOrder: 'asc' } },
+        },
+      },
       approvals: {
         where: { approverId: userId, status: 'PENDING' },
       },
@@ -725,10 +825,38 @@ export async function approveRequest(
   }
 
   // Check if user has a pending approval
-  const pendingApproval = request.approvals[0];
+  let pendingApproval = request.approvals[0];
+  
   if (!pendingApproval) {
-    // Check for delegation
-    // TODO: Check delegation table for this user
+    // Check for delegation - user might be a delegate
+    const delegation = await prisma.delegation.findFirst({
+      where: {
+        delegateId: userId,
+        approvalStatus: 'APPROVED',
+        revokedAt: null,
+        startDate: { lte: new Date() },
+        endDate: { gte: new Date() },
+      },
+      select: { delegatorId: true },
+    });
+
+    if (delegation) {
+      // Check if delegator has pending approval
+      const delegatorApproval = await prisma.requestApproval.findFirst({
+        where: {
+          requestId,
+          approverId: delegation.delegatorId,
+          status: 'PENDING',
+        },
+      });
+      
+      if (delegatorApproval) {
+        pendingApproval = delegatorApproval;
+      }
+    }
+  }
+
+  if (!pendingApproval) {
     throw new ApiError('You do not have a pending approval for this request', 403, 'NO_PENDING_APPROVAL');
   }
 
@@ -738,6 +866,7 @@ export async function approveRequest(
   }
 
   const now = new Date();
+  const currentStepOrder = pendingApproval.stepOrder;
 
   // Update the approval record
   await prisma.requestApproval.update({
@@ -754,18 +883,68 @@ export async function approveRequest(
   // Check if this was the first response (for SLA tracking)
   const isFirstResponse = !request.firstResponseAt;
 
-  // Check if more approvals needed
-  const remainingApprovals = await prisma.requestApproval.count({
+  // Check if more approvals needed at current step
+  const remainingAtCurrentStep = await prisma.requestApproval.count({
     where: {
       requestId,
+      stepOrder: currentStepOrder,
       status: 'PENDING',
     },
   });
 
   let newStatus: RequestStatus = 'PENDING_APPROVAL';
-  
-  if (remainingApprovals === 0) {
-    newStatus = 'APPROVED';
+  let nextStepOrder = currentStepOrder;
+  const newApprovals: { approverId: string; stepOrder: number }[] = [];
+
+  // If current step is complete, move to next step
+  if (remainingAtCurrentStep === 0) {
+    // Find the next step in the approval chain
+    const nextStep = request.approvalChain?.steps.find(s => s.stepOrder > currentStepOrder);
+
+    if (nextStep) {
+      // Advance to next step
+      nextStepOrder = nextStep.stepOrder;
+
+      // Resolve approvers for next step
+      if (request.approvalChainId) {
+        const resolvedApprovers = await resolveApproversForRequest(tenantId, requestId, request.approvalChainId);
+        const nextStepApprovers = resolvedApprovers.filter(a => a.stepOrder === nextStepOrder);
+
+        // Create approval records for next step
+        for (const approver of nextStepApprovers) {
+          await prisma.requestApproval.create({
+            data: {
+              requestId,
+              stepId: approver.stepId,
+              stepOrder: approver.stepOrder,
+              stepName: approver.stepName,
+              approverId: approver.userId,
+              assignedVia: approver.approverType,
+              assignmentReason: approver.reason,
+              status: 'PENDING',
+              delegatedFromId: approver.delegatedFromId,
+            },
+          });
+          newApprovals.push({
+            approverId: approver.userId,
+            stepOrder: approver.stepOrder,
+          });
+        }
+
+        // If no approvers for next step (e.g., skip condition), keep advancing
+        if (nextStepApprovers.length === 0) {
+          logger.info(`No approvers for step ${nextStepOrder}, skipping`, { requestId });
+          // Recursively check for more steps or mark as approved
+          const furtherSteps = request.approvalChain?.steps.filter(s => s.stepOrder > nextStepOrder);
+          if (!furtherSteps || furtherSteps.length === 0) {
+            newStatus = 'APPROVED';
+          }
+        }
+      }
+    } else {
+      // No more steps - fully approved!
+      newStatus = 'APPROVED';
+    }
   }
 
   // Update request
@@ -775,7 +954,7 @@ export async function approveRequest(
       status: newStatus,
       firstResponseAt: isFirstResponse ? now : request.firstResponseAt,
       resolvedAt: newStatus === 'APPROVED' ? now : null,
-      currentStepOrder: { increment: 1 },
+      currentStepOrder: nextStepOrder,
     },
     include: {
       type: { select: { code: true, name: true } },
@@ -786,19 +965,64 @@ export async function approveRequest(
   // Record history
   await recordHistory(requestId, userId, 'APPROVED', 'PENDING_APPROVAL', newStatus, {
     approvalId: pendingApproval.id,
-    stepOrder: pendingApproval.stepOrder,
+    stepOrder: currentStepOrder,
+    nextStepOrder: nextStepOrder !== currentStepOrder ? nextStepOrder : undefined,
     comments: input.comments,
   });
 
-  logger.info(`Request approved: ${request.requestNumber}`, {
+  logger.info(`Request approved at step ${currentStepOrder}: ${request.requestNumber}`, {
     requestId,
     tenantId,
     userId,
+    currentStep: currentStepOrder,
+    nextStep: nextStepOrder,
     newStatus,
   });
 
-  // TODO: If fully approved, trigger execution handler
-  // TODO: Create notifications
+  // Send notifications to next step approvers
+  if (newApprovals.length > 0) {
+    for (const approval of newApprovals) {
+      try {
+        await createNotification({
+          userId: approval.approverId,
+          tenantId,
+          type: 'REQUEST_ASSIGNED',
+          title: `Approval required: ${request.requestNumber}`,
+          message: `Request "${request.title}" requires your approval (Step ${approval.stepOrder})`,
+          requestId,
+          actionUrl: `/requests/${requestId}`,
+        });
+      } catch (err) {
+        logger.error('Failed to send approval notification', { requestId, approverId: approval.approverId, error: err });
+      }
+    }
+  }
+
+  // If fully approved, notify requester and trigger execution
+  if (newStatus === 'APPROVED') {
+    try {
+      await notifyApprovalDecision(
+        {
+          id: requestId,
+          requestNumber: request.requestNumber,
+          title: request.title,
+          requesterId: request.requesterId,
+          tenantId,
+        },
+        'APPROVED',
+        { id: userId, name: 'Approver' }, // TODO: Fetch actual user name
+        input.comments
+      );
+    } catch (err) {
+      logger.error('Failed to send approval notification to requester', { requestId, error: err });
+    }
+
+    // Trigger execution handler if configured
+    if (request.type.onApprovalHandler) {
+      logger.info(`Request fully approved, handler: ${request.type.onApprovalHandler}`, { requestId });
+      // TODO: Trigger execution handler asynchronously
+    }
+  }
 
   return updated as unknown as Record<string, unknown>;
 }
@@ -819,6 +1043,7 @@ export async function rejectRequest(
   const request = await prisma.request.findFirst({
     where: { id: requestId, tenantId, deletedAt: null },
     include: {
+      type: { select: { code: true, name: true } },
       approvals: {
         where: { approverId: userId, status: 'PENDING' },
       },
@@ -894,7 +1119,23 @@ export async function rejectRequest(
     userId,
   });
 
-  // TODO: Create notifications
+  // Notify requester of rejection
+  try {
+    await notifyApprovalDecision(
+      {
+        id: requestId,
+        requestNumber: request.requestNumber,
+        title: request.title,
+        requesterId: request.requesterId,
+        tenantId,
+      },
+      'REJECTED',
+      { id: userId, name: 'Approver' }, // TODO: Fetch actual user name
+      input.comments
+    );
+  } catch (err) {
+    logger.error('Failed to send rejection notification', { requestId, error: err });
+  }
 
   return updated as unknown as Record<string, unknown>;
 }
