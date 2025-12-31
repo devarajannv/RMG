@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rmgaas
+  labels:
+    app.kubernetes.io/name: rmgaas
+    app.kubernetes.io/part-of: rmgaas-platform

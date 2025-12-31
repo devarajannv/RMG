@@ -13,6 +13,18 @@ WRITER = Core Product (MUST work without AI)
 SCRIBE = AI Layer (Accelerates everything, never required)
 ```
 
+### Two-Portal Architecture
+
+```
+PLATFORM PORTAL (platform.product.com) = NewVision internal admin
+  - Tenant provisioning, billing, support tools
+  - NOT BUILT YET (Phase 1.5 in roadmap)
+
+TENANT APP (app.product.com) = Customer-facing application
+  - All users including tenant admins
+  - Organization Onboarding lives here
+```
+
 ### The Litmus Test
 
 > "If OpenAI's API went down for a week, would users still be productive?"
@@ -36,17 +48,35 @@ SCRIBE = AI Layer (Accelerates everything, never required)
 5. Access data user cannot see
 6. Submit without user review
 
+## 🚨 Current Critical Blocker
+
+**Organization Onboarding Module is MISSING.**
+
+Features like Workflow Builder have empty dropdowns because foundational data (roles, org structure, users) doesn't exist for new tenants.
+
+**This is Phase 0 in the roadmap - must be built first.**
+
 ## Current State
 
 - **Backend:** 22 modules, 99 endpoints, 55 models - SOLID
-- **Frontend:** 18 pages, missing Request UI & Workflow Builder
+- **Frontend:** 18 pages, Workflow Builder exists but non-functional without org data
 - **AI:** 100% SIMULATED - no real LLM calls exist
+- **Platform Portal:** NOT STARTED
+- **Org Onboarding:** NOT STARTED ← **BLOCKING**
 
-## Implementation Priority
+## Implementation Priority (Updated Dec 31, 2025)
 
-1. Complete traditional UI (Request Flow, Workflow Builder)
-2. Add permission system to frontend
-3. Then add real AI layer
+1. **Phase 0:** Organization Onboarding Module (BLOCKING)
+   - Org Identity, Structure, Roles, People Setup flows
+   - Without this, product cannot be used
+   
+2. **Phase 1.5:** Platform Portal (Minimum Viable)
+   - Tenant provisioning for NewVision staff
+   - Without this, can't onboard customers
+   
+3. **Phase 2:** AI Layer
+   - LLM integration, onboarding agent
+   - Accelerates but not required
 
 ## Key Files
 

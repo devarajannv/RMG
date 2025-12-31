@@ -1,6 +1,8 @@
 # RMGaaS Deployment Guide
 
 > Production deployment instructions for RMGaaS
+> 
+> **Last Updated:** December 30, 2025
 
 ---
 
@@ -10,10 +12,11 @@
 2. [Server Setup](#server-setup)
 3. [Configuration](#configuration)
 4. [Deployment](#deployment)
-5. [SSL/TLS Setup](#ssltls-setup)
-6. [Monitoring](#monitoring)
-7. [Backup & Recovery](#backup--recovery)
-8. [Troubleshooting](#troubleshooting)
+5. [Makefile Commands (NEW)](#makefile-commands)
+6. [SSL/TLS Setup](#ssltls-setup)
+7. [Monitoring](#monitoring)
+8. [Backup & Recovery](#backup--recovery)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -169,6 +172,93 @@ docker compose -f docker-compose.prod.yml logs -f
 # Test health endpoint
 curl https://api.rmgaas.newvision.in/health
 ```
+
+---
+
+## Makefile Commands (NEW)
+
+A Makefile is provided for common Docker operations:
+
+### Development
+
+```bash
+# Start development environment (hot reload enabled)
+make dev
+
+# Stop development environment
+make dev-down
+```
+
+### Staging
+
+```bash
+# Start staging environment (production-like, no hot reload)
+make staging
+
+# Stop staging environment
+make staging-down
+```
+
+### Production
+
+```bash
+# Start production environment
+make prod
+
+# Stop production environment
+make prod-down
+
+# Deploy with build
+make deploy
+```
+
+### Database Operations
+
+```bash
+# Run database migrations
+make db-migrate
+
+# Seed database
+make db-seed
+
+# Reset database (destructive!)
+make db-reset
+```
+
+### Utility Commands
+
+```bash
+# View logs (all services)
+make logs
+
+# View specific service logs
+make logs-api
+make logs-frontend
+
+# Clean up containers and volumes
+make clean
+
+# Docker system prune
+make prune
+
+# Shell into API container
+make shell-api
+
+# Shell into database container
+make shell-db
+```
+
+### Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `make dev` | Start development environment |
+| `make staging` | Start staging environment |
+| `make prod` | Start production environment |
+| `make logs` | Tail all container logs |
+| `make db-migrate` | Run Prisma migrations |
+| `make clean` | Remove containers and volumes |
+| `make prune` | Docker system prune |
 
 ---
 

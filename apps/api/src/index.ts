@@ -36,6 +36,8 @@ import { requestRoutes, requestTypesRoutes, approvalChainRoutes, delegationRoute
 import { userRoutes } from './modules/users';
 import { auditRoutes } from './modules/audit';
 import { organizationRoutes } from './modules/organization';
+import { healthRoutes, recordRequest, incrementConnections, decrementConnections } from './modules/health';
+import { onboardingRoutes } from './modules/onboarding';
 
 const app = express();
 
@@ -80,14 +82,21 @@ app.use(cookieParser(config.cookieSecret));
 // Request logging
 app.use(requestLogger);
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '0.1.0',
+// Track connections for metrics
+app.use((req, res, next) => {
+  incrementConnections();
+  const startTime = Date.now();
+  
+  res.on('finish', () => {
+    decrementConnections();
+    recordRequest(req.method, res.statusCode, Date.now() - startTime);
   });
+  
+  next();
 });
+
+// Health check routes (comprehensive Kubernetes-compatible endpoints)
+app.use('/health', healthRoutes);
 
 // API Info
 app.get('/api/v1', (_req, res) => {
@@ -145,6 +154,7 @@ app.use('/api/v1/triggers', triggerRoutes);
 app.use('/api/v1/webhooks/inbound', inboundWebhookRoutes);  // Public endpoint for receiving webhooks
 app.use('/api/v1/audit-logs', auditRoutes);
 app.use('/api/v1/organization', organizationRoutes);
+app.use('/api/v1/onboarding', onboardingRoutes);
 
 // Error handling
 app.use(errorHandler);

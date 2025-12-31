@@ -23,6 +23,7 @@ import {
   ClipboardList,
   CheckSquare,
   GitBranch,
+  Rocket,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -180,6 +181,13 @@ const navSections: NavSection[] = [
     title: 'Administration',
     permissions: [PERMISSIONS.SETTINGS_READ, PERMISSIONS.ROLES_READ],
     items: [
+      { 
+        icon: Rocket, 
+        label: 'Onboarding', 
+        href: '/onboarding',
+        permissions: PERMISSIONS.SETTINGS_UPDATE,
+        adminOnly: true,
+      },
       { 
         icon: Database, 
         label: 'Data Management', 

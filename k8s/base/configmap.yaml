@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rmgaas-config
+  namespace: rmgaas
+  labels:
+    app.kubernetes.io/name: rmgaas
+    app.kubernetes.io/component: config
+data:
+  # Application Environment
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  
+  # URLs (override in environment-specific overlays)
+  API_PORT: "4000"
+  FRONTEND_PORT: "3000"
+  
+  # Database Configuration (non-sensitive)
+  DB_POOL_MIN: "2"
+  DB_POOL_MAX: "10"
+  
+  # Redis Configuration (non-sensitive)
+  REDIS_KEY_PREFIX: "rmgaas:"
+  REDIS_DEFAULT_TTL: "3600"
+  
+  # Rate Limiting
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  
+  # CORS Settings
+  CORS_ENABLED: "true"
+  
+  # Feature Flags
+  FEATURE_AI_ENABLED: "false"
+  FEATURE_WEBHOOKS_ENABLED: "true"
+  FEATURE_AUDIT_LOG_ENABLED: "true"
+  
+  # Pagination Defaults
+  DEFAULT_PAGE_SIZE: "20"
+  MAX_PAGE_SIZE: "100"

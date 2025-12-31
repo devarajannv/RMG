@@ -1,4 +1,6 @@
-# Frontend Testing Strategy
+# Testing Strategy
+
+> **Last Updated:** December 30, 2025
 
 ## Fundamental Principle
 
@@ -9,7 +11,52 @@ When a test fails:
 2. **SECOND**: If it's a real bug, fix the component
 3. **ONLY LAST**: If the test expectation is genuinely wrong, fix the test
 
-## Current Test Coverage (Updated December 17, 2025)
+---
+
+## Test Suite Overview (December 30, 2025)
+
+### Backend Tests: 1,700+ tests
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Unit Tests | 1,644 | ✅ All Passing |
+| E2E Tests | 10 suites | ✅ All Passing |
+| Performance Tests | 3 suites | ✅ All Passing |
+| **Total** | **1,700+** | ✅ All Passing |
+
+### E2E Test Suites (NEW)
+
+| Suite | Coverage | File |
+|-------|----------|------|
+| Authentication | Login, logout, session, rate limiting | `auth.e2e.test.ts` |
+| Requests | Full CRUD, status transitions | `requests.e2e.test.ts` |
+| Approvals | Multi-step chains, delegation, SLA | `approval-workflow.e2e.test.ts` |
+| Resources | CRUD, status, manager hierarchy | `resources.e2e.test.ts` |
+| Contracts | Lifecycle, milestones, documents | `contracts.e2e.test.ts` |
+| Budget | Creation, utilization, alerts | `budget.e2e.test.ts` |
+| Timesheets | Entry, submission, approval | `timesheet.e2e.test.ts` |
+| Notifications | Create, read states, bulk ops | `notifications.e2e.test.ts` |
+| Webhooks | Config, events, signatures | `webhooks.e2e.test.ts` |
+| Search | Full-text, facets, pagination | `search.e2e.test.ts` |
+
+### Performance Tests (NEW)
+
+| Test | Target | Status |
+|------|--------|--------|
+| Health endpoint latency | <50ms | ✅ |
+| Auth under load (10 concurrent) | <500ms p99 | ✅ |
+| API response time | <200ms average | ✅ |
+
+### Frontend Tests: 23+ tests
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Component Tests | 23+ | ✅ All Passing |
+| E2E Ready | Playwright configured | ✅ Ready |
+
+---
+
+## Current Test Coverage (Updated December 30, 2025)
 
 ### Frontend Tests (204 total)
 

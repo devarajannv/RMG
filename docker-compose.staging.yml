@@ -1,0 +1,190 @@
+version: '3.8'
+
+# =============================================================================
+# RMGaaS Staging Docker Compose
+# =============================================================================
+# For staging/QA environment with debugging capabilities
+# Usage:
+#   docker-compose -f docker-compose.staging.yml up -d
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database (Staging)
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: rmgaas-postgres-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-rmgaas_staging}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-staging_password}
+      POSTGRES_DB: ${DB_NAME:-rmgaas_staging}
+    ports:
+      - '5433:5432'  # Different port for staging
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-rmgaas_staging} -d ${DB_NAME:-rmgaas_staging}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rmgaas-staging
+
+  # ===========================================================================
+  # Redis Cache (Staging)
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: rmgaas-redis-staging
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - '6380:6379'  # Different port for staging
+    volumes:
+      - redis_staging_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rmgaas-staging
+
+  # ===========================================================================
+  # API Server (Staging)
+  # ===========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/api.Dockerfile
+      target: production
+    image: rmgaas/api:staging
+    container_name: rmgaas-api-staging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: staging
+      PORT: 4000
+      DATABASE_URL: postgresql://${DB_USER:-rmgaas_staging}:${DB_PASSWORD:-staging_password}@postgres:5432/${DB_NAME:-rmgaas_staging}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-staging-jwt-secret-change-in-production-32chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-staging-jwt-refresh-secret-32chars}
+      COOKIE_SECRET: ${COOKIE_SECRET:-staging-cookie-secret-change-prod-32char}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,https://staging.rmgaas.newvision.in}
+      LOG_LEVEL: debug
+      # Enable debug features
+      DEBUG: true
+      ENABLE_SWAGGER: true
+    ports:
+      - '4001:4000'  # Different port for staging
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:4000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - rmgaas-staging
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ===========================================================================
+  # Frontend (Staging)
+  # ===========================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend.Dockerfile
+      target: production
+      args:
+        VITE_API_URL: ${API_URL:-http://localhost:4001}/api/v1
+        VITE_APP_ENV: staging
+    image: rmgaas/frontend:staging
+    container_name: rmgaas-frontend-staging
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '3001:80'  # Different port for staging
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:80/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - rmgaas-staging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Maildev (Email Testing)
+  # ===========================================================================
+  maildev:
+    image: maildev/maildev
+    container_name: rmgaas-maildev-staging
+    restart: unless-stopped
+    ports:
+      - '1080:1080'  # Web UI
+      - '1025:1025'  # SMTP
+    networks:
+      - rmgaas-staging
+
+  # ===========================================================================
+  # Adminer (Database Admin)
+  # ===========================================================================
+  adminer:
+    image: adminer
+    container_name: rmgaas-adminer-staging
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - '8080:8080'
+    networks:
+      - rmgaas-staging
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+  # ===========================================================================
+  # Redis Commander (Redis Admin)
+  # ===========================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: rmgaas-redis-commander-staging
+    restart: unless-stopped
+    depends_on:
+      - redis
+    ports:
+      - '8081:8081'
+    networks:
+      - rmgaas-staging
+    environment:
+      REDIS_HOSTS: local:redis:6379
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_staging_data:
+    driver: local
+  redis_staging_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  rmgaas-staging:
+    driver: bridge

@@ -16,6 +16,14 @@
     "lint:fix": "turbo lint:fix",
     "type-check": "turbo type-check",
     "test": "turbo test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:firefox": "playwright test --project=firefox",
+    "test:e2e:webkit": "playwright test --project=webkit",
+    "test:e2e:report": "playwright show-report",
     "clean": "turbo clean && rm -rf node_modules",
     "db:migrate": "npm run migrate --workspace=@rmgaas/api",
     "db:generate": "npm run generate --workspace=@rmgaas/api",
@@ -29,6 +37,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.6.0",
+    "@playwright/test": "^1.57.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "turbo": "^2.3.3",
@@ -49,5 +58,3 @@
     ]
   }
 }
-
-

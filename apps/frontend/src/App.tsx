@@ -1,48 +1,55 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { Toaster } from '@/components/ui/toaster';
 import { AgentWidget, CommandPalette } from '@/components/agent';
 
-// Pages
-import LoginPage from '@/pages/LoginPage';
-import DashboardPage from '@/pages/DashboardPage';
-import ResourcesPage from '@/pages/ResourcesPage';
-import ResourceDetailPage from '@/pages/ResourceDetailPage';
-import ProjectsPage from '@/pages/ProjectsPage';
-import AllocationsPage from '@/pages/AllocationsPage';
-import ClientsPage from '@/pages/ClientsPage';
-import BenchAnalysisPage from '@/pages/BenchAnalysisPage';
-import ReportsPage from '@/pages/ReportsPage';
-import ContractsPage from '@/pages/ContractsPage';
-import ContractDetailPage from '@/pages/ContractDetailPage';
-import TimesheetsPage from '@/pages/TimesheetsPage';
-import SmartSearchPage from '@/pages/SmartSearchPage';
-import AnalyticsPage from '@/pages/AnalyticsPage';
-import ExportImportPage from '@/pages/ExportImportPage';
-import SettingsPage from '@/pages/SettingsPage';
-import ProjectDetailPage from '@/pages/ProjectDetailPage';
-import ClientDetailPage from '@/pages/ClientDetailPage';
-import RequestsPage from '@/pages/RequestsPage';
-import RequestDetailPage from '@/pages/RequestDetailPage';
-import WorkflowBuilderPage from '@/pages/WorkflowBuilderPage';
+// Loading spinner component
+function LoadingSpinner() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    </div>
+  );
+}
+
+// Lazy loaded pages - code splitting for optimal bundle size
+const LoginPage = lazy(() => import('@/pages/LoginPage'));
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const ResourcesPage = lazy(() => import('@/pages/ResourcesPage'));
+const ResourceDetailPage = lazy(() => import('@/pages/ResourceDetailPage'));
+const ProjectsPage = lazy(() => import('@/pages/ProjectsPage'));
+const ProjectDetailPage = lazy(() => import('@/pages/ProjectDetailPage'));
+const AllocationsPage = lazy(() => import('@/pages/AllocationsPage'));
+const ClientsPage = lazy(() => import('@/pages/ClientsPage'));
+const ClientDetailPage = lazy(() => import('@/pages/ClientDetailPage'));
+const BenchAnalysisPage = lazy(() => import('@/pages/BenchAnalysisPage'));
+const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
+const ContractsPage = lazy(() => import('@/pages/ContractsPage'));
+const ContractDetailPage = lazy(() => import('@/pages/ContractDetailPage'));
+const TimesheetsPage = lazy(() => import('@/pages/TimesheetsPage'));
+const SmartSearchPage = lazy(() => import('@/pages/SmartSearchPage'));
+const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'));
+const ExportImportPage = lazy(() => import('@/pages/ExportImportPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const RequestsPage = lazy(() => import('@/pages/RequestsPage'));
+const RequestDetailPage = lazy(() => import('@/pages/RequestDetailPage'));
+const WorkflowBuilderPage = lazy(() => import('@/pages/WorkflowBuilderPage'));
+const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'));
 
 // Auth guard component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasHydrated } = useAuthStore();
 
   if (!hasHydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>;
 }
 
 // Public route - redirect if already authenticated
@@ -50,18 +57,14 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasHydrated } = useAuthStore();
 
   if (!hasHydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>;
 }
 
 function App() {
@@ -230,6 +233,14 @@ function App() {
           element={
             <ProtectedRoute>
               <WorkflowBuilderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <OnboardingPage />
             </ProtectedRoute>
           }
         />

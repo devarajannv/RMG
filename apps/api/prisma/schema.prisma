@@ -61,9 +61,22 @@ model Tenant {
   holidays                 Holiday[]
   webhooks                 Webhook[]
 
-  // Trigger Relations (NEW)
+  // Trigger Relations
   requestTriggers  RequestTrigger[]
   inboundWebhooks  InboundWebhook[]
+
+  // Organization Onboarding Relations (NEW)
+  profile               TenantProfile?
+  departments           Department[]
+  teams                 Team[]
+  costCenters           CostCenter[]
+  businessRoles         BusinessRole[]
+  gradeBands            GradeBand[]
+  userInvitations       UserInvitation[]
+  approvalMatrixTemplates ApprovalMatrixTemplate[]
+  delegationRules       DelegationRule[]
+  slaConfigurations     SlaConfiguration[]
+  onboardingChecklists  OnboardingChecklist[]
 
   @@index([status])
   @@index([tier])
@@ -171,6 +184,9 @@ model Role {
   // Request Flow Relations
   approvalSteps ApprovalStep[] @relation("StepApproverRole")
 
+  // Organization Onboarding Relations
+  invitations   UserInvitation[]
+
   @@unique([tenantId, name])
 }
 
@@ -198,6 +214,12 @@ model Resource {
   manager    Resource? @relation("ResourceManager", fields: [managerId], references: [id])
   locationId String?   @db.Uuid
   location   Location? @relation(fields: [locationId], references: [id])
+
+  // NEW: Organization Structure Links
+  departmentId String?     @db.Uuid
+  deptRef      Department? @relation("ResourceDepartment", fields: [departmentId], references: [id])
+  gradeBandId  String?     @db.Uuid
+  gradeBand    GradeBand?  @relation("ResourceGradeBand", fields: [gradeBandId], references: [id])
 
   // Identity
   employeeId    String  @db.VarChar(50)
@@ -250,12 +272,22 @@ model Resource {
   requests                 Request[]
   requestAffectedResources RequestAffectedResource[]
 
+  // NEW: Organization Onboarding Relations
+  businessRoles       ResourceBusinessRole[]
+  teamMemberships     TeamMember[]
+  departmentsHeaded   Department[]      @relation("DepartmentHead")
+  teamsLed            Team[]            @relation("TeamLead")
+  costCentersManaged  CostCenter[]      @relation("CostCenterManager")
+  invitations         UserInvitation[]
+
   @@unique([tenantId, employeeId])
   @@unique([tenantId, email])
   @@index([tenantId, status])
   @@index([tenantId, practiceId])
   @@index([tenantId, band])
   @@index([tenantId, benchSince])
+  @@index([tenantId, departmentId])
+  @@index([gradeBandId])
 }
 
 enum EmploymentType {
@@ -2675,4 +2707,487 @@ enum WebhookEvent {
   REQUEST_COMPLETED
   REQUEST_CANCELLED
   SLA_BREACHED
+}
+// =============================================================================
+// ORGANIZATION ONBOARDING - NEW MODELS
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// ENUMS FOR ORGANIZATION ONBOARDING
+// -----------------------------------------------------------------------------
+
+enum EmployeeCountRange {
+  SOLO        // 1
+  MICRO       // 2-10
+  SMALL       // 11-50
+  MEDIUM      // 51-200
+  LARGE       // 201-1000
+  ENTERPRISE  // 1001+
+}
+
+enum RevenueRange {
+  STARTUP           // <$1M
+  GROWING           // $1M-$10M
+  ESTABLISHED       // $10M-$100M
+  LARGE_REVENUE     // $100M-$1B
+  ENTERPRISE_REVENUE // $1B+
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum DepartmentType {
+  BUSINESS_UNIT
+  DEPARTMENT
+  DIVISION
+  REGION
+}
+
+enum EntityStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum RoleCategory {
+  LEADERSHIP    // C-suite, VPs
+  MANAGEMENT    // Directors, Managers
+  DELIVERY      // PMs, Tech Leads
+  INDIVIDUAL    // ICs, Engineers
+  SUPPORT       // HR, Admin
+  CONTRACTOR    // External
+}
+
+enum GradeLevel {
+  L1   // Entry
+  L2   // Junior
+  L3   // Mid
+  L4   // Senior
+  L5   // Staff/Lead
+  L6   // Principal
+  L7   // Director
+  L8   // VP
+  L9   // SVP
+  L10  // C-Level
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum DelegatorType {
+  ANY_USER
+  SPECIFIC_USER
+  ROLE_HOLDER
+  MANAGER_OF
+}
+
+// -----------------------------------------------------------------------------
+// TENANT PROFILE (Extended Organization Identity)
+// -----------------------------------------------------------------------------
+model TenantProfile {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @unique @db.Uuid
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Legal Entity
+  legalName         String   @db.VarChar(300)
+  tradingName       String?  @db.VarChar(300)
+  registrationNo    String?  @db.VarChar(100)
+  taxId             String?  @db.VarChar(100)
+  
+  // Industry & Size
+  industry          String   @db.VarChar(100)
+  industryCode      String?  @db.VarChar(20)
+  employeeCount     EmployeeCountRange @default(SMALL)
+  annualRevenue     RevenueRange?
+  
+  // Contact
+  primaryEmail      String   @db.VarChar(255)
+  primaryPhone      String?  @db.VarChar(20)
+  website           String?  @db.VarChar(255)
+  
+  // Address
+  addressLine1      String?  @db.VarChar(255)
+  addressLine2      String?  @db.VarChar(255)
+  city              String?  @db.VarChar(100)
+  state             String?  @db.VarChar(100)
+  country           String   @default("India") @db.VarChar(100)
+  postalCode        String?  @db.VarChar(20)
+  
+  // Branding
+  secondaryColor    String?  @db.VarChar(7)
+  accentColor       String?  @db.VarChar(7)
+  faviconUrl        String?  @db.VarChar(500)
+  
+  // Localization
+  dateFormat        String   @default("DD/MM/YYYY") @db.VarChar(20)
+  timeFormat        String   @default("HH:mm") @db.VarChar(10)
+  weekStartDay      Int      @default(1)
+  
+  // Onboarding Tracking
+  onboardingPhase       Int              @default(1)
+  onboardingStatus      OnboardingStatus @default(NOT_STARTED)
+  onboardingStartedAt   DateTime?
+  onboardingCompletedAt DateTime?
+  onboardingSkippedPhases Int[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// DEPARTMENT (Organizational Structure)
+// -----------------------------------------------------------------------------
+model Department {
+  id            String         @id @default(uuid()) @db.Uuid
+  tenantId      String         @db.Uuid
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parentId      String?        @db.Uuid
+  parent        Department?    @relation("DeptHierarchy", fields: [parentId], references: [id])
+  
+  code          String         @db.VarChar(20)
+  name          String         @db.VarChar(200)
+  description   String?        @db.VarChar(500)
+  type          DepartmentType @default(DEPARTMENT)
+  
+  headId        String?        @db.Uuid
+  head          Resource?      @relation("DepartmentHead", fields: [headId], references: [id])
+  costCenterId  String?        @db.Uuid
+  costCenter    CostCenter?    @relation(fields: [costCenterId], references: [id])
+  
+  status        EntityStatus   @default(ACTIVE)
+  sortOrder     Int            @default(0)
+  level         Int            @default(0)
+  path          String?        // Materialized path for hierarchy
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  
+  // Relations
+  children      Department[]   @relation("DeptHierarchy")
+  teams         Team[]
+  resources     Resource[]     @relation("ResourceDepartment")
+  
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, parentId])
+  @@index([tenantId, level])
+}
+
+// -----------------------------------------------------------------------------
+// COST CENTER
+// -----------------------------------------------------------------------------
+model CostCenter {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @db.Uuid
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  code           String       @db.VarChar(20)
+  name           String       @db.VarChar(200)
+  description    String?      @db.VarChar(500)
+  
+  managerId      String?      @db.Uuid
+  manager        Resource?    @relation("CostCenterManager", fields: [managerId], references: [id])
+  budget         Decimal?     @db.Decimal(15, 2)
+  budgetCurrency String       @default("INR") @db.VarChar(3)
+  fiscalYear     Int?
+  
+  status         EntityStatus @default(ACTIVE)
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  // Relations
+  departments    Department[]
+  
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+}
+
+// -----------------------------------------------------------------------------
+// TEAM (Within Department)
+// -----------------------------------------------------------------------------
+model Team {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  departmentId  String       @db.Uuid
+  department    Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  
+  code          String       @db.VarChar(20)
+  name          String       @db.VarChar(200)
+  description   String?      @db.VarChar(500)
+  
+  leadId        String?      @db.Uuid
+  lead          Resource?    @relation("TeamLead", fields: [leadId], references: [id])
+  
+  status        EntityStatus @default(ACTIVE)
+  sortOrder     Int          @default(0)
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+  
+  // Relations
+  members       TeamMember[]
+  
+  @@unique([tenantId, code])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, status])
+}
+
+// -----------------------------------------------------------------------------
+// TEAM MEMBER (Resource-Team Assignment)
+// -----------------------------------------------------------------------------
+model TeamMember {
+  id            String    @id @default(uuid()) @db.Uuid
+  teamId        String    @db.Uuid
+  team          Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  resourceId    String    @db.Uuid
+  resource      Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  
+  role          String?   @db.VarChar(100)
+  isPrimary     Boolean   @default(false)
+  
+  joinedAt      DateTime  @default(now())
+  leftAt        DateTime?
+  
+  @@unique([teamId, resourceId])
+  @@index([resourceId])
+}
+
+// -----------------------------------------------------------------------------
+// BUSINESS ROLE (Organizational Function - NOT System Permissions)
+// -----------------------------------------------------------------------------
+model BusinessRole {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  code          String       @db.VarChar(20)
+  name          String       @db.VarChar(200)
+  description   String?      @db.VarChar(500)
+  
+  category      RoleCategory @default(INDIVIDUAL)
+  level         GradeLevel?
+  
+  // Capabilities
+  canApprove    Boolean      @default(false)
+  canManage     Boolean      @default(false)
+  canBillable   Boolean      @default(true)
+  
+  // Competencies (JSON array of requirements)
+  competencies  Json?
+  
+  status        EntityStatus @default(ACTIVE)
+  isSystem      Boolean      @default(false)
+  sortOrder     Int          @default(0)
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  assignments   ResourceBusinessRole[]
+  
+  @@unique([tenantId, code])
+  @@index([tenantId, category])
+  @@index([tenantId, status])
+}
+
+// -----------------------------------------------------------------------------
+// RESOURCE BUSINESS ROLE (Many-to-Many Assignment)
+// -----------------------------------------------------------------------------
+model ResourceBusinessRole {
+  id              String       @id @default(uuid()) @db.Uuid
+  resourceId      String       @db.Uuid
+  resource        Resource     @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  businessRoleId  String       @db.Uuid
+  businessRole    BusinessRole @relation(fields: [businessRoleId], references: [id], onDelete: Cascade)
+  
+  isPrimary       Boolean      @default(false)
+  effectiveFrom   DateTime     @default(now())
+  effectiveTo     DateTime?
+  
+  assignedBy      String       @db.Uuid
+  assignedAt      DateTime     @default(now())
+  
+  @@unique([resourceId, businessRoleId, effectiveFrom])
+  @@index([businessRoleId])
+}
+
+// -----------------------------------------------------------------------------
+// GRADE BAND (Compensation Levels)
+// -----------------------------------------------------------------------------
+model GradeBand {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  code          String   @db.VarChar(10)
+  name          String   @db.VarChar(100)
+  level         Int
+  
+  minSalary     Decimal? @db.Decimal(15, 2)
+  maxSalary     Decimal? @db.Decimal(15, 2)
+  currency      String   @default("INR") @db.VarChar(3)
+  
+  billRateMin   Decimal? @db.Decimal(10, 2)
+  billRateMax   Decimal? @db.Decimal(10, 2)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  resources     Resource[] @relation("ResourceGradeBand")
+  
+  @@unique([tenantId, code])
+  @@index([tenantId, level])
+}
+
+// -----------------------------------------------------------------------------
+// USER INVITATION (Pending Invites)
+// -----------------------------------------------------------------------------
+model UserInvitation {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  email         String       @db.VarChar(255)
+  firstName     String       @db.VarChar(100)
+  lastName      String       @db.VarChar(100)
+  
+  roleId        String       @db.Uuid
+  role          Role         @relation(fields: [roleId], references: [id])
+  resourceId    String?      @db.Uuid
+  resource      Resource?    @relation(fields: [resourceId], references: [id])
+  
+  token         String       @unique @db.VarChar(64)
+  expiresAt     DateTime
+  
+  invitedBy     String       @db.Uuid
+  invitedAt     DateTime     @default(now())
+  acceptedAt    DateTime?
+  
+  status        InviteStatus @default(PENDING)
+  message       String?
+  
+  @@unique([tenantId, email])
+  @@index([expiresAt])
+  @@index([status])
+}
+
+// -----------------------------------------------------------------------------
+// APPROVAL MATRIX TEMPLATE
+// -----------------------------------------------------------------------------
+model ApprovalMatrixTemplate {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  name          String   @db.VarChar(200)
+  description   String?  @db.VarChar(500)
+  
+  requestType   String   @db.VarChar(50)
+  conditions    Json     @default("[]")
+  steps         Json     @default("[]")
+  
+  isActive      Boolean  @default(true)
+  isSystem      Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([tenantId, requestType])
+  @@index([tenantId, isActive])
+}
+
+// -----------------------------------------------------------------------------
+// DELEGATION RULE
+// -----------------------------------------------------------------------------
+model DelegationRule {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  name          String        @db.VarChar(200)
+  description   String?       @db.VarChar(500)
+  
+  delegatorType DelegatorType @default(ANY_USER)
+  delegatorId   String?       @db.Uuid
+  
+  autoDelegate  Boolean       @default(false)
+  triggerDays   Int?
+  
+  maxDuration   Int?
+  allowedTypes  String[]
+  
+  status        EntityStatus  @default(ACTIVE)
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@index([tenantId, status])
+}
+
+// -----------------------------------------------------------------------------
+// SLA CONFIGURATION
+// -----------------------------------------------------------------------------
+model SlaConfiguration {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @db.Uuid
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  name               String   @db.VarChar(200)
+  requestType        String   @db.VarChar(50)
+  priority           String   @db.VarChar(20)
+  
+  responseTime       Int      // Hours
+  resolutionTime     Int      // Hours
+  
+  escalationEnabled  Boolean  @default(true)
+  escalateAfter      Int?     // Hours
+  escalateTo         String?  @db.Uuid
+  
+  useBusinessHours   Boolean  @default(true)
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  @@unique([tenantId, requestType, priority])
+}
+
+// -----------------------------------------------------------------------------
+// ONBOARDING CHECKLIST (Progress Tracking)
+// -----------------------------------------------------------------------------
+model OnboardingChecklist {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  phase         Int
+  stepCode      String    @db.VarChar(50)
+  stepName      String    @db.VarChar(200)
+  
+  isRequired    Boolean   @default(true)
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  completedBy   String?   @db.Uuid
+  
+  data          Json?
+  notes         String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([tenantId, phase, stepCode])
+  @@index([tenantId, phase])
 }
