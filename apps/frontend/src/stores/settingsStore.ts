@@ -47,7 +47,7 @@ const defaultSettings = {
   theme: 'light' as Theme,
   language: 'en' as Language,
   dateFormat: 'DD/MM/YYYY' as DateFormat,
-  currency: 'INR' as Currency,
+  currency: 'USD' as Currency,  // Default to USD, will be overridden by tenant setting
   compactMode: false,
   emailNotifications: true,
   benchAlerts: true,

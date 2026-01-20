@@ -9,6 +9,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Edit2, Shield, DollarSign, Users, Search, FileText, ChevronLeft, ChevronRight, Building2, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter, ConfirmDialog } from '@/components/ui/dialog';
 import { cn, formatDate } from '@/lib/utils';
+import FunctionsTab from '@/components/settings/FunctionsTab';
+import RequestTypesTab from '@/components/settings/RequestTypesTab';
 
 // ============================================================================
 // Types
@@ -126,7 +128,7 @@ interface OrganizationStats {
   storage: { documentsCount: number };
 }
 
-type TabType = 'profile' | 'notifications' | 'display' | 'security' | 'organization' | 'currency' | 'roles' | 'users' | 'audit';
+type TabType = 'profile' | 'notifications' | 'display' | 'security' | 'organization' | 'currency' | 'roles' | 'users' | 'functions' | 'request-types' | 'audit';
 
 // ============================================================================
 // Available Permissions
@@ -143,6 +145,9 @@ const AVAILABLE_PERMISSIONS = [
   'settings:read', 'settings:update',
   'users:create', 'users:read', 'users:update', 'users:delete',
   'roles:create', 'roles:read', 'roles:update', 'roles:delete',
+  'request-types:create', 'request-types:read', 'request-types:update', 'request-types:delete', 'request-types:clone',
+  'request-templates:read', 'request-templates:import',
+  'workflows:create', 'workflows:read', 'workflows:update', 'workflows:delete',
 ];
 
 // ============================================================================
@@ -1265,9 +1270,11 @@ export default function SettingsPage() {
     { id: 'security', label: 'Security', icon: '🔒' },
     { id: 'users', label: 'Users', icon: '👥' },
     { id: 'roles', label: 'Roles', icon: '🛡️' },
+    { id: 'functions', label: 'Functions', icon: '⚙️' },
+    { id: 'request-types', label: 'Request Types', icon: '📋' },
     { id: 'currency', label: 'Currency', icon: '💰' },
     { id: 'organization', label: 'Organization', icon: '🏢' },
-    { id: 'audit', label: 'Audit Logs', icon: '📋' },
+    { id: 'audit', label: 'Audit Logs', icon: '📝' },
   ];
 
   return (
@@ -1971,6 +1978,10 @@ export default function SettingsPage() {
                 </Card>
               </div>
             )}
+
+            {activeTab === 'functions' && <FunctionsTab />}
+
+            {activeTab === 'request-types' && <RequestTypesTab />}
 
             {activeTab === 'organization' && (
               <Card className="shadow-sm">

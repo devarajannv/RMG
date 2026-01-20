@@ -42,6 +42,7 @@ import {
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import MainLayout from '@/components/layout/MainLayout';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Allocation {
   id: string;
@@ -108,6 +109,7 @@ function AllocationFormModal({
   isLoading,
   resources,
   projects,
+  currencySymbol,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -116,6 +118,7 @@ function AllocationFormModal({
   isLoading: boolean;
   resources: Resource[];
   projects: Project[];
+  currencySymbol: string;
 }) {
   const [formData, setFormData] = useState({
     resourceId: '',
@@ -328,7 +331,7 @@ function AllocationFormModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bill Rate ($/hr)
+                  Bill Rate ({currencySymbol}/hr)
                 </label>
                 <Input
                   type="number"
@@ -370,6 +373,11 @@ function AllocationFormModal({
 
 export default function AllocationsPage() {
   const queryClient = useQueryClient();
+  
+  // Get currency context
+  const { getCurrencySymbol } = useCurrency();
+  const currencySymbol = getCurrencySymbol();
+  
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string[]>(['ACTIVE', 'CONFIRMED', 'PROPOSED']);
@@ -960,6 +968,7 @@ export default function AllocationsPage() {
           isLoading={createMutation.isPending}
           resources={resources}
           projects={projects}
+          currencySymbol={currencySymbol}
         />
 
         {/* Edit Allocation Modal */}
@@ -974,6 +983,7 @@ export default function AllocationsPage() {
           isLoading={updateMutation.isPending}
           resources={resources}
           projects={projects}
+          currencySymbol={currencySymbol}
         />
 
         {/* Delete Confirmation Dialog */}

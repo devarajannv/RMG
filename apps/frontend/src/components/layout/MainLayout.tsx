@@ -24,6 +24,7 @@ import {
   CheckSquare,
   GitBranch,
   Rocket,
+  Briefcase,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -102,6 +103,12 @@ const navSections: NavSection[] = [
         href: '/requests?tab=pending-approvals', 
         badge: 'pending-approvals',
         permissions: [PERMISSIONS.REQUESTS_APPROVE, PERMISSIONS.TIMESHEETS_APPROVE, PERMISSIONS.ALLOCATIONS_APPROVE],
+      },
+      { 
+        icon: Briefcase, 
+        label: 'My Functions', 
+        href: '/my-functions',
+        // Available to all authenticated users who might have functions
       },
     ],
   },

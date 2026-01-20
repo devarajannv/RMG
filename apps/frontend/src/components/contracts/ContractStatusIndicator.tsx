@@ -336,13 +336,13 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function formatCurrency(value: number, currency: string = 'INR'): string {
+function formatCurrency(value: number, currency: string = 'USD'): string {
   if (currency === 'INR') {
     if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
     if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
     return `₹${value.toLocaleString('en-IN')}`;
   }
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
 }
 
 export default ContractStatusIndicator;

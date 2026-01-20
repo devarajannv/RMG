@@ -32,7 +32,7 @@ import {
   useCompleteStep,
 } from '../api';
 import { useOnboardingStore } from '../store';
-import type { TenantProfileInput, BrandingInput, RegionalInput } from '../types';
+import type { TenantProfileInput, BrandingInput, RegionalInput, Industry } from '../types';
 
 // ============================================================================
 // Constants
@@ -168,13 +168,9 @@ interface BasicInfoFormProps {
 }
 
 function BasicInfoForm({ onComplete }: BasicInfoFormProps) {
-  const { data: profileResponse, isLoading: profileLoading } = useTenantProfile();
-  const { data: industriesResponse, isLoading: industriesLoading } = useIndustries();
+  const { data: profile, isLoading: profileLoading } = useTenantProfile();
+  const { data: industries = [], isLoading: industriesLoading } = useIndustries();
   const updateProfile = useUpdateTenantProfile();
-  
-  // Extract data from API response wrapper
-  const profile = profileResponse?.data;
-  const industries = industriesResponse?.data || [];
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isDirty } } = useForm<TenantProfileInput>({
     defaultValues: {
@@ -245,7 +241,7 @@ function BasicInfoForm({ onComplete }: BasicInfoFormProps) {
               <SelectValue placeholder="Select industry" />
             </SelectTrigger>
             <SelectContent>
-              {industries?.map((industry) => (
+              {industries?.map((industry: Industry) => (
                 <SelectItem key={industry.id} value={industry.id}>
                   {industry.name}
                 </SelectItem>
@@ -354,8 +350,7 @@ interface BrandingFormProps {
 }
 
 function BrandingForm({ onComplete }: BrandingFormProps) {
-  const { data: profileResponse, isLoading } = useTenantProfile();
-  const profile = profileResponse?.data;
+  const { data: profile, isLoading } = useTenantProfile();
   const updateBranding = useUpdateBranding();
   const [formData, setFormData] = useState<BrandingInput>({
     primaryColor: '#3B82F6',
@@ -514,8 +509,7 @@ interface RegionalFormProps {
 }
 
 function RegionalForm({ onComplete }: RegionalFormProps) {
-  const { data: profileResponse, isLoading } = useTenantProfile();
-  const profile = profileResponse?.data;
+  const { data: profile, isLoading } = useTenantProfile();
   const updateRegional = useUpdateRegional();
   const [formData, setFormData] = useState<RegionalInput>({
     defaultCurrency: 'INR',

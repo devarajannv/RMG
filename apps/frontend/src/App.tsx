@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { Toaster } from '@/components/ui/toaster';
 import { AgentWidget, CommandPalette } from '@/components/agent';
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
 
 // Loading spinner component
 function LoadingSpinner() {
@@ -36,6 +37,7 @@ const RequestsPage = lazy(() => import('@/pages/RequestsPage'));
 const RequestDetailPage = lazy(() => import('@/pages/RequestDetailPage'));
 const WorkflowBuilderPage = lazy(() => import('@/pages/WorkflowBuilderPage'));
 const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'));
+const MyFunctionsPage = lazy(() => import('@/pages/MyFunctionsPage'));
 
 // Auth guard component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -49,7 +51,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>;
+  return (
+    <CurrencyProvider>
+      <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
+    </CurrencyProvider>
+  );
 }
 
 // Public route - redirect if already authenticated
@@ -249,6 +255,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-functions"
+          element={
+            <ProtectedRoute>
+              <MyFunctionsPage />
             </ProtectedRoute>
           }
         />

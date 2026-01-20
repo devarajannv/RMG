@@ -127,13 +127,13 @@ const BILLING_LABELS: Record<string, string> = {
 // Helper Functions
 // ============================================================================
 
-function formatCurrency(value: number, currency: string = 'INR'): string {
+function formatCurrencyValue(value: number, currency: string = 'USD'): string {
   if (currency === 'INR') {
     if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
     if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
     return `₹${value.toLocaleString('en-IN')}`;
   }
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
 }
 
 function formatDate(dateStr?: string): string {
@@ -786,7 +786,7 @@ export default function ContractsPage() {
             <Card className="border-l-4 border-l-blue-500">
               <CardContent className="p-4 text-center">
                 <p className="text-2xl font-bold text-blue-700">
-                  {formatCurrency(stats.totalActiveValue)}
+                  {formatCurrencyValue(stats.totalActiveValue)}
                 </p>
                 <p className="text-xs text-gray-500">Active Value</p>
               </CardContent>
@@ -967,7 +967,7 @@ export default function ContractsPage() {
                               <div className="flex items-center justify-end gap-1">
                                 <DollarSign className="h-4 w-4 text-gray-400" />
                                 <span className="font-medium text-gray-900">
-                                  {formatCurrency(contract.value, contract.currency)}
+                                  {formatCurrencyValue(contract.value, contract.currency)}
                                 </span>
                               </div>
                             ) : (

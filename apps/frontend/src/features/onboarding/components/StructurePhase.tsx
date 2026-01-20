@@ -148,8 +148,7 @@ function CollapsibleSection({
 // ============================================================================
 
 function DepartmentsSection() {
-  const { data: departmentsResponse, isLoading } = useDepartments();
-  const departments = departmentsResponse?.data || [];
+  const { data: departments = [], isLoading } = useDepartments();
   const createDepartment = useCreateDepartment();
   const updateDepartment = useUpdateDepartment();
   const deleteDepartment = useDeleteDepartment();
@@ -259,7 +258,7 @@ function DepartmentsSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {departments.map((dept) => (
+              {departments.map((dept: Department) => (
                 <TableRow key={dept.id}>
                   <TableCell className="font-mono text-sm">{dept.code}</TableCell>
                   <TableCell className="font-medium">{dept.name}</TableCell>
@@ -362,8 +361,8 @@ function DepartmentsSection() {
                     <SelectContent>
                       <SelectItem value="">None (top-level)</SelectItem>
                       {departments
-                        .filter((d) => d.id !== editingDepartment?.id)
-                        .map((dept) => (
+                        .filter((d: Department) => d.id !== editingDepartment?.id)
+                        .map((dept: Department) => (
                           <SelectItem key={dept.id} value={dept.id}>
                             {dept.name}
                           </SelectItem>
@@ -410,10 +409,8 @@ function DepartmentsSection() {
 // ============================================================================
 
 function TeamsSection() {
-  const { data: teamsResponse, isLoading } = useTeams();
-  const { data: departmentsResponse } = useDepartments();
-  const teams = teamsResponse?.data || [];
-  const departments = departmentsResponse?.data || [];
+  const { data: teams = [], isLoading } = useTeams();
+  const { data: departments = [] } = useDepartments();
   const createTeam = useCreateTeam();
   const updateTeam = useUpdateTeam();
   const deleteTeam = useDeleteTeam();
@@ -512,7 +509,7 @@ function TeamsSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {teams.map((team) => (
+              {teams.map((team: Team) => (
                 <TableRow key={team.id}>
                   <TableCell className="font-mono text-sm">{team.code}</TableCell>
                   <TableCell className="font-medium">{team.name}</TableCell>
@@ -604,7 +601,7 @@ function TeamsSection() {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments?.map((dept) => (
+                    {departments?.map((dept: Department) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
                       </SelectItem>
@@ -662,8 +659,7 @@ function TeamsSection() {
 // ============================================================================
 
 function CostCentersSection() {
-  const { data: costCentersResponse, isLoading } = useCostCenters();
-  const costCenters = costCentersResponse?.data || [];
+  const { data: costCenters = [], isLoading } = useCostCenters();
   const createCostCenter = useCreateCostCenter();
   const updateCostCenter = useUpdateCostCenter();
   const deleteCostCenter = useDeleteCostCenter();
@@ -753,7 +749,7 @@ function CostCentersSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {costCenters.map((cc) => (
+              {costCenters.map((cc: CostCenter) => (
                 <TableRow key={cc.id}>
                   <TableCell className="font-mono text-sm">{cc.code}</TableCell>
                   <TableCell className="font-medium">{cc.name}</TableCell>
@@ -879,8 +875,8 @@ function CostCentersSection() {
                     <SelectContent>
                       <SelectItem value="">None (top-level)</SelectItem>
                       {costCenters
-                        .filter((c) => c.id !== editingCostCenter?.id)
-                        .map((cc) => (
+                        .filter((c: CostCenter) => c.id !== editingCostCenter?.id)
+                        .map((cc: CostCenter) => (
                           <SelectItem key={cc.id} value={cc.id}>
                             {cc.name}
                           </SelectItem>

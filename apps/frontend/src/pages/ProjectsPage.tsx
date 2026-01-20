@@ -42,6 +42,7 @@ import {
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import MainLayout from '@/components/layout/MainLayout';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Project {
   id: string;
@@ -99,6 +100,7 @@ function ProjectFormModal({
   isLoading,
   clients,
   managers,
+  currencySymbol,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -107,6 +109,7 @@ function ProjectFormModal({
   isLoading: boolean;
   clients: Client[];
   managers: Resource[];
+  currencySymbol: string;
 }) {
   const [formData, setFormData] = useState({
     code: '',
@@ -385,7 +388,7 @@ function ProjectFormModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Budget Amount ($)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Budget Amount ({currencySymbol})</label>
                 <Input
                   type="number"
                   min="0"
@@ -396,7 +399,7 @@ function ProjectFormModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Default Rate ($/hr)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Default Rate ({currencySymbol}/hr)</label>
                 <Input
                   type="number"
                   min="0"
@@ -434,6 +437,11 @@ function ProjectFormModal({
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  // Get currency context
+  const { getCurrencySymbol } = useCurrency();
+  const currencySymbol = getCurrencySymbol();
+  
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string[]>(['ACTIVE', 'PIPELINE']);
@@ -897,6 +905,7 @@ export default function ProjectsPage() {
           isLoading={createMutation.isPending}
           clients={clients}
           managers={managers}
+          currencySymbol={currencySymbol}
         />
 
         {/* Edit Project Modal */}
@@ -911,6 +920,7 @@ export default function ProjectsPage() {
           isLoading={updateMutation.isPending}
           clients={clients}
           managers={managers}
+          currencySymbol={currencySymbol}
         />
 
         {/* Delete Confirmation Dialog */}

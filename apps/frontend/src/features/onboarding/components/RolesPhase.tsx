@@ -174,8 +174,7 @@ function getCategoryBadge(category: RoleCategory) {
 // ============================================================================
 
 function BusinessRolesSection() {
-  const { data: rolesResponse, isLoading } = useBusinessRoles();
-  const roles = rolesResponse?.data || [];
+  const { data: roles = [], isLoading } = useBusinessRoles();
   const createRole = useCreateBusinessRole();
   const updateRole = useUpdateBusinessRole();
   const deleteRole = useDeleteBusinessRole();
@@ -302,7 +301,7 @@ function BusinessRolesSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {roles.map((role) => (
+              {roles.map((role: BusinessRole) => (
                 <TableRow key={role.id}>
                   <TableCell className="font-mono text-sm">{role.code}</TableCell>
                   <TableCell className="font-medium">{role.name}</TableCell>
@@ -468,8 +467,7 @@ function BusinessRolesSection() {
 // ============================================================================
 
 function GradeBandsSection() {
-  const { data: gradeBandsResponse, isLoading } = useGradeBands();
-  const gradeBands = gradeBandsResponse?.data || [];
+  const { data: gradeBands = [], isLoading } = useGradeBands();
   const createGradeBand = useCreateGradeBand();
   const updateGradeBand = useUpdateGradeBand();
   const deleteGradeBand = useDeleteGradeBand();
@@ -598,7 +596,7 @@ function GradeBandsSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {gradeBands.map((band) => (
+              {gradeBands.map((band: GradeBand) => (
                 <TableRow key={band.id}>
                   <TableCell className="font-mono text-sm">{band.code}</TableCell>
                   <TableCell className="font-medium">{band.name}</TableCell>

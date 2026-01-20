@@ -6,6 +6,10 @@
 export { NotificationSettings } from './NotificationSettings';
 export { IntegrationSettings } from './IntegrationSettings';
 export { WorkflowSettings } from './WorkflowSettings';
+export { default as FunctionsTab } from './FunctionsTab';
+export { default as RequestTypesTab } from './RequestTypesTab';
+export { default as RequestTypeFormModal } from './RequestTypeFormModal';
+export { default as CloneRequestTypeModal } from './CloneRequestTypeModal';
 
 // Re-export types for convenience
 export type {
@@ -25,3 +29,4 @@ export type {
   SLAConfig,
   EscalationRule,
 } from './WorkflowSettings';
+

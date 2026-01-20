@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import MainLayout from '@/components/layout/MainLayout';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import {
   AreaChart,
   Area,
@@ -130,6 +131,9 @@ export default function BenchAnalysisPage() {
 
   // Rolloff days filter
   const [rolloffDays, setRolloffDays] = useState(30);
+  
+  // Get currency formatting from context
+  const { formatCompact } = useCurrency();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -209,13 +213,8 @@ export default function BenchAnalysisPage() {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
-  // Helpers
-  function formatCurrency(value: number): string {
-    if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
-    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
-    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
-    return `₹${value}`;
-  }
+  // Use formatCompact from currency context as formatCurrency
+  const formatCurrency = formatCompact;
 
   function getAgingColor(category: string): string {
     switch (category) {

@@ -7,6 +7,13 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+
+// API Response wrapper type - matches backend { success: boolean, data: T }
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+}
+
 import type {
   TenantProfile,
   TenantProfileInput,
@@ -93,21 +100,24 @@ export const onboardingKeys = {
 export function useOnboardingProgress() {
   return useQuery({
     queryKey: onboardingKeys.progress(),
-    queryFn: () => api.get<OnboardingProgress>(`${BASE}/progress`),
+    queryFn: () => api.get<ApiResponse<OnboardingProgress>>(`${BASE}/progress`),
+    select: (response) => response.data,
   });
 }
 
 export function useOnboardingSummary() {
   return useQuery({
     queryKey: onboardingKeys.summary(),
-    queryFn: () => api.get<OnboardingSummary>(`${BASE}/summary`),
+    queryFn: () => api.get<ApiResponse<OnboardingSummary>>(`${BASE}/summary`),
+    select: (response) => response.data,
   });
 }
 
 export function usePhaseConfigs() {
   return useQuery({
     queryKey: onboardingKeys.phases(),
-    queryFn: () => api.get<PhaseConfig[]>(`${BASE}/phases`),
+    queryFn: () => api.get<ApiResponse<PhaseConfig[]>>(`${BASE}/phases`),
+    select: (response) => response.data,
   });
 }
 
@@ -174,7 +184,8 @@ export function useMarkOnboardingComplete() {
 export function useTenantProfile() {
   return useQuery({
     queryKey: onboardingKeys.profile(),
-    queryFn: () => api.get<TenantProfile>(`${BASE}/profile`),
+    queryFn: () => api.get<ApiResponse<TenantProfile>>(`${BASE}/profile`),
+    select: (response) => response.data,
   });
 }
 
@@ -217,7 +228,8 @@ export function useUpdateRegional() {
 export function useIndustries() {
   return useQuery({
     queryKey: onboardingKeys.industries(),
-    queryFn: () => api.get<Industry[]>(`${BASE}/industries`),
+    queryFn: () => api.get<ApiResponse<Industry[]>>(`${BASE}/industries`),
+    select: (response) => response.data,
   });
 }
 
@@ -229,14 +241,16 @@ export function useIndustries() {
 export function useDepartments() {
   return useQuery({
     queryKey: onboardingKeys.departments(),
-    queryFn: () => api.get<Department[]>(`${BASE}/departments`),
+    queryFn: () => api.get<ApiResponse<Department[]>>(`${BASE}/departments`),
+    select: (response) => response.data,
   });
 }
 
 export function useDepartment(id: string) {
   return useQuery({
     queryKey: onboardingKeys.department(id),
-    queryFn: () => api.get<Department>(`${BASE}/departments/${id}`),
+    queryFn: () => api.get<ApiResponse<Department>>(`${BASE}/departments/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -293,14 +307,16 @@ export function useSeedDefaultDepartments() {
 export function useTeams() {
   return useQuery({
     queryKey: onboardingKeys.teams(),
-    queryFn: () => api.get<Team[]>(`${BASE}/teams`),
+    queryFn: () => api.get<ApiResponse<Team[]>>(`${BASE}/teams`),
+    select: (response) => response.data,
   });
 }
 
 export function useTeam(id: string) {
   return useQuery({
     queryKey: onboardingKeys.team(id),
-    queryFn: () => api.get<Team>(`${BASE}/teams/${id}`),
+    queryFn: () => api.get<ApiResponse<Team>>(`${BASE}/teams/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -345,14 +361,16 @@ export function useDeleteTeam() {
 export function useCostCenters() {
   return useQuery({
     queryKey: onboardingKeys.costCenters(),
-    queryFn: () => api.get<CostCenter[]>(`${BASE}/cost-centers`),
+    queryFn: () => api.get<ApiResponse<CostCenter[]>>(`${BASE}/cost-centers`),
+    select: (response) => response.data,
   });
 }
 
 export function useCostCenter(id: string) {
   return useQuery({
     queryKey: onboardingKeys.costCenter(id),
-    queryFn: () => api.get<CostCenter>(`${BASE}/cost-centers/${id}`),
+    queryFn: () => api.get<ApiResponse<CostCenter>>(`${BASE}/cost-centers/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -396,7 +414,8 @@ export function useDeleteCostCenter() {
 export function useStructureSummary() {
   return useQuery({
     queryKey: onboardingKeys.structureSummary(),
-    queryFn: () => api.get<StructureSummary>(`${BASE}/structure/summary`),
+    queryFn: () => api.get<ApiResponse<StructureSummary>>(`${BASE}/structure/summary`),
+    select: (response) => response.data,
   });
 }
 
@@ -408,14 +427,16 @@ export function useStructureSummary() {
 export function useBusinessRoles() {
   return useQuery({
     queryKey: onboardingKeys.businessRoles(),
-    queryFn: () => api.get<BusinessRole[]>(`${BASE}/business-roles`),
+    queryFn: () => api.get<ApiResponse<BusinessRole[]>>(`${BASE}/business-roles`),
+    select: (response) => response.data,
   });
 }
 
 export function useBusinessRole(id: string) {
   return useQuery({
     queryKey: onboardingKeys.businessRole(id),
-    queryFn: () => api.get<BusinessRole>(`${BASE}/business-roles/${id}`),
+    queryFn: () => api.get<ApiResponse<BusinessRole>>(`${BASE}/business-roles/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -469,14 +490,16 @@ export function useSeedDefaultBusinessRoles() {
 export function useGradeBands() {
   return useQuery({
     queryKey: onboardingKeys.gradeBands(),
-    queryFn: () => api.get<GradeBand[]>(`${BASE}/grade-bands`),
+    queryFn: () => api.get<ApiResponse<GradeBand[]>>(`${BASE}/grade-bands`),
+    select: (response) => response.data,
   });
 }
 
 export function useGradeBand(id: string) {
   return useQuery({
     queryKey: onboardingKeys.gradeBand(id),
-    queryFn: () => api.get<GradeBand>(`${BASE}/grade-bands/${id}`),
+    queryFn: () => api.get<ApiResponse<GradeBand>>(`${BASE}/grade-bands/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -530,7 +553,8 @@ export function useSeedDefaultGradeBands() {
 export function useResourceRoles(resourceId: string) {
   return useQuery({
     queryKey: onboardingKeys.resourceRoles(resourceId),
-    queryFn: () => api.get<ResourceBusinessRole[]>(`${BASE}/resources/${resourceId}/roles`),
+    queryFn: () => api.get<ApiResponse<ResourceBusinessRole[]>>(`${BASE}/resources/${resourceId}/roles`),
+    select: (response) => response.data,
     enabled: !!resourceId,
   });
 }
@@ -569,14 +593,16 @@ export function useRemoveRoleFromResource() {
 export function useResources() {
   return useQuery({
     queryKey: onboardingKeys.resources(),
-    queryFn: () => api.get<Resource[]>(`${BASE}/resources`),
+    queryFn: () => api.get<ApiResponse<Resource[]>>(`${BASE}/resources`),
+    select: (response) => response.data,
   });
 }
 
 export function useResource(id: string) {
   return useQuery({
     queryKey: onboardingKeys.resource(id),
-    queryFn: () => api.get<Resource>(`${BASE}/resources/${id}`),
+    queryFn: () => api.get<ApiResponse<Resource>>(`${BASE}/resources/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -637,14 +663,16 @@ export function useCreateUserForResource() {
 export function useInvitations() {
   return useQuery({
     queryKey: onboardingKeys.invitations(),
-    queryFn: () => api.get<UserInvitation[]>(`${BASE}/invitations`),
+    queryFn: () => api.get<ApiResponse<UserInvitation[]>>(`${BASE}/invitations`),
+    select: (response) => response.data,
   });
 }
 
 export function useInvitation(id: string) {
   return useQuery({
     queryKey: onboardingKeys.invitation(id),
-    queryFn: () => api.get<UserInvitation>(`${BASE}/invitations/${id}`),
+    queryFn: () => api.get<ApiResponse<UserInvitation>>(`${BASE}/invitations/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -707,7 +735,8 @@ export function useImportResources() {
 export function useExportResources() {
   return useQuery({
     queryKey: [...onboardingKeys.resources(), 'export'],
-    queryFn: () => api.get<ImportResourceRow[]>(`${BASE}/resources/export`),
+    queryFn: () => api.get<ApiResponse<ImportResourceRow[]>>(`${BASE}/resources/export`),
+    select: (response) => response.data,
     enabled: false, // Manual trigger only
   });
 }
@@ -716,7 +745,8 @@ export function useExportResources() {
 export function usePeopleStats() {
   return useQuery({
     queryKey: onboardingKeys.peopleStats(),
-    queryFn: () => api.get<PeopleStats>(`${BASE}/people/stats`),
+    queryFn: () => api.get<ApiResponse<PeopleStats>>(`${BASE}/people/stats`),
+    select: (response) => response.data,
   });
 }
 
@@ -727,14 +757,16 @@ export function usePeopleStats() {
 export function useDelegationRules() {
   return useQuery({
     queryKey: onboardingKeys.delegationRules(),
-    queryFn: () => api.get<DelegationRule[]>(`${BASE}/delegation-rules`),
+    queryFn: () => api.get<ApiResponse<DelegationRule[]>>(`${BASE}/delegation-rules`),
+    select: (response) => response.data,
   });
 }
 
 export function useDelegationRule(id: string) {
   return useQuery({
     queryKey: onboardingKeys.delegationRule(id),
-    queryFn: () => api.get<DelegationRule>(`${BASE}/delegation-rules/${id}`),
+    queryFn: () => api.get<ApiResponse<DelegationRule>>(`${BASE}/delegation-rules/${id}`),
+    select: (response) => response.data,
     enabled: !!id,
   });
 }
@@ -790,6 +822,7 @@ export function useSeedDefaultDelegationRules() {
 export function useGovernanceStatus() {
   return useQuery({
     queryKey: onboardingKeys.governanceStatus(),
-    queryFn: () => api.get<GovernanceStatus>(`${BASE}/governance/status`),
+    queryFn: () => api.get<ApiResponse<GovernanceStatus>>(`${BASE}/governance/status`),
+    select: (response) => response.data,
   });
 }

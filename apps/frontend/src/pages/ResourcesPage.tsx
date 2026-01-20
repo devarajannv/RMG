@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { useCurrency } from '../contexts/CurrencyContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -122,6 +123,7 @@ function ResourceFormModal({
   onSubmit,
   isLoading,
   skills,
+  currencySymbol,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -129,6 +131,7 @@ function ResourceFormModal({
   onSubmit: (data: Partial<ResourceFormData>) => void;
   isLoading: boolean;
   skills: Skill[];
+  currencySymbol: string;
 }) {
   const [formData, setFormData] = useState<ResourceFormData>({
     employeeId: '',
@@ -317,7 +320,7 @@ function ResourceFormModal({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cost Rate ($/hr)
+                  Cost Rate ({currencySymbol}/hr)
                 </label>
                 <Input
                   type="number"
@@ -332,7 +335,7 @@ function ResourceFormModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bill Rate ($/hr)
+                  Bill Rate ({currencySymbol}/hr)
                 </label>
                 <Input
                   type="number"
@@ -418,6 +421,10 @@ export default function ResourcesPage() {
   
   // Get permissions
   const { can } = usePermissions();
+  
+  // Get currency context
+  const { getCurrencySymbol } = useCurrency();
+  const currencySymbol = getCurrencySymbol();
 
   // State
   const [searchTerm, setSearchTerm] = useState('');
@@ -756,7 +763,7 @@ export default function ResourcesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Avg Bill Rate</p>
-                <p className="text-2xl font-bold">${stats.avgBillRate.toFixed(0)}/hr</p>
+                <p className="text-2xl font-bold">{currencySymbol}{stats.avgBillRate.toFixed(0)}/hr</p>
               </div>
             </div>
           </CardContent>
@@ -1027,7 +1034,7 @@ export default function ResourcesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        ${resource.billRateDefault?.toFixed(0) || 0}/hr
+                        {currencySymbol}{resource.billRateDefault?.toFixed(0) || 0}/hr
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -1088,6 +1095,7 @@ export default function ResourcesPage() {
         onSubmit={handleCreateResource}
         isLoading={createMutation.isPending}
         skills={skills}
+        currencySymbol={currencySymbol}
       />
 
       {/* Edit Resource Modal */}
@@ -1101,6 +1109,7 @@ export default function ResourcesPage() {
         onSubmit={handleUpdateResource}
         isLoading={updateMutation.isPending}
         skills={skills}
+        currencySymbol={currencySymbol}
       />
 
       {/* Delete Confirmation Dialog */}

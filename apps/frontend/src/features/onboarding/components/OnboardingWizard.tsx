@@ -186,12 +186,8 @@ function PhaseContent({ phase, onPhaseComplete }: PhaseContentProps) {
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
-  const { data: progressResponse, isLoading: progressLoading } = useOnboardingProgress();
-  const { data: summaryResponse, isLoading: summaryLoading } = useOnboardingSummary();
-  
-  // Extract data from API response wrapper
-  const progress = progressResponse?.data;
-  const summary = summaryResponse?.data;
+  const { data: progress, isLoading: progressLoading } = useOnboardingProgress();
+  const { data: summary, isLoading: summaryLoading } = useOnboardingSummary();
   
   const { 
     currentPhase, 
@@ -230,7 +226,7 @@ export function OnboardingWizard() {
   // Get completed phases from progress data
   const completedPhases = new Set<number>();
   if (progress?.phases) {
-    progress.phases.forEach((p) => {
+    progress.phases.forEach((p: { isComplete: boolean; phase: number }) => {
       if (p.isComplete) {
         completedPhases.add(p.phase);
       }

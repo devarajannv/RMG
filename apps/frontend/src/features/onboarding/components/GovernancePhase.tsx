@@ -68,6 +68,7 @@ import type {
   DelegationRule, 
   DelegationRuleInput,
   DelegatorType,
+  BusinessRole,
 } from '../types';
 
 // ============================================================================
@@ -163,10 +164,8 @@ function getDelegatorTypeBadge(type: DelegatorType) {
 // ============================================================================
 
 function DelegationRulesSection() {
-  const { data: rulesResponse, isLoading } = useDelegationRules();
-  const { data: businessRolesResponse } = useBusinessRoles();
-  const rules = rulesResponse?.data || [];
-  const businessRoles = businessRolesResponse?.data || [];
+  const { data: rules = [], isLoading } = useDelegationRules();
+  const { data: businessRoles = [] } = useBusinessRoles();
   const createRule = useCreateDelegationRule();
   const updateRule = useUpdateDelegationRule();
   const deleteRule = useDeleteDelegationRule();
@@ -313,7 +312,7 @@ function DelegationRulesSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rules.map((rule) => (
+              {rules.map((rule: DelegationRule) => (
                 <TableRow key={rule.id}>
                   <TableCell>
                     <div>
@@ -440,7 +439,7 @@ function DelegationRulesSection() {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {businessRoles.map((role) => (
+                      {businessRoles.map((role: BusinessRole) => (
                         <SelectItem key={role.id} value={role.id}>
                           {role.name}
                         </SelectItem>

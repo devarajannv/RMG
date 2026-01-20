@@ -111,13 +111,13 @@ const VALUE_ADJUSTMENTS = [
 // Helper Functions
 // ============================================================================
 
-function formatCurrency(amount: number, currency: string = 'INR'): string {
+function formatCurrency(amount: number, currency: string = 'USD'): string {
   if (currency === 'INR') {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`;
     if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)}L`;
     return `₹${amount.toLocaleString('en-IN')}`;
   }
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
 }
 
 function formatDate(dateStr: string): string {

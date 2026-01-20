@@ -41,6 +41,7 @@ import {
   Timer,
   Bell,
   Building2,
+  Briefcase,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -75,7 +76,7 @@ import { PERMISSIONS } from '@/hooks/usePermissions';
 
 type ApprovalChainStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED' | 'DEPRECATED';
 type ApprovalChainScope = 'TENANT' | 'PRACTICE' | 'GLOBAL';
-type ApproverType = 'ROLE' | 'USER' | 'DYNAMIC';
+type ApproverType = 'ROLE' | 'USER' | 'DYNAMIC' | 'FUNCTION';
 type ApprovalMode = 'ANY' | 'ALL' | 'MAJORITY' | 'FIRST_RESPONSE';
 type ConflictResolution = 'REJECTION_WINS' | 'APPROVAL_WINS' | 'MAJORITY_WINS';
 
@@ -92,6 +93,13 @@ interface User {
   email: string;
 }
 
+interface ApprovalFunction {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+}
+
 interface ApprovalStep {
   id?: string;
   name: string;
@@ -100,13 +108,16 @@ interface ApprovalStep {
   approverType: ApproverType;
   approverRoleId?: string;
   approverUserId?: string;
+  approvalFunctionId?: string;
   approverRole?: Role;
   approverUser?: User;
+  approvalFunction?: ApprovalFunction;
   practiceSource?: string;
   roleAssignmentMode?: string;
   fallbackType?: ApproverType;
   fallbackRoleId?: string;
   fallbackUserId?: string;
+  fallbackFunctionId?: string;
   skipIfUnresolvable?: boolean;
   approvalMode: ApprovalMode;
   onConflict?: ConflictResolution;
@@ -120,6 +131,7 @@ interface ApprovalStep {
   escalateToType?: ApproverType;
   escalateToRoleId?: string;
   escalateToUserId?: string;
+  escalateToFunctionId?: string;
   reminderAfterHours?: number;
   reminderIntervalHours?: number;
   maxReminders?: number;
@@ -177,6 +189,7 @@ const SCOPE_CONFIG: Record<ApprovalChainScope, { label: string; icon: React.Elem
 const APPROVER_TYPE_CONFIG: Record<ApproverType, { label: string; icon: React.ElementType; description: string }> = {
   ROLE: { label: 'Role', icon: Shield, description: 'Anyone with this role can approve' },
   USER: { label: 'Specific User', icon: User, description: 'Only this specific user can approve' },
+  FUNCTION: { label: 'Function', icon: Briefcase, description: 'User holding this approval function can approve' },
   DYNAMIC: { label: 'Dynamic', icon: Zap, description: 'Determined at runtime based on request context' },
 };
 
@@ -232,6 +245,12 @@ export default function WorkflowBuilderPage() {
     queryFn: () => api.get<{ success: boolean; data: User[] }>('/users'),
   });
 
+  // Fetch functions for step configuration
+  const { data: functionsResponse } = useQuery({
+    queryKey: ['functions'],
+    queryFn: () => api.get<{ success: boolean; data: ApprovalFunction[] }>('/functions'),
+  });
+
   const chains = chainsResponse?.data || [];
   const roles = rolesResponse?.data || [];
   const users = usersResponse?.data || [];
@@ -278,6 +297,7 @@ export default function WorkflowBuilderPage() {
           isNew={isCreating}
           roles={roles}
           users={users}
+          functions={functionsResponse?.data || []}
           onBack={handleBackToList}
           onSave={handleSaveComplete}
         />
@@ -558,6 +578,7 @@ function WorkflowCard({ chain, onEdit, onDelete }: WorkflowCardProps) {
                               {step.approverType === 'USER' &&
                                 step.approverUser &&
                                 `${step.approverUser.firstName} ${step.approverUser.lastName}`}
+                              {step.approverType === 'FUNCTION' && step.approvalFunction?.name}
                               {step.approverType === 'DYNAMIC' && 'Dynamic Assignment'}
                             </div>
                           </div>
@@ -596,11 +617,12 @@ interface WorkflowEditorProps {
   isNew: boolean;
   roles: Role[];
   users: User[];
+  functions: ApprovalFunction[];
   onBack: () => void;
   onSave: () => void;
 }
 
-function WorkflowEditor({ chain, isNew, roles, users, onBack, onSave }: WorkflowEditorProps) {
+function WorkflowEditor({ chain, isNew, roles, users, functions, onBack, onSave }: WorkflowEditorProps) {
   const [formData, setFormData] = useState<CreateChainInput>({
     code: chain?.code || '',
     name: chain?.name || '',
@@ -737,6 +759,9 @@ function WorkflowEditor({ chain, isNew, roles, users, onBack, onSave }: Workflow
       }
       if (step.approverType === 'USER' && !step.approverUserId) {
         newErrors[`step_${index}_approver`] = 'Please select a user';
+      }
+      if (step.approverType === 'FUNCTION' && !step.approvalFunctionId) {
+        newErrors[`step_${index}_approver`] = 'Please select a function';
       }
     });
 
@@ -957,6 +982,12 @@ function WorkflowEditor({ chain, isNew, roles, users, onBack, onSave }: Workflow
                                   })()}
                                 </>
                               )}
+                              {step.approverType === 'FUNCTION' && (
+                                <>
+                                  <Briefcase className="w-3 h-3" />
+                                  {functions.find((f: ApprovalFunction) => f.id === step.approvalFunctionId)?.name || 'Select function'}
+                                </>
+                              )}
                               {step.approverType === 'DYNAMIC' && (
                                 <>
                                   <Zap className="w-3 h-3" />
@@ -1032,6 +1063,7 @@ function WorkflowEditor({ chain, isNew, roles, users, onBack, onSave }: Workflow
                     index={selectedStepIndex}
                     roles={roles}
                     users={users}
+                    functions={functions}
                     errors={errors}
                     onUpdate={(updates) => handleUpdateStep(selectedStepIndex, updates)}
                   />
@@ -1054,11 +1086,12 @@ interface StepConfigPanelProps {
   index: number;
   roles: Role[];
   users: User[];
+  functions: ApprovalFunction[];
   errors: Record<string, string>;
   onUpdate: (updates: Partial<CreateChainInput['steps'][0]>) => void;
 }
 
-function StepConfigPanel({ step, index, roles, users, errors, onUpdate }: StepConfigPanelProps) {
+function StepConfigPanel({ step, index, roles, users, functions, errors, onUpdate }: StepConfigPanelProps) {
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced' | 'timing'>('basic');
 
   return (
@@ -1113,7 +1146,7 @@ function StepConfigPanel({ step, index, roles, users, errors, onUpdate }: StepCo
 
           <div>
             <Label>Approver Type *</Label>
-            <div className="grid grid-cols-3 gap-2 mt-2">
+            <div className="grid grid-cols-2 gap-2 mt-2">
               {Object.entries(APPROVER_TYPE_CONFIG).map(([key, config]) => (
                 <button
                   key={key}
@@ -1123,6 +1156,7 @@ function StepConfigPanel({ step, index, roles, users, errors, onUpdate }: StepCo
                       approverType: key as ApproverType,
                       approverRoleId: undefined,
                       approverUserId: undefined,
+                      approvalFunctionId: undefined,
                     })
                   }
                   className={cn(
@@ -1175,6 +1209,28 @@ function StepConfigPanel({ step, index, roles, users, errors, onUpdate }: StepCo
                 error={!!errors[`step_${index}_approver`]}
                 emptyMessage="No users found"
               />
+            </div>
+          )}
+
+          {step.approverType === 'FUNCTION' && (
+            <div>
+              <Label>Select Function *</Label>
+              <SearchableSelect
+                options={functions.map((func) => ({
+                  value: func.id,
+                  label: func.name,
+                  description: func.code,
+                }))}
+                value={step.approvalFunctionId || ''}
+                onChange={(v) => onUpdate({ approvalFunctionId: v })}
+                placeholder="Select an approval function"
+                searchPlaceholder="Search functions..."
+                error={!!errors[`step_${index}_approver`]}
+                emptyMessage="No functions found"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                The user currently holding this function will be the approver
+              </p>
             </div>
           )}
 

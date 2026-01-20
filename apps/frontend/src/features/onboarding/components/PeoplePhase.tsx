@@ -95,6 +95,9 @@ import type {
   InvitationInput,
   ResourceStatus,
   ImportResourceRow,
+  Department,
+  Team,
+  GradeBand,
 } from '../types';
 
 // ============================================================================
@@ -182,14 +185,10 @@ function getStatusBadge(status: ResourceStatus) {
 // ============================================================================
 
 function ResourcesSection() {
-  const { data: resourcesResponse, isLoading } = useResources();
-  const { data: departmentsResponse } = useDepartments();
-  const { data: teamsResponse } = useTeams();
-  const { data: gradeBandsResponse } = useGradeBands();
-  const resources = resourcesResponse?.data || [];
-  const departments = departmentsResponse?.data || [];
-  const teams = teamsResponse?.data || [];
-  const gradeBands = gradeBandsResponse?.data || [];
+  const { data: resources = [], isLoading } = useResources();
+  const { data: departments = [] } = useDepartments();
+  const { data: teams = [] } = useTeams();
+  const { data: gradeBands = [] } = useGradeBands();
   const createResource = useCreateResource();
   const updateResource = useUpdateResource();
   const deleteResource = useDeleteResource();
@@ -217,7 +216,7 @@ function ResourcesSection() {
     if (!resources) return [];
     if (!searchQuery) return resources;
     const query = searchQuery.toLowerCase();
-    return resources.filter(r => 
+    return resources.filter((r: Resource) => 
       r.firstName.toLowerCase().includes(query) ||
       r.lastName.toLowerCase().includes(query) ||
       r.email.toLowerCase().includes(query) ||
@@ -228,7 +227,7 @@ function ResourcesSection() {
   const selectedDepartmentId = watch('departmentId');
   const filteredTeams = useMemo(() => {
     if (!teams || !selectedDepartmentId) return [];
-    return teams.filter(t => t.departmentId === selectedDepartmentId);
+    return teams.filter((t: Team) => t.departmentId === selectedDepartmentId);
   }, [teams, selectedDepartmentId]);
 
   const openCreateDialog = () => {
@@ -516,7 +515,7 @@ function ResourcesSection() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>
-                      {departments?.map((dept) => (
+                      {departments?.map((dept: Department) => (
                         <SelectItem key={dept.id} value={dept.id}>
                           {dept.name}
                         </SelectItem>
@@ -536,7 +535,7 @@ function ResourcesSection() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">None</SelectItem>
-                        {filteredTeams.map((team) => (
+                        {filteredTeams.map((team: Team) => (
                           <SelectItem key={team.id} value={team.id}>
                             {team.name}
                           </SelectItem>
@@ -561,7 +560,7 @@ function ResourcesSection() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>
-                      {gradeBands?.map((band) => (
+                      {gradeBands?.map((band: GradeBand) => (
                         <SelectItem key={band.id} value={band.id}>
                           {band.name} ({band.code})
                         </SelectItem>
@@ -637,10 +636,8 @@ function ResourcesSection() {
 // ============================================================================
 
 function InvitationsSection() {
-  const { data: invitationsResponse, isLoading } = useInvitations();
-  const { data: resourcesResponse } = useResources();
-  const invitations = invitationsResponse?.data || [];
-  const resources = resourcesResponse?.data || [];
+  const { data: invitations = [], isLoading } = useInvitations();
+  const { data: resources = [] } = useResources();
   const sendInvitation = useSendInvitation();
   const revokeInvitation = useRevokeInvitation();
   const resendInvitation = useResendInvitation();
@@ -656,7 +653,7 @@ function InvitationsSection() {
 
   const resourcesWithoutAccounts = useMemo(() => {
     if (!resources) return [];
-    return resources.filter(r => !r.user || r.user.length === 0);
+    return resources.filter((r: Resource) => !r.user || r.user.length === 0);
   }, [resources]);
 
   // Track resourceId for potential validation - underscore prefix avoids linter warning
@@ -753,7 +750,7 @@ function InvitationsSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invitations.map((invitation) => (
+              {invitations.map((invitation: UserInvitation) => (
                 <TableRow key={invitation.id}>
                   <TableCell>{invitation.email}</TableCell>
                   <TableCell>
@@ -845,7 +842,7 @@ function InvitationsSection() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>
-                      {resourcesWithoutAccounts.map((resource) => (
+                      {resourcesWithoutAccounts.map((resource: Resource) => (
                         <SelectItem key={resource.id} value={resource.id}>
                           {resource.firstName} {resource.lastName} ({resource.email})
                         </SelectItem>
@@ -1090,7 +1087,7 @@ export function PeoplePhase({ onPhaseComplete }: PeoplePhaseProps) {
   const { data: invitations } = useInvitations();
   const completeStep = useCompleteStep();
 
-  const pendingInvitations = invitations?.filter(i => i.status === 'PENDING').length || 0;
+  const pendingInvitations = invitations?.filter((i: UserInvitation) => i.status === 'PENDING').length || 0;
 
   const handleContinue = async () => {
     await completeStep.mutateAsync({ phase: 4, stepCode: 'resources' });

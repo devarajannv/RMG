@@ -1,13 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  Edit,
-  Trash2,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
   FileText,
   Building2,
   Calendar,
@@ -19,9 +14,6 @@ import {
   History,
   File,
   Clock,
-  AlertTriangle,
-  TrendingUp,
-  Zap,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -58,11 +50,18 @@ interface ContractMilestone {
 interface ContractDocument {
   id: string;
   name: string;
-  type: string;
+  type: 'CONTRACT' | 'AMENDMENT' | 'ATTACHMENT' | 'SOW' | 'INVOICE' | 'OTHER';
+  mimeType: string;
   size: number;
+  url: string;
+  version: number;
+  uploadedBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
   uploadedAt: string;
-  uploadedBy: { id: string; name: string };
-  url?: string;
+  description?: string;
 }
 
 interface ContractAuditEntry {
@@ -165,13 +164,14 @@ const BILLING_LABELS: Record<string, string> = {
 // Helper Functions
 // ============================================================================
 
-function formatCurrency(value: number, currency: string = 'INR'): string {
+function formatCurrencyValue(value: number, currency: string = 'USD'): string {
   if (currency === 'INR') {
     if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)}Cr`;
     if (value >= 100000) return `₹${(value / 100000).toFixed(2)}L`;
     return `₹${value.toLocaleString('en-IN')}`;
   }
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+  // Use Intl for proper currency formatting
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
 }
 
 function formatDate(dateStr?: string): string {
@@ -203,7 +203,6 @@ function getDaysRemaining(endDate?: string): { days: number; status: 'ok' | 'war
 export default function ContractDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
   const [showRenewalDialog, setShowRenewalDialog] = useState(false);
 
@@ -218,20 +217,6 @@ export default function ContractDetailPage() {
   });
 
   // Mutations
-  const activateMutation = useMutation({
-    mutationFn: () => api.post(`/contracts/${id}/activate`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract', id] });
-    },
-  });
-
-  const terminateMutation = useMutation({
-    mutationFn: (reason: string) => api.post(`/contracts/${id}/terminate`, { reason }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract', id] });
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/contracts/${id}`),
     onSuccess: () => {
@@ -239,32 +224,7 @@ export default function ContractDetailPage() {
     },
   });
 
-  const renewMutation = useMutation({
-    mutationFn: (data: { newEndDate: string; newValue?: number; notes?: string }) =>
-      api.post(`/contracts/${id}/renew`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract', id] });
-      setShowRenewalDialog(false);
-    },
-  });
-
   // Handlers
-  async function handleActivate() {
-    if (!confirm('Activate this contract?')) return;
-    await activateMutation.mutateAsync();
-  }
-
-  async function handleTerminate() {
-    const reason = prompt('Reason for termination:');
-    if (!reason) return;
-    try {
-      await terminateMutation.mutateAsync(reason);
-    } catch (err) {
-      console.error('Failed to terminate:', err);
-      alert('Failed to terminate contract');
-    }
-  }
-
   async function handleDelete() {
     if (!confirm('Delete this contract? This cannot be undone.')) return;
     try {
@@ -274,16 +234,6 @@ export default function ContractDetailPage() {
       alert('Failed to delete contract. It may have linked projects.');
     }
   }
-
-  async function handleRenew(data: { newEndDate: string; newValue?: number; notes?: string }) {
-    await renewMutation.mutateAsync(data);
-  }
-
-  const actionLoading = 
-    activateMutation.isPending || 
-    terminateMutation.isPending || 
-    deleteMutation.isPending ||
-    renewMutation.isPending;
 
   // Loading state
   if (isLoading) {
@@ -349,12 +299,10 @@ export default function ContractDetailPage() {
           <div className="flex gap-2">
             <ContractQuickActions
               contract={contract}
-              onActivate={handleActivate}
-              onTerminate={handleTerminate}
-              onRenew={() => setShowRenewalDialog(true)}
+              onStatusChange={() => refetch()}
               onEdit={() => navigate(`/contracts/${contract.id}/edit`)}
-              onDelete={handleDelete}
-              loading={actionLoading}
+              onRenew={() => setShowRenewalDialog(true)}
+              onDelete={() => handleDelete()}
             />
           </div>
         </div>
@@ -453,7 +401,7 @@ export default function ContractDetailPage() {
                       <LinkIcon className="h-5 w-5 text-gray-400" />
                       Linked Projects ({contract.projects.length})
                     </CardTitle>
-                    <Can I="create" a="project">
+                    <Can permission="projects:create">
                       <Button variant="outline" size="sm">
                         <Plus className="h-4 w-4 mr-1" />
                         Link Project
@@ -542,7 +490,7 @@ export default function ContractDetailPage() {
                     {contract.value ? (
                       <div className="text-center p-4 bg-green-50 rounded-lg">
                         <p className="text-3xl font-bold text-green-700">
-                          {formatCurrency(contract.value, contract.currency)}
+                          {formatCurrencyValue(contract.value, contract.currency)}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">{contract.currency}</p>
                       </div>
@@ -619,9 +567,7 @@ export default function ContractDetailPage() {
             <ContractMilestones
               contractId={contract.id}
               milestones={contract.milestones || []}
-              billingType={contract.billingType}
               currency={contract.currency}
-              onUpdate={() => refetch()}
             />
           </TabsContent>
 
@@ -630,8 +576,6 @@ export default function ContractDetailPage() {
             <ContractDocuments
               contractId={contract.id}
               documents={contract.documents || []}
-              contractDocumentUrl={contract.documentUrl}
-              onUpdate={() => refetch()}
             />
           </TabsContent>
 
@@ -639,11 +583,8 @@ export default function ContractDetailPage() {
           <TabsContent value="budget" className="mt-6">
             <ContractBudgetPanel
               contractId={contract.id}
-              totalValue={contract.value || 0}
+              contractValue={contract.value || 0}
               currency={contract.currency}
-              budget={contract.budget}
-              billingType={contract.billingType}
-              milestones={contract.milestones || []}
             />
           </TabsContent>
 
@@ -651,24 +592,16 @@ export default function ContractDetailPage() {
           <TabsContent value="history" className="mt-6">
             <ContractAuditHistory
               contractId={contract.id}
-              history={contract.auditHistory || []}
             />
           </TabsContent>
         </Tabs>
 
         {/* Renewal Dialog */}
         <ContractRenewalDialog
-          open={showRenewalDialog}
-          onOpenChange={setShowRenewalDialog}
-          contract={{
-            id: contract.id,
-            name: contract.name,
-            currentEndDate: contract.endDate || '',
-            value: contract.value,
-            currency: contract.currency,
-          }}
-          onRenew={handleRenew}
-          loading={renewMutation.isPending}
+          isOpen={showRenewalDialog}
+          onClose={() => setShowRenewalDialog(false)}
+          contract={contract}
+          onSuccess={() => refetch()}
         />
       </div>
     </MainLayout>
