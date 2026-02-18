@@ -15,7 +15,7 @@
 
 import prisma from '../../lib/prisma';
 import { logger } from '../../lib/logger';
-import { ProjectType, ProjectStatus, AllocationStatus, TimesheetStatus } from '@prisma/client';
+import { ProjectType, ProjectStatus } from '@prisma/client';
 
 // ============================================================================
 // Types
@@ -214,18 +214,8 @@ export interface ExecutiveBudgetSummary {
 // Constants
 // ============================================================================
 
-const HOURS_PER_DAY = 8;
-const DAYS_PER_MONTH = 22;
-const HOURS_PER_MONTH = HOURS_PER_DAY * DAYS_PER_MONTH;
-
 const DEFAULT_BILL_RATE = 125; // USD/hour
 const DEFAULT_COST_RATE = 75; // USD/hour
-
-const BUDGET_THRESHOLDS = {
-  healthy: 80,     // < 80% burn = healthy
-  atRisk: 100,     // 80-100% = at risk
-  critical: 100,   // > 100% = critical (over budget)
-};
 
 // ============================================================================
 // Core Service Functions

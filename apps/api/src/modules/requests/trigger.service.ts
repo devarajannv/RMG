@@ -18,12 +18,11 @@ import {
   TriggerEventStatus,
   TriggerExecutionStatus,
   Priority,
-  RequestStatus,
 } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
-import { submitRequest } from './request.service';
+import { createRequest } from './request.service';
 import * as crypto from 'crypto';
 
 // Import pure functions from logic module (tested without mocks)
@@ -139,7 +138,7 @@ export async function createInboundWebhook(
     },
   });
 
-  logger.info({ tenantId, webhookId: webhook.id, source: input.source }, 'Inbound webhook created');
+  logger.info('Inbound webhook created', { tenantId, webhookId: webhook.id, source: input.source });
   return webhook;
 }
 
@@ -194,7 +193,7 @@ export async function getInboundWebhook(
   });
 
   if (!webhook || webhook.tenantId !== tenantId) {
-    throw new ApiError(404, 'Inbound webhook not found');
+    throw new ApiError('Inbound webhook not found', 404);
   }
 
   return webhook;
@@ -234,7 +233,7 @@ export async function updateInboundWebhook(
   });
 
   if (!existing || existing.tenantId !== tenantId) {
-    throw new ApiError(404, 'Inbound webhook not found');
+    throw new ApiError('Inbound webhook not found', 404);
   }
 
   return prisma.inboundWebhook.update({
@@ -261,7 +260,7 @@ export async function regenerateWebhookSecret(
   });
 
   if (!existing || existing.tenantId !== tenantId) {
-    throw new ApiError(404, 'Inbound webhook not found');
+    throw new ApiError('Inbound webhook not found', 404);
   }
 
   const secretKey = crypto.randomBytes(32).toString('hex');
@@ -287,18 +286,18 @@ export async function deleteInboundWebhook(
   });
 
   if (!existing || existing.tenantId !== tenantId) {
-    throw new ApiError(404, 'Inbound webhook not found');
+    throw new ApiError('Inbound webhook not found', 404);
   }
 
   if (existing.triggers.length > 0) {
-    throw new ApiError(400, 'Cannot delete webhook with active triggers. Delete triggers first.');
+    throw new ApiError('Cannot delete webhook with active triggers. Delete triggers first.', 400);
   }
 
   await prisma.inboundWebhook.delete({
     where: { id: webhookId },
   });
 
-  logger.info({ tenantId, webhookId }, 'Inbound webhook deleted');
+  logger.info('Inbound webhook deleted', { tenantId, webhookId });
 }
 
 // ============================================================================
@@ -320,7 +319,7 @@ export async function createRequestTrigger(
   });
 
   if (!requestTypeConfig || requestTypeConfig.tenantId !== tenantId) {
-    throw new ApiError(404, 'Request type configuration not found');
+    throw new ApiError('Request type configuration not found', 404);
   }
 
   // Validate webhook if provided
@@ -329,7 +328,7 @@ export async function createRequestTrigger(
       where: { id: input.webhookId },
     });
     if (!webhook || webhook.tenantId !== tenantId) {
-      throw new ApiError(404, 'Inbound webhook not found');
+      throw new ApiError('Inbound webhook not found', 404);
     }
   }
 
@@ -339,7 +338,7 @@ export async function createRequestTrigger(
       where: { id: input.approvalChainId },
     });
     if (!chain || chain.tenantId !== tenantId) {
-      throw new ApiError(404, 'Approval chain not found');
+      throw new ApiError('Approval chain not found', 404);
     }
   }
 
@@ -354,11 +353,11 @@ export async function createRequestTrigger(
       sourceType: input.sourceType,
       webhookId: input.webhookId,
       eventType: input.eventType,
-      eventFilter: input.eventFilter as Prisma.JsonValue,
+      eventFilter: input.eventFilter as Prisma.InputJsonValue,
       requestTypeConfigId: input.requestTypeConfigId,
-      fieldMapping: input.fieldMapping as Prisma.JsonValue,
+      fieldMapping: input.fieldMapping as Prisma.InputJsonValue,
       defaultPriority: input.defaultPriority || 'MEDIUM',
-      defaultMetadata: input.defaultMetadata as Prisma.JsonValue,
+      defaultMetadata: input.defaultMetadata as Prisma.InputJsonValue,
       approvalChainId: input.approvalChainId,
       requireConfirmation: input.requireConfirmation ?? false,
       deduplicationKey: input.deduplicationKey,
@@ -375,8 +374,8 @@ export async function createRequestTrigger(
   });
 
   logger.info(
-    { tenantId, triggerId: trigger.id, name: input.name, eventType: input.eventType },
-    'Request trigger created'
+    'Request trigger created',
+    { tenantId, triggerId: trigger.id, name: input.name, eventType: input.eventType }
   );
 
   return trigger;
@@ -389,7 +388,7 @@ export async function createRequestTrigger(
 function validateFieldMapping(mapping: Record<string, string>): void {
   const result = validateMappingLogic(mapping);
   if (!result.valid) {
-    throw new ApiError(400, result.errors.join('; '));
+    throw new ApiError(result.errors.join('; '), 400);
   }
 }
 
@@ -467,7 +466,7 @@ export async function getRequestTrigger(
   });
 
   if (!trigger || trigger.tenantId !== tenantId || trigger.deletedAt) {
-    throw new ApiError(404, 'Request trigger not found');
+    throw new ApiError('Request trigger not found', 404);
   }
 
   return trigger;
@@ -486,7 +485,7 @@ export async function updateRequestTrigger(
   });
 
   if (!existing || existing.tenantId !== tenantId || existing.deletedAt) {
-    throw new ApiError(404, 'Request trigger not found');
+    throw new ApiError('Request trigger not found', 404);
   }
 
   if (input.fieldMapping) {
@@ -498,7 +497,7 @@ export async function updateRequestTrigger(
       where: { id: input.approvalChainId },
     });
     if (!chain || chain.tenantId !== tenantId) {
-      throw new ApiError(404, 'Approval chain not found');
+      throw new ApiError('Approval chain not found', 404);
     }
   }
 
@@ -508,10 +507,10 @@ export async function updateRequestTrigger(
       name: input.name,
       description: input.description,
       eventType: input.eventType,
-      eventFilter: input.eventFilter as Prisma.JsonValue,
-      fieldMapping: input.fieldMapping as Prisma.JsonValue,
+      eventFilter: input.eventFilter as Prisma.InputJsonValue,
+      fieldMapping: input.fieldMapping as Prisma.InputJsonValue,
       defaultPriority: input.defaultPriority,
-      defaultMetadata: input.defaultMetadata as Prisma.JsonValue,
+      defaultMetadata: input.defaultMetadata as Prisma.InputJsonValue,
       approvalChainId: input.approvalChainId,
       isActive: input.isActive,
       requireConfirmation: input.requireConfirmation,
@@ -540,7 +539,7 @@ export async function deleteRequestTrigger(
   });
 
   if (!existing || existing.tenantId !== tenantId) {
-    throw new ApiError(404, 'Request trigger not found');
+    throw new ApiError('Request trigger not found', 404);
   }
 
   await prisma.requestTrigger.update({
@@ -548,7 +547,7 @@ export async function deleteRequestTrigger(
     data: { deletedAt: new Date(), isActive: false },
   });
 
-  logger.info({ tenantId, triggerId }, 'Request trigger deleted');
+  logger.info('Request trigger deleted', { tenantId, triggerId });
 }
 
 // ============================================================================
@@ -592,7 +591,7 @@ export async function processWebhookEvent(
   });
 
   if (!webhook || !webhook.isActive) {
-    throw new ApiError(404, 'Webhook not found or inactive');
+    throw new ApiError('Webhook not found or inactive', 404);
   }
 
   // Log the event
@@ -600,8 +599,8 @@ export async function processWebhookEvent(
     data: {
       webhookId: webhook.id,
       eventType: input.eventType,
-      payload: input.payload as Prisma.JsonValue,
-      headers: input.headers as Prisma.JsonValue,
+      payload: input.payload as Prisma.InputJsonValue,
+      headers: input.headers as Prisma.InputJsonValue,
       signatureValid: input.signature
         ? validateWebhookSignature(
             JSON.stringify(input.payload),
@@ -632,7 +631,7 @@ export async function processWebhookEvent(
       where: { id: webhookEvent.id },
       data: { status: 'SKIPPED', processedAt: new Date() },
     });
-    logger.info({ webhookId: webhook.id, eventType: input.eventType }, 'No matching triggers for event');
+    logger.info('No matching triggers for event', { webhookId: webhook.id, eventType: input.eventType });
     return [];
   }
 
@@ -724,59 +723,51 @@ export async function executeTrigger(
 
     // 5. Create the request
     const requestTypeConfig = trigger.requestTypeConfig;
-    const approvalChain = trigger.approvalChain || requestTypeConfig.approvalChain;
-
-    // Determine request status based on requireConfirmation
-    const initialStatus: RequestStatus = trigger.requireConfirmation ? 'DRAFT' : 'PENDING_APPROVAL';
 
     // Build request data
-    const requestData = {
-      ...mappedFields.metadata,
+    const requestData: Record<string, unknown> = {
+      ...((mappedFields.metadata as Record<string, unknown>) || {}),
       ...((trigger.defaultMetadata as Record<string, unknown>) || {}),
       _triggerId: trigger.id,
       _webhookEventId: webhookEventId,
     };
 
     // Create request using the request service
-    const request = await submitRequest(
+    const request = await createRequest(
       trigger.tenantId,
       trigger.createdById, // Use trigger creator as system user
       {
-        typeId: requestTypeConfig.requestTypeId,
-        title: mappedFields.title as string,
-        description: mappedFields.description as string || `Auto-created from ${trigger.name}`,
+        typeCode: requestTypeConfig.requestType.code,
+        title: (mappedFields.title as string) || `Auto-created from ${trigger.name}`,
+        description: (mappedFields.description as string) || `Auto-created from ${trigger.name}`,
         requestData,
         priority: trigger.defaultPriority,
-        resourceId: mappedFields.resourceId as string,
-        projectId: mappedFields.projectId as string,
-        externalRef: mappedFields.externalRef as string,
-        externalUrl: mappedFields.externalUrl as string,
-      },
-      {
-        skipValidation: false,
-        autoSubmit: !trigger.requireConfirmation,
+        resourceId: mappedFields.resourceId as string | undefined,
+        projectId: mappedFields.projectId as string | undefined,
+        externalRef: mappedFields.externalRef as string | undefined,
+        externalUrl: mappedFields.externalUrl as string | undefined,
       }
     );
 
     logger.info(
+      'Trigger created request',
       {
         tenantId: trigger.tenantId,
         triggerId: trigger.id,
-        requestId: request.id,
-        requestNumber: request.requestNumber,
-      },
-      'Trigger created request'
+        requestId: request.id as string,
+        requestNumber: request.requestNumber as string,
+      }
     );
 
     return await logExecution(trigger.id, webhookEventId, payload, {
       status: 'SUCCESS',
-      requestId: request.id,
+      requestId: request.id as string,
       mappedFields,
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error({ triggerId: trigger.id, error: errorMessage }, 'Trigger execution failed');
+    logger.error('Trigger execution failed', { triggerId: trigger.id, error: errorMessage });
 
     return await logExecution(trigger.id, webhookEventId, payload, {
       status: 'FAILED_ERROR',
@@ -802,29 +793,36 @@ async function logExecution(
     durationMs?: number;
   }
 ): Promise<TriggerExecutionResult> {
-  const execution = await prisma.triggerExecution.create({
+  await prisma.triggerExecution.create({
     data: {
       triggerId,
       webhookEventId,
-      inputPayload: payload as Prisma.JsonValue,
+      inputPayload: payload as Prisma.InputJsonValue,
       matchedFilter: !result.status.startsWith('SKIPPED_FILTER'),
       status: result.status,
       requestId: result.requestId,
       errorMessage: result.errorMessage,
       skippedReason: result.skippedReason,
-      mappedFields: result.mappedFields as Prisma.JsonValue,
+      mappedFields: result.mappedFields as Prisma.InputJsonValue | undefined,
       durationMs: result.durationMs,
     },
-    include: {
-      request: { select: { requestNumber: true } },
-    },
   });
+
+  // Look up request number if we have a requestId
+  let requestNumber: string | undefined;
+  if (result.requestId) {
+    const req = await prisma.request.findUnique({
+      where: { id: result.requestId },
+      select: { requestNumber: true },
+    });
+    requestNumber = req?.requestNumber;
+  }
 
   return {
     triggerId,
     status: result.status,
     requestId: result.requestId,
-    requestNumber: execution.request?.requestNumber,
+    requestNumber,
     errorMessage: result.errorMessage,
     skippedReason: result.skippedReason,
   };
@@ -867,7 +865,7 @@ async function checkDuplication(
       executedAt: { gte: cutoffTime },
       inputPayload: {
         path: [trigger.deduplicationKey.replace('$.', '').split('.')[0]],
-        equals: deduplicationValue,
+        equals: deduplicationValue as Prisma.InputJsonValue,
       },
     },
   });
@@ -909,7 +907,7 @@ export async function manuallyExecuteTrigger(
   });
 
   if (!trigger || trigger.tenantId !== tenantId || trigger.deletedAt) {
-    throw new ApiError(404, 'Request trigger not found');
+    throw new ApiError('Request trigger not found', 404);
   }
 
   return executeTrigger(trigger, payload);
@@ -933,7 +931,7 @@ export async function getTriggerExecutions(
   });
 
   if (!trigger || trigger.tenantId !== tenantId) {
-    throw new ApiError(404, 'Request trigger not found');
+    throw new ApiError('Request trigger not found', 404);
   }
 
   const page = options.page || 1;
@@ -976,7 +974,7 @@ export async function getWebhookEvents(
   });
 
   if (!webhook || webhook.tenantId !== tenantId) {
-    throw new ApiError(404, 'Inbound webhook not found');
+    throw new ApiError('Inbound webhook not found', 404);
   }
 
   const page = options.page || 1;

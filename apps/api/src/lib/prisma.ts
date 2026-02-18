@@ -6,13 +6,6 @@ import { logger } from './logger';
 // Query Performance Tracking
 // ============================================================================
 
-interface QueryMetrics {
-  model: string;
-  action: string;
-  duration: number;
-  timestamp: number;
-}
-
 const SLOW_QUERY_THRESHOLD = 100; // ms
 
 // ============================================================================
@@ -46,16 +39,16 @@ function createPrismaClient(): PrismaClient {
       
       // Log slow queries
       if (duration > SLOW_QUERY_THRESHOLD) {
-        logger.warn({
+        logger.warn(`Slow query detected: ${duration}ms`, {
           type: 'slow_query',
           duration,
           query: e.query.substring(0, 500),
           params: e.params.substring(0, 200),
-        }, `Slow query detected: ${duration}ms`);
+        });
       }
       
       // Debug logging for all queries
-      logger.debug({
+      logger.debug(`Query executed in ${duration}ms`, {
         type: 'query',
         duration,
         query: e.query.substring(0, 200),

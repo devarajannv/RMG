@@ -5,7 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
-import { redis } from '../../lib/redis';
+import { getRedis } from '../../lib/redis';
 import { logger } from '../../lib/logger';
 import { collectMetrics, getMetricsText } from './metrics';
 
@@ -218,6 +218,7 @@ async function checkRedis(): Promise<ComponentCheck> {
   const start = Date.now();
   
   try {
+    const redis = getRedis();
     if (!redis) {
       return {
         status: 'down',

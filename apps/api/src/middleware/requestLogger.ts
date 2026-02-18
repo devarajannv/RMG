@@ -1,16 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger, sanitizeLogData, requestContext, generateRequestId, RequestContext } from '../lib/logger';
 
-declare global {
-  namespace Express {
-    interface Request {
-      requestId: string;
-      correlationId?: string;
-      startTime: number;
-    }
-  }
-}
-
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   // Generate or use existing request ID
   const requestId = (req.headers['x-request-id'] as string) || generateRequestId();

@@ -1,5 +1,4 @@
 import prisma from '../../lib/prisma';
-import { logger } from '../../lib/logger';
 
 // ============================================================================
 // Types
@@ -124,8 +123,6 @@ const PROFICIENCY_SCORES: Record<string, number> = {
   INTERMEDIATE: 50,
   BEGINNER: 25,
 };
-
-const PROFICIENCY_ORDER = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'];
 
 // ============================================================================
 // Smart Matching Algorithm
@@ -444,7 +441,7 @@ export async function analyzeProjectSkillGap(
         include: {
           resource: {
             include: {
-              skills: { include: { skill: true } },
+              skills: { include: { skill: { include: { category: true } } } },
             },
           },
         },

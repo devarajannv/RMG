@@ -273,7 +273,7 @@ export async function manuallyExecuteTrigger(req: Request, res: Response, next: 
  * Receive inbound webhook (public endpoint - no auth required)
  * POST /api/webhooks/inbound/:endpointPath
  */
-export async function receiveInboundWebhook(req: Request, res: Response, next: NextFunction) {
+export async function receiveInboundWebhook(req: Request, res: Response, _next: NextFunction) {
   try {
     const { endpointPath } = req.params;
     
@@ -302,7 +302,7 @@ export async function receiveInboundWebhook(req: Request, res: Response, next: N
     });
 
     // Return success (most webhook providers expect 200/202)
-    res.status(202).json({
+    return res.status(202).json({
       received: true,
       eventType,
       triggers: results.length,
@@ -316,7 +316,7 @@ export async function receiveInboundWebhook(req: Request, res: Response, next: N
     // Always return 200/202 to webhook providers to prevent retries
     // Log the error but don't expose it
     console.error('Webhook processing error:', error);
-    res.status(202).json({ received: true, error: 'Processing failed' });
+    return res.status(202).json({ received: true, error: 'Processing failed' });
   }
 }
 
@@ -354,7 +354,7 @@ function extractEventType(
 
   // Slack
   if (source === 'SLACK') {
-    return payload.type as string || payload.event?.type as string || 'unknown';
+    return payload.type as string || (payload.event as Record<string, unknown>)?.type as string || 'unknown';
   }
 
   // Teams

@@ -59,7 +59,7 @@ router.post(
 
       const webhook = await webhookService.registerWebhook(
         req.tenantId!,
-        req.userId!,
+        req.user!.id,
         {
           ...input,
           events: input.events as webhookService.WebhookConfig['events'],

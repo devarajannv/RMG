@@ -18,7 +18,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
       data: users,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }
 
@@ -36,12 +36,12 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: user,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }
 
@@ -67,7 +67,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       roleIds,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: user,
     });
@@ -78,7 +78,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
         error: error.message,
       });
     }
-    next(error);
+    return next(error);
   }
 }
 
@@ -96,7 +96,7 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
       status,
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: user,
     });
@@ -107,7 +107,7 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
         error: error.message,
       });
     }
-    next(error);
+    return next(error);
   }
 }
 
@@ -127,12 +127,12 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
 
     await userService.deleteUser(id, tenantId);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'User deleted successfully',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }
 
@@ -152,7 +152,7 @@ export async function assignRole(req: Request, res: Response, next: NextFunction
 
     await userService.assignRoleToUser(id, roleId, assignedBy);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Role assigned successfully',
     });
@@ -163,7 +163,7 @@ export async function assignRole(req: Request, res: Response, next: NextFunction
         error: error.message,
       });
     }
-    next(error);
+    return next(error);
   }
 }
 
@@ -179,7 +179,7 @@ export async function removeRole(req: Request, res: Response, next: NextFunction
       message: 'Role removed successfully',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }
 
@@ -199,12 +199,12 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 
     await userService.resetUserPassword(id, tenantId, newPassword);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Password reset successfully',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }
 
@@ -224,11 +224,11 @@ export async function toggleStatus(req: Request, res: Response, next: NextFuncti
 
     const user = await userService.toggleUserStatus(id, tenantId);
 
-    res.json({
+    return res.json({
       success: true,
       data: user,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }

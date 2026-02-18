@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as intelligenceService from './intelligence.service';
 import { authenticate, authorize } from '../../middleware/auth';
+import prisma from '../../lib/prisma';
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.post(
         },
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -91,7 +92,7 @@ router.get(
 
       res.json({ data: analysis });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -108,7 +109,7 @@ router.get(
       const insights = await intelligenceService.getUtilizationInsights(req.tenantId!);
       res.json({ data: insights });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -141,7 +142,7 @@ router.get(
 
       res.json({ data: recommendations });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -158,7 +159,7 @@ router.get(
       const inventory = await intelligenceService.getSkillInventory(req.tenantId!);
       res.json({ data: inventory });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -181,7 +182,7 @@ router.post(
       const input = schema.parse(req.body);
 
       // Find skill IDs by name
-      const skills = await (await import('../../lib/prisma')).default.skill.findMany({
+      const skills = await prisma.skill.findMany({
         where: {
           tenantId: req.tenantId!,
           name: { in: input.skillNames, mode: 'insensitive' },
@@ -199,7 +200,7 @@ router.post(
       const matches = await intelligenceService.findMatchingResources(
         req.tenantId!,
         {
-          requiredSkills: skills.map(s => s.id),
+          requiredSkills: skills.map((s: { id: string; name: string }) => s.id),
           allocationPercentage: input.availableOnly ? 50 : undefined,
         },
         {
@@ -208,15 +209,15 @@ router.post(
         }
       );
 
-      res.json({
+      return res.json({
         data: matches,
         meta: {
-          searchedSkills: skills.map(s => s.name),
+          searchedSkills: skills.map((s: { id: string; name: string }) => s.name),
           matchCount: matches.length,
         },
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -280,7 +281,7 @@ router.get(
         },
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );

@@ -72,7 +72,7 @@ function setAuthCookies(res: Response, tokens: any): void {
  * GET /api/v1/auth/microsoft/status
  * Check if Microsoft SSO is configured
  */
-router.get('/status', (req: Request, res: Response) => {
+router.get('/status', (_req: Request, res: Response) => {
   res.json({
     enabled: microsoftService.isMicrosoftSSOConfigured(),
     provider: 'Microsoft 365',
@@ -87,7 +87,7 @@ router.get('/status', (req: Request, res: Response) => {
  * - tenantId: Optional tenant ID to associate with the user
  * - redirectUrl: Optional URL to redirect after successful login
  */
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Check if SSO is configured
     if (!microsoftService.isMicrosoftSSOConfigured()) {
@@ -126,7 +126,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
  * GET /api/v1/auth/microsoft/callback
  * Handle Microsoft OAuth callback
  */
-router.get('/callback', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/callback', async (req: Request, res: Response, _next: NextFunction) => {
   try {
     const params = callbackSchema.parse(req.query);
 
@@ -191,7 +191,7 @@ router.get('/callback', async (req: Request, res: Response, next: NextFunction) 
  * Exchange Microsoft token for app tokens (for SPA flow)
  * Used when frontend handles OAuth flow directly
  */
-router.post('/token', async (req: Request, res: Response, _next: NextFunction) => {
+router.post('/token', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { code, redirectUri, tenantId } = req.body;
 

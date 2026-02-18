@@ -38,6 +38,7 @@ import { auditRoutes } from './modules/audit';
 import { organizationRoutes } from './modules/organization';
 import { healthRoutes, recordRequest, incrementConnections, decrementConnections } from './modules/health';
 import { onboardingRoutes } from './modules/onboarding';
+import { functionsRoutes, assignmentsRoutes } from './modules/functions';
 
 const app = express();
 
@@ -155,6 +156,8 @@ app.use('/api/v1/webhooks/inbound', inboundWebhookRoutes);  // Public endpoint f
 app.use('/api/v1/audit-logs', auditRoutes);
 app.use('/api/v1/organization', organizationRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
+app.use('/api/v1/functions', functionsRoutes);
+app.use('/api/v1/assignments', assignmentsRoutes);
 
 // Error handling
 app.use(errorHandler);

@@ -30,7 +30,7 @@ router.post(
       const result = await importService.importResources(
         req.tenantId!,
         input.data,
-        req.userId!,
+        req.user!.id,
         { updateExisting: input.updateExisting }
       );
 
@@ -44,7 +44,7 @@ router.post(
         },
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -68,7 +68,7 @@ router.post(
       const result = await importService.importAllocations(
         req.tenantId!,
         input.data,
-        req.userId!,
+        req.user!.id,
         { updateExisting: input.updateExisting }
       );
 
@@ -82,7 +82,7 @@ router.post(
         },
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -106,7 +106,7 @@ router.post(
       const result = await importService.importProjects(
         req.tenantId!,
         input.data,
-        req.userId!,
+        req.user!.id,
         { updateExisting: input.updateExisting }
       );
 
@@ -120,7 +120,7 @@ router.post(
         },
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -146,9 +146,9 @@ router.get(
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${type}_template.csv"`);
-      res.send(template);
+      return res.send(template);
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -199,14 +199,14 @@ router.post(
         });
       }
 
-      res.json({
+      return res.json({
         valid: true,
         headers,
         rowCount: lines.length - 1,
         message: `Ready to import ${lines.length - 1} ${input.type}`,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );

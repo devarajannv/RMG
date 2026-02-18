@@ -1,4 +1,4 @@
-import { PrismaClient, TenantTier, TenantStatus, UserStatus, EmploymentType, ResourceStatus, Proficiency, ClientStatus, ClientTier, ProjectType, ProjectStatus, BillingType, AllocationStatus, PracticeStatus, LocationType, LocationStatus } from '@prisma/client';
+import { PrismaClient, TenantTier, TenantStatus, UserStatus, EmploymentType, ResourceStatus, Proficiency, ClientStatus, ClientTier, ProjectType, ProjectStatus, BillingType, AllocationStatus, PracticeStatus, LocationType, LocationStatus, FunctionCategory, FunctionScopeType } from '@prisma/client';
 import argon2 from 'argon2';
 
 const prisma = new PrismaClient();
@@ -495,6 +495,192 @@ async function main() {
       isBillable: true,
     },
   });
+
+  // Create approval functions (system functions)
+  console.log('🎭 Creating approval functions...');
+  
+  // System approval functions - these are "hats" that users can wear
+  // Separate from organizational structure (reporting manager) and system roles
+  const systemFunctions = [
+    {
+      code: 'RESOURCE_ALLOCATOR',
+      name: 'Resource Allocator',
+      description: 'Can approve resource allocation requests',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.PRACTICE,
+      allowMultipleHolders: true,
+      requiresApproval: false,
+      canDelegate: true,
+      maxDelegationDays: 30,
+      sortOrder: 10,
+    },
+    {
+      code: 'LEAVE_APPROVER',
+      name: 'Leave Approver',
+      description: 'Can approve leave requests for assigned resources',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.PRACTICE,
+      allowMultipleHolders: true,
+      requiresApproval: false,
+      canDelegate: true,
+      maxDelegationDays: 14,
+      sortOrder: 20,
+    },
+    {
+      code: 'TIMESHEET_APPROVER',
+      name: 'Timesheet Approver',
+      description: 'Can approve timesheets for assigned resources',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.PROJECT,
+      allowMultipleHolders: true,
+      requiresApproval: false,
+      canDelegate: true,
+      maxDelegationDays: 7,
+      sortOrder: 30,
+    },
+    {
+      code: 'PRACTICE_HEAD',
+      name: 'Practice Head',
+      description: 'Head of a practice unit - responsible for practice-level decisions',
+      category: FunctionCategory.LEADERSHIP,
+      scopeType: FunctionScopeType.PRACTICE,
+      allowMultipleHolders: false,
+      requiresApproval: true,
+      canDelegate: true,
+      maxDelegationDays: 30,
+      sortOrder: 40,
+    },
+    {
+      code: 'PROJECT_MANAGER',
+      name: 'Project Manager',
+      description: 'Manages a specific project - responsible for project-level approvals',
+      category: FunctionCategory.LEADERSHIP,
+      scopeType: FunctionScopeType.PROJECT,
+      allowMultipleHolders: false,
+      requiresApproval: false,
+      canDelegate: true,
+      maxDelegationDays: 14,
+      sortOrder: 50,
+    },
+    {
+      code: 'HIRING_MANAGER',
+      name: 'Hiring Manager',
+      description: 'Can approve hiring requests and requisitions',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.PRACTICE,
+      allowMultipleHolders: true,
+      requiresApproval: true,
+      canDelegate: false,
+      sortOrder: 60,
+    },
+    {
+      code: 'BUDGET_APPROVER',
+      name: 'Budget Approver',
+      description: 'Can approve budget-related requests',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.TENANT,
+      allowMultipleHolders: true,
+      requiresApproval: true,
+      canDelegate: true,
+      maxDelegationDays: 7,
+      sortOrder: 70,
+    },
+    {
+      code: 'TRAVEL_APPROVER',
+      name: 'Travel Approver',
+      description: 'Can approve travel requests',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.PRACTICE,
+      allowMultipleHolders: true,
+      requiresApproval: false,
+      canDelegate: true,
+      maxDelegationDays: 14,
+      sortOrder: 80,
+    },
+    {
+      code: 'EXPENSE_APPROVER',
+      name: 'Expense Approver',
+      description: 'Can approve expense reports and reimbursements',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.PRACTICE,
+      allowMultipleHolders: true,
+      requiresApproval: false,
+      canDelegate: true,
+      maxDelegationDays: 14,
+      sortOrder: 90,
+    },
+    {
+      code: 'ASSET_APPROVER',
+      name: 'Asset Approver',
+      description: 'Can approve asset requests (laptops, equipment, etc.)',
+      category: FunctionCategory.APPROVAL,
+      scopeType: FunctionScopeType.TENANT,
+      allowMultipleHolders: true,
+      requiresApproval: false,
+      canDelegate: true,
+      maxDelegationDays: 7,
+      sortOrder: 100,
+    },
+  ];
+
+  for (const func of systemFunctions) {
+    await prisma.approvalFunction.upsert({
+      where: {
+        tenantId_code: {
+          tenantId: tenant.id,
+          code: func.code,
+        },
+      },
+      update: func,
+      create: {
+        tenantId: tenant.id,
+        isSystem: true,
+        ...func,
+      },
+    });
+  }
+  console.log(`   Created ${systemFunctions.length} system approval functions`);
+
+  // Assign some default functions to the Resource Manager and Practice Lead
+  console.log('🔗 Assigning default functions...');
+  
+  // Make userRM the Resource Allocator and Leave Approver for Tech practice
+  const resourceAllocatorFunc = await prisma.approvalFunction.findFirst({
+    where: { tenantId: tenant.id, code: 'RESOURCE_ALLOCATOR' },
+  });
+  const leaveApproverFunc = await prisma.approvalFunction.findFirst({
+    where: { tenantId: tenant.id, code: 'LEAVE_APPROVER' },
+  });
+
+  if (resourceAllocatorFunc) {
+    await prisma.functionAssignment.create({
+      data: {
+        tenantId: tenant.id,
+        functionId: resourceAllocatorFunc.id,
+        userId: userRM.id,
+        scopeType: FunctionScopeType.PRACTICE,
+        scopeEntityId: practiceTech.id,
+        assignedById: userAdmin.id,
+        approvalStatus: 'APPROVED',
+      },
+    });
+    console.log(`   Assigned Resource Allocator to ${userRM.email} for ${practiceTech.name}`);
+  }
+
+  if (leaveApproverFunc) {
+    await prisma.functionAssignment.create({
+      data: {
+        tenantId: tenant.id,
+        functionId: leaveApproverFunc.id,
+        userId: userRM.id,
+        scopeType: FunctionScopeType.PRACTICE,
+        scopeEntityId: practiceTech.id,
+        assignedById: userAdmin.id,
+        approvalStatus: 'APPROVED',
+      },
+    });
+    console.log(`   Assigned Leave Approver to ${userRM.email} for ${practiceTech.name}`);
+  }
 
   console.log('✅ Seeding complete!');
   console.log('');

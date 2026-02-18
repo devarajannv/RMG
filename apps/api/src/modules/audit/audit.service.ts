@@ -4,6 +4,7 @@
  */
 
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export interface AuditLogEntry {
   id: string;
@@ -131,8 +132,8 @@ export async function createAuditLog(
       entityType,
       entityId,
       action: action as never,
-      changes: changes ?? undefined,
-      metadata: metadata ?? undefined,
+      changes: (changes ?? undefined) as Prisma.InputJsonValue | undefined,
+      metadata: (metadata ?? undefined) as Prisma.InputJsonValue | undefined,
     },
   });
 }

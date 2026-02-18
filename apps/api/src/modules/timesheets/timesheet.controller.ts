@@ -85,7 +85,7 @@ router.get(
                        req.user!.permissions.includes('timesheet:*') ||
                        req.user!.permissions.includes('*');
     
-    let effectiveResourceId = resourceId as string;
+    let effectiveResourceId: string | undefined = resourceId as string;
     if (!hasReadAll && !resourceId) {
       // Get user's linked resource ID or their direct reports
       const linkedResource = await timesheetService.getLinkedResourceForUser(tenantId, userId);
@@ -103,7 +103,7 @@ router.get(
       limit: limit ? parseInt(limit as string, 10) : 50,
     });
 
-    res.json(result);
+    return res.json(result);
   })
 );
 
@@ -139,7 +139,7 @@ router.get(
       week
     );
 
-    res.json({ data: result });
+    return res.json({ data: result });
   })
 );
 
@@ -177,7 +177,7 @@ router.post(
       isOvertime: validated.isOvertime,
     });
 
-    res.status(201).json({ data: result });
+    return res.status(201).json({ data: result });
   })
 );
 
@@ -204,7 +204,7 @@ router.put(
 
     const validated = updateEntrySchema.parse(req.body);
     const result = await timesheetService.updateTimesheetEntry(id, tenantId, validated);
-    res.json({ data: result });
+    return res.json({ data: result });
   })
 );
 
@@ -230,7 +230,7 @@ router.delete(
     }
 
     await timesheetService.deleteTimesheetEntry(id, tenantId);
-    res.status(204).send();
+    return res.status(204).send();
   })
 );
 
@@ -262,7 +262,7 @@ router.post(
       validated.entries
     );
 
-    res.json({ data: result, message: `Saved ${result.length} entries` });
+    return res.json({ data: result, message: `Saved ${result.length} entries` });
   })
 );
 
@@ -293,7 +293,7 @@ router.post(
       parseISO(validated.weekStart)
     );
 
-    res.json({ data: result, message: 'Timesheet submitted for approval' });
+    return res.json({ data: result, message: 'Timesheet submitted for approval' });
   })
 );
 
@@ -308,7 +308,7 @@ router.get(
 
     // For managers, filter to their direct reports
     const result = await timesheetService.getPendingApprovals(tenantId, userId);
-    res.json({ data: result });
+    return res.json({ data: result });
   })
 );
 
@@ -335,7 +335,7 @@ router.post(
     }
 
     const result = await timesheetService.approveTimesheet(tenantId, periodId, userId);
-    res.json({ data: result, message: 'Timesheet approved' });
+    return res.json({ data: result, message: 'Timesheet approved' });
   })
 );
 
@@ -365,7 +365,7 @@ router.post(
     }
 
     const result = await timesheetService.rejectTimesheet(tenantId, periodId, userId, reason);
-    res.json({ data: result, message: 'Timesheet rejected' });
+    return res.json({ data: result, message: 'Timesheet rejected' });
   })
 );
 
@@ -399,7 +399,7 @@ router.get(
       endDate ? parseISO(endDate as string) : undefined
     );
 
-    res.json({ data: result });
+    return res.json({ data: result });
   })
 );
 

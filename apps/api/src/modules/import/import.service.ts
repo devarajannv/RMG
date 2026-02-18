@@ -1,5 +1,5 @@
 import prisma from '../../lib/prisma';
-import { hashPassword } from '../../lib/password';
+import { Prisma } from '@prisma/client';
 
 // ============================================================================
 // Types
@@ -138,10 +138,10 @@ function parseBoolean(value: string | boolean | undefined): boolean {
 export async function importResources(
   tenantId: string,
   csvData: string,
-  userId: string,
+  _userId: string,
   options: { updateExisting?: boolean } = {}
 ): Promise<ImportResult> {
-  const rows = parseCSV(csvData) as ResourceImportRow[];
+  const rows = parseCSV(csvData) as unknown as ResourceImportRow[];
   const result: ImportResult = {
     success: true,
     totalRows: rows.length,
@@ -217,14 +217,14 @@ export async function importResources(
       if (existing) {
         await prisma.resource.update({
           where: { id: existing.id },
-          data: resourceData,
+          data: resourceData as Prisma.ResourceUncheckedUpdateInput,
         });
       } else {
         await prisma.resource.create({
           data: {
             ...resourceData,
             tenantId,
-          },
+          } as unknown as Prisma.ResourceUncheckedCreateInput,
         });
       }
 
@@ -301,7 +301,7 @@ export async function importAllocations(
   userId: string,
   options: { updateExisting?: boolean } = {}
 ): Promise<ImportResult> {
-  const rows = parseCSV(csvData) as AllocationImportRow[];
+  const rows = parseCSV(csvData) as unknown as AllocationImportRow[];
   const result: ImportResult = {
     success: true,
     totalRows: rows.length,
@@ -436,10 +436,10 @@ export async function importAllocations(
 export async function importProjects(
   tenantId: string,
   csvData: string,
-  userId: string,
+  _userId: string,
   options: { updateExisting?: boolean } = {}
 ): Promise<ImportResult> {
-  const rows = parseCSV(csvData) as ProjectImportRow[];
+  const rows = parseCSV(csvData) as unknown as ProjectImportRow[];
   const result: ImportResult = {
     success: true,
     totalRows: rows.length,
@@ -499,14 +499,14 @@ export async function importProjects(
       if (existing) {
         await prisma.project.update({
           where: { id: existing.id },
-          data: projectData,
+          data: projectData as Prisma.ProjectUncheckedUpdateInput,
         });
       } else {
         await prisma.project.create({
           data: {
             ...projectData,
             tenantId,
-          },
+          } as Prisma.ProjectUncheckedCreateInput,
         });
       }
 

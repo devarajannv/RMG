@@ -9,7 +9,7 @@ export interface OrganizationStats {
   tenant: {
     id: string;
     name: string;
-    code: string;
+    slug: string;
     status: string;
     createdAt: Date;
   };
@@ -54,7 +54,7 @@ export async function getOrganizationStats(tenantId: string): Promise<Organizati
       select: {
         id: true,
         name: true,
-        code: true,
+        slug: true,
         status: true,
         createdAt: true,
       },

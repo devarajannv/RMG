@@ -375,7 +375,7 @@ export async function getPracticeMetrics(tenantId: string): Promise<PracticeMetr
       billableHours: Math.round(totalBillable * HOURS_PER_MONTH / 100),
       benchCost: benchCount * AVG_MONTHLY_COST,
       topSkills,
-      trend: variance > 0 ? 'up' : variance < -5 ? 'down' : 'stable' as const,
+      trend: (variance > 0 ? 'up' : variance < -5 ? 'down' : 'stable') as 'up' | 'down' | 'stable',
     };
   });
 
@@ -489,8 +489,6 @@ export async function getFinancialMetrics(tenantId: string): Promise<FinancialMe
 
   // Get projections from bench forecast
   const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const sixtyDays = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
-  const ninetyDays = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
   // Count expected rolloffs
   const rolloffs30 = await prisma.allocation.count({

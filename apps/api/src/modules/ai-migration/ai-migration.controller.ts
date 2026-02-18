@@ -6,19 +6,6 @@ import fs from 'fs';
 import { authenticate, authorize } from '../../middleware/auth';
 import { aiMigrationService } from './ai-migration.service';
 
-// Extend Request type to include our custom properties
-declare module 'express' {
-  interface Request {
-    tenantId?: string;
-    userId?: string;
-    user?: {
-      id: string;
-      tenantId: string;
-      email: string;
-    };
-  }
-}
-
 const router = Router();
 
 // Configure multer for file uploads

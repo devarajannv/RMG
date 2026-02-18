@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '../../lib/prisma';
-import { redis } from '../../lib/redis';
+import { getRedis } from '../../lib/redis';
 import { logger } from '../../lib/logger';
 
 // Track startup time for uptime metric
@@ -175,6 +175,7 @@ export async function getMetricsText(): Promise<string> {
   
   // Redis metrics
   try {
+    const redis = getRedis();
     if (redis) {
       const redisStart = Date.now();
       await redis.ping();

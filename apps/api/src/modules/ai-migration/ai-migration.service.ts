@@ -1,4 +1,5 @@
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import * as XLSX from 'xlsx';
 
@@ -460,7 +461,7 @@ export const aiMigrationService = {
   },
 
   // Detect which entities are present in the data
-  detectEntities(columns: string[], rows: Record<string, string>[]): { entity: string; confidence: number; matchedColumns: string[] }[] {
+  detectEntities(columns: string[], _rows: Record<string, string>[]): { entity: string; confidence: number; matchedColumns: string[] }[] {
     const results: { entity: string; confidence: number; matchedColumns: string[] }[] = [];
 
     for (const [entityName, entityDef] of Object.entries(ENTITY_DEFINITIONS)) {
@@ -1194,7 +1195,7 @@ export const aiMigrationService = {
         dateOfJoining: data.joinDate || data.dateOfJoining || new Date(),
         status: data.status || 'ACTIVE',
         benchSince: new Date(),
-      },
+      } as Prisma.ResourceUncheckedCreateInput,
     });
 
     return { imported: true, skipped: false, recordId: resource.id, wasCreated: true };
@@ -1231,7 +1232,7 @@ export const aiMigrationService = {
         type: data.type || 'BILLABLE',
         status: data.status || 'ACTIVE',
         startDate: data.startDate || new Date(),
-      },
+      } as Prisma.ProjectUncheckedCreateInput,
     });
 
     return { imported: true, skipped: false, recordId: project.id, wasCreated: true };
@@ -1280,7 +1281,7 @@ export const aiMigrationService = {
         status: data.status || 'ACTIVE',
         role: data.role || 'Team Member',
         isBillable: data.isBillable ?? true,
-      },
+      } as Prisma.AllocationUncheckedCreateInput,
     });
 
     return { imported: true, skipped: false, recordId: allocation.id, wasCreated: true };
@@ -1315,7 +1316,7 @@ export const aiMigrationService = {
       data: {
         ...data,
         status: data.status || 'ACTIVE',
-      },
+      } as Prisma.ClientUncheckedCreateInput,
     });
 
     return { imported: true, skipped: false, recordId: client.id, wasCreated: true };

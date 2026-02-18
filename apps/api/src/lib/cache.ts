@@ -51,7 +51,6 @@ export interface CacheEntry<T> {
 const DEFAULT_TTL = 300; // 5 minutes
 const CACHE_PREFIX = 'cache:';
 const TAG_PREFIX = 'tag:';
-const STATS_KEY = 'cache:stats';
 
 // TTL configurations by entity type
 export const CACHE_TTL = {
@@ -485,7 +484,7 @@ export function Cached(
   options: CacheOptions = {}
 ) {
   return function (
-    target: any,
+    _target: any,
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {

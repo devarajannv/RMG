@@ -175,7 +175,7 @@ export async function createRequest(
   input: CreateRequestInput
 ): Promise<Record<string, unknown>> {
   // Get request type
-  const requestType = await prisma.requestType.findUnique({
+  const requestType = await prisma.requestType.findFirst({
     where: { code: input.typeCode },
     include: {
       tenantConfigs: {
@@ -1587,7 +1587,7 @@ export async function getRequestType(
   tenantId?: string
 ): Promise<Record<string, unknown> | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const type: any = await prisma.requestType.findUnique({
+  const type: any = await prisma.requestType.findFirst({
     where: { code },
     include: tenantId ? {
       tenantConfigs: { where: { tenantId } },

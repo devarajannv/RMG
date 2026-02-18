@@ -122,17 +122,17 @@ export function logQueryEvent(e: Prisma.QueryEvent): void {
   
   // Log slow queries
   if (e.duration > SLOW_QUERY_THRESHOLD) {
-    logger.warn({
+    logger.warn(`Slow query detected: ${e.duration}ms`, {
       type: 'slow_query',
       duration: e.duration,
       query: e.query.substring(0, 500), // Truncate long queries
       requestId: stats?.requestId,
-    }, `Slow query detected: ${e.duration}ms`);
+    });
   }
   
   // Debug logging
   if (config.isDev) {
-    logger.debug({
+    logger.debug(`Query: ${e.query.substring(0, 200)}`, {
       type: 'query',
       duration: e.duration,
       query: e.query.substring(0, 200),
@@ -324,7 +324,7 @@ function reportQueryStats(stats: RequestQueryStats, method: string, path: string
   
   // Log summary
   if (config.isDev || suggestions.length > 0) {
-    logger.info({
+    logger.info(`Query stats: ${queryCount} queries, ${queryTime}ms query time`, {
       type: 'request_query_summary',
       requestId: stats.requestId,
       method,
@@ -334,18 +334,21 @@ function reportQueryStats(stats: RequestQueryStats, method: string, path: string
       queryTime,
       nonQueryTime: duration - queryTime,
       suggestions: suggestions.length,
-    }, `Query stats: ${queryCount} queries, ${queryTime}ms query time`);
+    });
     
     // Log suggestions
     for (const suggestion of suggestions) {
-      const logFn = suggestion.severity === 'error' ? logger.error : logger.warn;
-      logFn.call(logger, {
+      const meta = {
         type: 'query_optimization',
         suggestionType: suggestion.type,
         requestId: stats.requestId,
-        message: suggestion.message,
         fix: suggestion.fix,
-      });
+      };
+      if (suggestion.severity === 'error') {
+        logger.error(suggestion.message, meta);
+      } else {
+        logger.warn(suggestion.message, meta);
+      }
     }
   }
 }

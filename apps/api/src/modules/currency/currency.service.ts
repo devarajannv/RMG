@@ -94,20 +94,31 @@ export const currencyService = {
 
   // Seed default currencies
   async seedDefaultCurrencies(tenantId: string): Promise<void> {
+    // Get tenant's base currency setting
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { currency: true },
+    });
+    const baseCurrencyCode = tenant?.currency || 'INR'; // Default to INR for Indian company
+
     const defaultCurrencies = [
-      { code: 'USD', name: 'US Dollar', symbol: '$', isBase: true },
-      { code: 'INR', name: 'Indian Rupee', symbol: '₹', isBase: false },
-      { code: 'EUR', name: 'Euro', symbol: '€', isBase: false },
-      { code: 'GBP', name: 'British Pound', symbol: '£', isBase: false },
-      { code: 'AUD', name: 'Australian Dollar', symbol: 'A$', isBase: false },
-      { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$', isBase: false },
+      { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+      { code: 'USD', name: 'US Dollar', symbol: '$' },
+      { code: 'EUR', name: 'Euro', symbol: '€' },
+      { code: 'GBP', name: 'British Pound', symbol: '£' },
+      { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+      { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
     ];
 
     for (const curr of defaultCurrencies) {
       await prisma.currency.upsert({
         where: { tenantId_code: { tenantId, code: curr.code } },
         update: {},
-        create: { tenantId, ...curr },
+        create: { 
+          tenantId, 
+          ...curr,
+          isBase: curr.code === baseCurrencyCode, // Set base based on tenant setting
+        },
       });
     }
   },

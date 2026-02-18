@@ -6,7 +6,7 @@
 import { ConfidentialClientApplication, Configuration, AuthorizationCodeRequest } from '@azure/msal-node';
 import prisma from '../../lib/prisma';
 import { config } from '../../config/env';
-import { generateTokenPair, TokenPair } from '../../lib/jwt';
+import { generateTokenPair } from '../../lib/jwt';
 import { storeRefreshTokenFamily } from '../../lib/redis';
 import { logger } from '../../lib/logger';
 import argon2 from 'argon2';
@@ -135,7 +135,7 @@ export async function handleCallback(
   const tokens = generateTokenPair(user.id, user.tenantId, user.email, tokenFamily);
   
   // Store refresh token family in Redis
-  await storeRefreshTokenFamily(user.id, tokenFamily);
+  await storeRefreshTokenFamily(user.id, tokenFamily, tokens.refreshExpiresIn);
   
   // Log the SSO login
   await prisma.auditLog.create({

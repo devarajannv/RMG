@@ -15,6 +15,12 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0', // Allow LAN access
+    hmr: {
+      protocol: 'ws',
+      host: '172.40.0.29', // Use network IP for HMR
+      port: 3000,
+      clientPort: 3000,
+    },
     proxy: {
       '/api': {
         target: API_TARGET,

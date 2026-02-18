@@ -1,5 +1,5 @@
-import { PrismaClient, Prisma, TimesheetStatus, PeriodStatus, PeriodType } from '@prisma/client';
-import { addDays, startOfWeek, endOfWeek, format, parseISO, differenceInDays } from 'date-fns';
+import { PrismaClient, Prisma, TimesheetStatus, PeriodStatus } from '@prisma/client';
+import { addDays, startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
 
 const prisma = new PrismaClient();
 
@@ -363,7 +363,7 @@ export async function getWeeklyTimesheet(
 export async function saveWeeklyTimesheet(
   tenantId: string,
   resourceId: string,
-  weekStart: Date,
+  _weekStart: Date,
   entries: Array<{
     projectId: string;
     date: string;
@@ -372,9 +372,6 @@ export async function saveWeeklyTimesheet(
     description?: string;
   }>
 ) {
-  const start = startOfWeek(weekStart, { weekStartsOn: 1 });
-  const end = endOfWeek(weekStart, { weekStartsOn: 1 });
-
   // Use transaction for atomicity
   return prisma.$transaction(async (tx) => {
     const savedEntries = [];
@@ -572,7 +569,7 @@ export async function approveTimesheet(
 export async function rejectTimesheet(
   tenantId: string,
   periodId: string,
-  approverId: string,
+  _approverId: string,
   reason: string
 ) {
   const period = await prisma.timesheetPeriod.findFirst({

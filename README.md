@@ -39,7 +39,32 @@ See `ARCHITECTURE.md` for complete details.
 - Docker & Docker Compose
 - npm 10+
 
-### Development Setup
+### Quick Start (Recommended)
+
+```bash
+# 1. Clone and install dependencies
+npm install
+
+# 2. Start everything with automatic service checks
+npm start
+# or
+make start
+
+# 3. Check service status
+npm run start:status
+# or
+make status
+```
+
+The startup script automatically:
+- ✅ Checks if Docker is running
+- ✅ Starts PostgreSQL and waits for it to be healthy
+- ✅ Starts Redis and waits for it to be healthy
+- ✅ Starts the API server
+- ✅ Starts the Frontend
+- ✅ Runs database migrations if needed
+
+### Manual Development Setup
 
 ```bash
 # 1. Clone and install dependencies

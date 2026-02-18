@@ -5,16 +5,6 @@ import { Errors } from './errorHandler';
 import { logger } from '../lib/logger';
 import prisma from '../lib/prisma';
 
-// Extend Express Request type
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthUser;
-      tenantId?: string;
-    }
-  }
-}
-
 export interface AuthUser {
   id: string;
   tenantId: string;

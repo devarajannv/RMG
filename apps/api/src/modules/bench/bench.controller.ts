@@ -243,12 +243,12 @@ router.post(
       const allocation = await benchService.quickAllocateFromBench(
         req.tenantId!,
         input,
-        req.userId!
+        req.user!.id
       );
 
-      res.status(201).json({ data: allocation });
+      return res.status(201).json({ data: allocation });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );

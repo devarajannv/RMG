@@ -33,6 +33,15 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # =============================================================================
+# Quick Start
+# =============================================================================
+start: ## Start development with service checks (recommended)
+	@./scripts/startup.sh dev
+
+status: ## Show service status
+	@./scripts/startup.sh status
+
+# =============================================================================
 # Development
 # =============================================================================
 dev: dev-up ## Start development environment

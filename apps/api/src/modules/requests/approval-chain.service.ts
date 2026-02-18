@@ -7,6 +7,7 @@ import { Prisma, ApprovalChainStatus, ApprovalChainScope, ApproverType, Approval
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
+import { resolveFunctionToHolders } from '../functions/functions.service';
 
 // ============================================================================
 // Types
@@ -805,6 +806,36 @@ async function resolveStepApprovers(
           approverType: step.approverType,
           reason: 'Resource Manager',
         });
+      }
+      break;
+
+    case 'FUNCTION':
+      // Approval function holders
+      if (step.approvalFunctionId) {
+        // Build scope context from request
+        const scopeContext = {
+          practiceId: request.resource?.practiceId || request.project?.practiceId,
+          projectId: request.projectId || request.allocation?.projectId,
+          departmentId: request.resource?.departmentId,
+          teamId: request.resource?.teamId,
+        };
+
+        const holders = await resolveFunctionToHolders(
+          tenantId,
+          step.approvalFunctionId,
+          scopeContext
+        );
+
+        for (const holder of holders) {
+          approvers.push({
+            userId: holder.userId,
+            stepId: step.id,
+            stepOrder: step.stepOrder,
+            stepName: step.name,
+            approverType: step.approverType,
+            reason: `Function: ${holder.functionName}${holder.isDelegated ? ' (delegated)' : ''}`,
+          });
+        }
       }
       break;
   }

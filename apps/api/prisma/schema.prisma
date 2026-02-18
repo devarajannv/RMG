@@ -53,6 +53,7 @@ model Tenant {
   approvalChains           ApprovalChain[]
   approvalRules            ApprovalRule[]
   tenantRequestTypeConfigs TenantRequestTypeConfig[]
+  customRequestTypes       RequestType[]            @relation("TenantRequestTypes")
   delegations              Delegation[]
   requestSequences         RequestSequence[]
   requestTemplates         RequestTemplate[]
@@ -77,6 +78,9 @@ model Tenant {
   delegationRules       DelegationRule[]
   slaConfigurations     SlaConfiguration[]
   onboardingChecklists  OnboardingChecklist[]
+
+  // Approval Functions Relations
+  approvalFunctions     ApprovalFunction[]
 
   @@index([status])
   @@index([tier])
@@ -148,6 +152,11 @@ model User {
   slaEscalations          SlaBreachEvent[]         @relation("SlaEscalatedTo")
   notifications           Notification[]           @relation("UserNotifications")
   notificationPreferences NotificationPreference[] @relation("NotificationPreferences")
+
+  // Approval Function Relations
+  functionAssignments     FunctionAssignment[]     @relation("UserFunctionAssignments")
+  delegatedFunctions      FunctionAssignment[]     @relation("DelegatedFunctions")
+  functionsAssigned       FunctionAssignment[]     @relation("FunctionAssigner")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -1391,11 +1400,20 @@ enum ImportRecordStatus {
 // Request Type Definition (System-level, tenant can override via config)
 model RequestType {
   id              String          @id @default(uuid()) @db.Uuid
-  code            String          @unique @db.VarChar(50) // RESOURCE_ALLOCATION, etc.
+  code            String          @db.VarChar(50) // RESOURCE_ALLOCATION, etc. - unique per tenant or system
   name            String          @db.VarChar(100)
   description     String?         @db.VarChar(500)
   category        RequestCategory
   defaultPriority Priority        @default(MEDIUM)
+
+  // Tenant Ownership (null = system type, set = tenant-created)
+  tenantId     String? @db.Uuid
+  tenant       Tenant? @relation("TenantRequestTypes", fields: [tenantId], references: [id])
+  
+  // Cloning/Versioning (track which system type this was cloned from)
+  clonedFromId String?      @db.Uuid
+  clonedFrom   RequestType? @relation("RequestTypeClones", fields: [clonedFromId], references: [id])
+  clones       RequestType[] @relation("RequestTypeClones")
 
   // SLA Configuration (defaults, can be overridden per tenant)
   responseSlaHours   Int                @default(24)
@@ -1444,8 +1462,11 @@ model RequestType {
   templates         RequestTemplate[]
   slaPriorityMatrix SlaPriorityMatrix[]
 
+  @@unique([code, tenantId]) // Code unique per tenant (null tenantId = system)
   @@index([category])
   @@index([isActive])
+  @@index([tenantId])
+  @@index([isSystemType])
 }
 
 // Tenant-specific overrides for system request types
@@ -1489,6 +1510,36 @@ model TenantRequestTypeConfig {
 
   @@unique([tenantId, requestTypeId])
   @@index([tenantId])
+}
+
+// Request Type Template - Pre-built bundles for quick setup
+model RequestTypeTemplate {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique @db.VarChar(50)
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+  category    String  @db.VarChar(50) // "HR", "Finance", "Operations", "General"
+  
+  // Template content (stored as JSON)
+  requestTypes Json   // Array of request type definitions
+  workflows    Json   // Array of workflow definitions
+  bindings     Json   // Default type→workflow mappings
+  
+  // Metadata
+  version    Int     @default(1)
+  isActive   Boolean @default(true)
+  usageCount Int     @default(0)
+  tags       String[] // Tags for filtering/search
+  
+  // Optional: Icon and preview image
+  iconName     String? @db.VarChar(50)  // Lucide icon name
+  previewImage String? @db.VarChar(500) // URL to preview image
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([category])
+  @@index([isActive])
 }
 
 // Approval Chain Definition
@@ -1556,6 +1607,10 @@ model ApprovalStep {
   approverRole   Role?        @relation("StepApproverRole", fields: [approverRoleId], references: [id])
   approverUserId String?      @db.Uuid
   approverUser   User?        @relation("StepApprover", fields: [approverUserId], references: [id])
+
+  // Function-based approval (NEW - preferred for dynamic resolution)
+  approvalFunctionId String?           @db.Uuid
+  approvalFunction   ApprovalFunction? @relation("StepApprovalFunction", fields: [approvalFunctionId], references: [id])
 
   // Dynamic Approver Resolution
   practiceSource     PracticeSource? // For PRACTICE_HEAD - whose practice?
@@ -2507,6 +2562,7 @@ enum ApprovalChainScope {
 }
 
 enum ApproverType {
+  FUNCTION
   ROLE
   USER
   MANAGER
@@ -3190,4 +3246,123 @@ model OnboardingChecklist {
   
   @@unique([tenantId, phase, stepCode])
   @@index([tenantId, phase])
+}
+
+// =============================================================================
+// APPROVAL FUNCTIONS (Business Capabilities as "Hats")
+// =============================================================================
+
+model ApprovalFunction {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Identity
+  code        String   @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  category    FunctionCategory @default(APPROVAL)
+  
+  // Scope Configuration
+  scopeType   FunctionScopeType @default(TENANT)
+  
+  // Behavior
+  allowMultipleHolders Boolean @default(true)
+  requiresApproval     Boolean @default(false)
+  canDelegate          Boolean @default(true)
+  maxDelegationDays    Int?
+  
+  // Status
+  status      EntityStatus @default(ACTIVE)
+  isSystem    Boolean      @default(false)
+  sortOrder   Int          @default(0)
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  
+  // Relations
+  assignments    FunctionAssignment[]
+  approvalSteps  ApprovalStep[]  @relation("StepApprovalFunction")
+  
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+}
+
+enum FunctionCategory {
+  APPROVAL
+  MANAGEMENT
+  FINANCIAL
+  ADMINISTRATIVE
+  CUSTOM
+}
+
+enum FunctionScopeType {
+  TENANT
+  PRACTICE
+  DEPARTMENT
+  PROJECT
+  TEAM
+}
+
+// -----------------------------------------------------------------------------
+// FUNCTION ASSIGNMENT (Who holds what function)
+// -----------------------------------------------------------------------------
+model FunctionAssignment {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  
+  // What function
+  functionId      String    @db.Uuid
+  function        ApprovalFunction @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  
+  // Who holds it
+  userId          String    @db.Uuid
+  user            User      @relation("UserFunctionAssignments", fields: [userId], references: [id])
+  
+  // Scope (optional narrowing)
+  scopeType       FunctionScopeType?
+  scopeEntityId   String?   @db.Uuid
+  
+  // Time bounds
+  effectiveFrom   DateTime  @default(now())
+  effectiveTo     DateTime?
+  
+  // Delegation tracking
+  isDelegated     Boolean   @default(false)
+  delegatedFromId String?   @db.Uuid
+  delegatedFrom   User?     @relation("DelegatedFunctions", fields: [delegatedFromId], references: [id])
+  delegationReason String?  @db.VarChar(500)
+  
+  // Assignment tracking
+  assignedById    String    @db.Uuid
+  assignedBy      User      @relation("FunctionAssigner", fields: [assignedById], references: [id])
+  assignedAt      DateTime  @default(now())
+  
+  // Approval (if required)
+  approvalStatus  AssignmentApprovalStatus @default(APPROVED)
+  approvedById    String?   @db.Uuid
+  approvedAt      DateTime?
+  
+  // Status
+  status          EntityStatus @default(ACTIVE)
+  revokedAt       DateTime?
+  revokedById     String?   @db.Uuid
+  revocationReason String?  @db.VarChar(500)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([tenantId, functionId, status])
+  @@index([tenantId, userId, status])
+  @@index([tenantId, scopeType, scopeEntityId])
+  @@index([effectiveFrom, effectiveTo])
+}
+
+enum AssignmentApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

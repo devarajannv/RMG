@@ -10,6 +10,8 @@
     "packages/*"
   ],
   "scripts": {
+    "start": "./scripts/startup.sh dev",
+    "start:status": "./scripts/startup.sh status",
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
