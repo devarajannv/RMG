@@ -136,7 +136,7 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: '.auth/user.json',
       },
       dependencies: ['setup'],
     },
@@ -145,7 +145,7 @@ export default defineConfig({
       name: 'firefox',
       use: { 
         ...devices['Desktop Firefox'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: '.auth/user.json',
       },
       dependencies: ['setup'],
     },
@@ -154,7 +154,7 @@ export default defineConfig({
       name: 'webkit',
       use: { 
         ...devices['Desktop Safari'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: '.auth/user.json',
       },
       dependencies: ['setup'],
     },
@@ -166,7 +166,7 @@ export default defineConfig({
       name: 'mobile-chrome',
       use: { 
         ...devices['Pixel 5'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: '.auth/user.json',
       },
       dependencies: ['setup'],
     },
@@ -175,7 +175,7 @@ export default defineConfig({
       name: 'mobile-safari',
       use: { 
         ...devices['iPhone 13'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: '.auth/user.json',
       },
       dependencies: ['setup'],
     },
@@ -189,7 +189,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: { cookies: [], origins: [] },
       },
-      testMatch: /auth\.spec\.ts/,
+      testMatch: /(auth|login-screen|dashboard-screen|requests-screen)\.spec\.ts/,
     },
   ],
 

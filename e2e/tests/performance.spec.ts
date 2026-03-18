@@ -190,7 +190,7 @@ test.describe('Page Load Performance', () => {
 // ============================================================================
 
 test.describe('API Performance', () => {
-  test('PERF-005: API calls should complete within 1 second', async ({ apiHelper }) => {
+  test('PERF-005: API calls should complete within 1 second', async ({ api }) => {
     const endpoints = [
       '/api/resources?limit=10',
       '/api/projects?limit=10',
@@ -200,7 +200,7 @@ test.describe('API Performance', () => {
     
     for (const endpoint of endpoints) {
       const start = Date.now();
-      const response = await apiHelper.request.get(endpoint);
+      const response = await api.request.get(endpoint);
       const duration = Date.now() - start;
       
       console.log(`${endpoint}: ${duration}ms`);
@@ -210,12 +210,12 @@ test.describe('API Performance', () => {
     }
   });
 
-  test('PERF-006: List endpoints should handle pagination efficiently', async ({ apiHelper }) => {
+  test('PERF-006: List endpoints should handle pagination efficiently', async ({ api }) => {
     const pageSizes = [10, 25, 50, 100];
     
     for (const limit of pageSizes) {
       const start = Date.now();
-      const response = await apiHelper.request.get(`/api/resources?limit=${limit}`);
+      const response = await api.request.get(`/api/resources?limit=${limit}`);
       const duration = Date.now() - start;
       
       console.log(`Resources (limit=${limit}): ${duration}ms`);
@@ -226,9 +226,9 @@ test.describe('API Performance', () => {
     }
   });
 
-  test('PERF-007: Search should return results quickly', async ({ apiHelper }) => {
+  test('PERF-007: Search should return results quickly', async ({ api }) => {
     const start = Date.now();
-    const response = await apiHelper.request.get('/api/resources/search?query=test');
+    const response = await api.request.get('/api/resources/search?query=test');
     const duration = Date.now() - start;
     
     console.log(`Search: ${duration}ms`);
@@ -238,9 +238,9 @@ test.describe('API Performance', () => {
     expect(duration).toBeLessThan(500);
   });
 
-  test('PERF-008: Dashboard stats should load quickly', async ({ apiHelper }) => {
+  test('PERF-008: Dashboard stats should load quickly', async ({ api }) => {
     const start = Date.now();
-    const response = await apiHelper.request.get('/api/dashboard/stats');
+    const response = await api.request.get('/api/dashboard/stats');
     const duration = Date.now() - start;
     
     console.log(`Dashboard stats: ${duration}ms`);

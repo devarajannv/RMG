@@ -11,8 +11,8 @@
  * @module e2e/fixtures
  */
 
-import { test as base, expect, Page, APIRequestContext, BrowserContext } from '@playwright/test';
-import { testConfig } from './playwright.config';
+import { test as base, expect, Page, APIRequestContext, APIResponse, BrowserContext } from '@playwright/test';
+import { testConfig } from '../playwright.config';
 
 // ============================================================================
 // Type Definitions
@@ -103,6 +103,13 @@ interface AllocationData {
  * API helper for making authenticated requests
  */
 export interface ApiHelper {
+  request: {
+    get: (path: string, options?: Parameters<APIRequestContext['get']>[1]) => Promise<APIResponse>;
+    post: (path: string, options?: Parameters<APIRequestContext['post']>[1]) => Promise<APIResponse>;
+    put: (path: string, options?: Parameters<APIRequestContext['put']>[1]) => Promise<APIResponse>;
+    patch: (path: string, options?: Parameters<APIRequestContext['patch']>[1]) => Promise<APIResponse>;
+    delete: (path: string, options?: Parameters<APIRequestContext['delete']>[1]) => Promise<APIResponse>;
+  };
   get: <T = unknown>(path: string) => Promise<T>;
   post: <T = unknown>(path: string, data?: unknown) => Promise<T>;
   put: <T = unknown>(path: string, data?: unknown) => Promise<T>;
@@ -355,11 +362,24 @@ function createApiHelper(request: APIRequestContext, token: string): ApiHelper {
 
   const apiUrl = testConfig.apiURL;
 
+  const withHeaders = <T extends Record<string, unknown> | undefined>(options?: T) => ({
+    ...options,
+    headers: {
+      ...baseHeaders,
+      ...(options?.headers ?? {}),
+    },
+  });
+
   return {
+    request: {
+      get: (path, options) => request.get(`${apiUrl}${path}`, withHeaders(options)),
+      post: (path, options) => request.post(`${apiUrl}${path}`, withHeaders(options)),
+      put: (path, options) => request.put(`${apiUrl}${path}`, withHeaders(options)),
+      patch: (path, options) => request.patch(`${apiUrl}${path}`, withHeaders(options)),
+      delete: (path, options) => request.delete(`${apiUrl}${path}`, withHeaders(options)),
+    },
     async get<T>(path: string): Promise<T> {
-      const response = await request.get(`${apiUrl}${path}`, {
-        headers: baseHeaders,
-      });
+      const response = await request.get(`${apiUrl}${path}`, withHeaders());
       const data = await response.json();
       if (!response.ok) {
         throw new Error(`API GET ${path} failed: ${response.status} - ${JSON.stringify(data)}`);
@@ -368,10 +388,9 @@ function createApiHelper(request: APIRequestContext, token: string): ApiHelper {
     },
 
     async post<T>(path: string, body?: unknown): Promise<T> {
-      const response = await request.post(`${apiUrl}${path}`, {
-        headers: baseHeaders,
+      const response = await request.post(`${apiUrl}${path}`, withHeaders({
         data: body,
-      });
+      }));
       const data = await response.json();
       if (!response.ok) {
         throw new Error(`API POST ${path} failed: ${response.status} - ${JSON.stringify(data)}`);
@@ -380,10 +399,9 @@ function createApiHelper(request: APIRequestContext, token: string): ApiHelper {
     },
 
     async put<T>(path: string, body?: unknown): Promise<T> {
-      const response = await request.put(`${apiUrl}${path}`, {
-        headers: baseHeaders,
+      const response = await request.put(`${apiUrl}${path}`, withHeaders({
         data: body,
-      });
+      }));
       const data = await response.json();
       if (!response.ok) {
         throw new Error(`API PUT ${path} failed: ${response.status} - ${JSON.stringify(data)}`);
@@ -392,10 +410,9 @@ function createApiHelper(request: APIRequestContext, token: string): ApiHelper {
     },
 
     async patch<T>(path: string, body?: unknown): Promise<T> {
-      const response = await request.patch(`${apiUrl}${path}`, {
-        headers: baseHeaders,
+      const response = await request.patch(`${apiUrl}${path}`, withHeaders({
         data: body,
-      });
+      }));
       const data = await response.json();
       if (!response.ok) {
         throw new Error(`API PATCH ${path} failed: ${response.status} - ${JSON.stringify(data)}`);
@@ -404,9 +421,7 @@ function createApiHelper(request: APIRequestContext, token: string): ApiHelper {
     },
 
     async delete<T>(path: string): Promise<T> {
-      const response = await request.delete(`${apiUrl}${path}`, {
-        headers: baseHeaders,
-      });
+      const response = await request.delete(`${apiUrl}${path}`, withHeaders());
       const data = await response.json();
       if (!response.ok) {
         throw new Error(`API DELETE ${path} failed: ${response.status} - ${JSON.stringify(data)}`);
@@ -501,16 +516,13 @@ export { expect };
  * Mark test as smoke test (runs on every commit)
  */
 export const smokeTest = test.extend({});
-smokeTest.use({ tag: '@smoke' });
 
 /**
  * Mark test as regression test (runs nightly)
  */
 export const regressionTest = test.extend({});
-regressionTest.use({ tag: '@regression' });
 
 /**
  * Mark test as visual test (screenshot comparison)
  */
 export const visualTest = test.extend({});
-visualTest.use({ tag: '@visual' });
