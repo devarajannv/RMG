@@ -3,7 +3,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import {
   AreaChart,
@@ -236,27 +235,22 @@ export default function BenchAnalysisPage() {
 
   if (loading) {
     return (
-      <MainLayout>
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      </MainLayout>
     );
   }
 
   if (error) {
     return (
-      <MainLayout>
         <div className="flex flex-col items-center justify-center h-full">
           <p className="text-red-600 mb-4">{error}</p>
           <Button onClick={loadData}>Retry</Button>
         </div>
-      </MainLayout>
     );
   }
 
   return (
-    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -369,7 +363,6 @@ export default function BenchAnalysisPage() {
         />
       )}
     </div>
-    </MainLayout>
   );
 }
 

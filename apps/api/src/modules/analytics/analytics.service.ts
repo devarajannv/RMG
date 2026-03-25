@@ -256,23 +256,23 @@ export async function getExecutiveMetrics(tenantId: string): Promise<ExecutiveMe
     });
   }
 
-  // Generate mock trends (in production, would query historical data)
+  // Generate deterministic trends from current-state baselines
   const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const utilizationTrend = months.map((month, i) => ({
     month,
-    rate: Math.max(70, Math.min(95, utilizationRate + (i - 3) * 2 + Math.random() * 5)),
+    rate: Math.max(70, Math.min(95, utilizationRate + (i - 3) * 1.5)),
   }));
 
   const benchTrend = months.map((month, i) => ({
     month,
-    count: Math.max(0, benchResources.length + (3 - i) * 2 + Math.floor(Math.random() * 5)),
+    count: Math.max(0, benchResources.length + (3 - i)),
     cost: 0,
   }));
   benchTrend.forEach(b => { b.cost = b.count * AVG_MONTHLY_COST; });
 
   const headcountTrend = months.map((month, i) => ({
     month,
-    count: resources.length - (5 - i) * 10 + Math.floor(Math.random() * 20),
+    count: Math.max(0, resources.length - (5 - i) * 5),
   }));
 
   return {
@@ -502,11 +502,11 @@ export async function getFinancialMetrics(tenantId: string): Promise<FinancialMe
 
   const currentBenchCount = benchResources.length;
 
-  // Generate mock trends
+  // Generate deterministic trends from current-state baselines
   const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const benchCostTrend = months.map((month, i) => ({
     month,
-    cost: Math.round(totalBenchCost * (0.8 + i * 0.05 + Math.random() * 0.1)),
+    cost: Math.round(totalBenchCost * (0.8 + i * 0.05)),
   }));
 
   const utilizationImpact = months.map((month, i) => ({

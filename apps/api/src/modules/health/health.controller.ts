@@ -7,7 +7,9 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { getRedis } from '../../lib/redis';
 import { logger } from '../../lib/logger';
+import { config } from '../../config/env';
 import { collectMetrics, getMetricsText } from './metrics';
+import { authenticate, requireRoles } from '../../middleware/auth';
 
 const router = Router();
 
@@ -48,11 +50,15 @@ const startTime = Date.now();
  *         description: Service is healthy
  */
 router.get('/', (_req: Request, res: Response) => {
+  // I-01: Hide version/uptime from public health endpoint in production
+  const isProduction = process.env.NODE_ENV === 'production';
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
-    uptime: Math.floor((Date.now() - startTime) / 1000),
+    ...(isProduction ? {} : {
+      version: process.env.npm_package_version || '1.0.0',
+      uptime: Math.floor((Date.now() - startTime) / 1000),
+    }),
   });
 });
 
@@ -140,7 +146,8 @@ router.get('/ready', async (_req: Request, res: Response) => {
  *       200:
  *         description: Prometheus metrics
  */
-router.get('/metrics', async (_req: Request, res: Response) => {
+// H-13: Metrics endpoint requires authentication and admin role
+router.get('/metrics', authenticate, requireRoles('ADMIN'), async (_req: Request, res: Response) => {
   try {
     // Collect current metrics
     await collectMetrics();
@@ -165,6 +172,16 @@ router.get('/metrics', async (_req: Request, res: Response) => {
  *         description: Service information
  */
 router.get('/info', (_req: Request, res: Response) => {
+  // In production, only expose minimal info
+  if (config.isProd) {
+    res.json({
+      service: 'rmgaas-api',
+      status: 'running',
+      uptime: Math.floor((Date.now() - startTime) / 1000),
+    });
+    return;
+  }
+
   const memoryUsage = process.memoryUsage();
   
   res.json({
@@ -206,7 +223,8 @@ async function checkDatabase(): Promise<ComponentCheck> {
     return {
       status: 'down',
       responseTime: Date.now() - start,
-      message: error instanceof Error ? error.message : 'Connection failed',
+      // M-26: Don't leak database error details in responses
+      message: config.isProd ? 'Connection failed' : (error instanceof Error ? error.message : 'Connection failed'),
     };
   }
 }
@@ -252,7 +270,8 @@ async function checkRedis(): Promise<ComponentCheck> {
     return {
       status: 'down',
       responseTime: Date.now() - start,
-      message: error instanceof Error ? error.message : 'Connection failed',
+      // M-19: Hide error details in production to prevent leaking Redis connection info
+      message: process.env.NODE_ENV === 'production' ? 'Connection failed' : (error instanceof Error ? error.message : 'Connection failed'),
     };
   }
 }

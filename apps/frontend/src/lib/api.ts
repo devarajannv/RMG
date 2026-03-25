@@ -2,6 +2,14 @@ import { useAuthStore } from '@/stores/authStore';
 
 const API_BASE = '/api/v1';
 
+/**
+ * M-02: Read CSRF token from cookie for double-submit pattern
+ */
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 interface ApiOptions extends RequestInit {
   skipAuth?: boolean;
 }
@@ -24,11 +32,21 @@ async function request<T>(
 ): Promise<T> {
   const { skipAuth, ...fetchOptions } = options;
   const url = `${API_BASE}${endpoint}`;
+  const isFormDataBody = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
 
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
     ...fetchOptions.headers,
   };
+
+  if (!isFormDataBody && fetchOptions.body !== undefined && !(headers as Record<string, string>)['Content-Type']) {
+    (headers as Record<string, string>)['Content-Type'] = 'application/json';
+  }
+
+  // M-02: Add CSRF token for state-changing requests
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    (headers as Record<string, string>)['X-XSRF-TOKEN'] = csrfToken;
+  }
 
   // Add auth token if available and not skipped
   if (!skipAuth) {
@@ -114,6 +132,18 @@ async function refreshToken(): Promise<boolean> {
 }
 
 // API methods
+function serializeRequestBody(data?: unknown): BodyInit | undefined {
+  if (data === undefined) {
+    return undefined;
+  }
+
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    return data;
+  }
+
+  return JSON.stringify(data);
+}
+
 export const api = {
   get: <T>(endpoint: string, options?: ApiOptions) =>
     request<T>(endpoint, { ...options, method: 'GET' }),
@@ -122,21 +152,21 @@ export const api = {
     request<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body: serializeRequestBody(data),
     }),
 
   put: <T>(endpoint: string, data?: unknown, options?: ApiOptions) =>
     request<T>(endpoint, {
       ...options,
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
+      body: serializeRequestBody(data),
     }),
 
   patch: <T>(endpoint: string, data?: unknown, options?: ApiOptions) =>
     request<T>(endpoint, {
       ...options,
       method: 'PATCH',
-      body: data ? JSON.stringify(data) : undefined,
+      body: serializeRequestBody(data),
     }),
 
   delete: <T>(endpoint: string, options?: ApiOptions) =>

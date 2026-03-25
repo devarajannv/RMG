@@ -8,6 +8,7 @@ import { render, RenderOptions, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
 
 // Mock permissions for testing - full admin access
 const mockPermissions = [
@@ -102,7 +103,9 @@ const createWrapper = (options: TestWrapperOptions = {}) => {
 
   const Wrapper = ({ children }: WrapperProps) => (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
+      <CurrencyProvider>
+        <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
+      </CurrencyProvider>
     </QueryClientProvider>
   );
 

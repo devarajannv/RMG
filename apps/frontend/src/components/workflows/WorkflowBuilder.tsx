@@ -583,7 +583,7 @@ function StepConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" preventDismiss>
         <DialogHeader>
           <DialogTitle>Configure {step.type} Step</DialogTitle>
           <DialogDescription>
@@ -852,7 +852,7 @@ function ConditionBuilderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" preventDismiss>
         <DialogHeader>
           <DialogTitle>Condition Builder</DialogTitle>
           <DialogDescription>

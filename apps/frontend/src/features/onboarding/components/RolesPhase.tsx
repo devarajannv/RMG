@@ -348,7 +348,7 @@ function BusinessRolesSection() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" preventDismiss>
           <DialogHeader>
             <DialogTitle>
               {editingRole ? 'Edit Business Role' : 'Create Business Role'}
@@ -653,7 +653,7 @@ function GradeBandsSection() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" preventDismiss>
           <DialogHeader>
             <DialogTitle>
               {editingBand ? 'Edit Grade Band' : 'Create Grade Band'}

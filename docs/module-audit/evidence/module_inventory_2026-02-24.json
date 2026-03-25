@@ -1,0 +1,307 @@
+[
+  {
+    "module": "agent",
+    "ts_files": 5,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 8,
+    "route_paths": [
+      "apps/api/src/modules/agent/agent.routes.ts"
+    ]
+  },
+  {
+    "module": "ai-migration",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "allocations",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "analytics",
+    "ts_files": 7,
+    "route_files": 0,
+    "controller_files": 2,
+    "service_files": 4,
+    "test_files": 2,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "audit",
+    "ts_files": 6,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 2,
+    "endpoints": 3,
+    "route_paths": [
+      "apps/api/src/modules/audit/audit.routes.ts"
+    ]
+  },
+  {
+    "module": "auth",
+    "ts_files": 8,
+    "route_files": 0,
+    "controller_files": 2,
+    "service_files": 5,
+    "test_files": 3,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "bench",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "clients",
+    "ts_files": 6,
+    "route_files": 0,
+    "controller_files": 2,
+    "service_files": 3,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "contracts",
+    "ts_files": 1,
+    "route_files": 0,
+    "controller_files": 0,
+    "service_files": 1,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "currency",
+    "ts_files": 5,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 13,
+    "route_paths": [
+      "apps/api/src/modules/currency/currency.routes.ts"
+    ]
+  },
+  {
+    "module": "dashboard",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "documents",
+    "ts_files": 5,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 11,
+    "route_paths": [
+      "apps/api/src/modules/documents/document.routes.ts"
+    ]
+  },
+  {
+    "module": "export",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "functions",
+    "ts_files": 6,
+    "route_files": 2,
+    "controller_files": 1,
+    "service_files": 1,
+    "test_files": 0,
+    "endpoints": 13,
+    "route_paths": [
+      "apps/api/src/modules/functions/functions.routes.ts",
+      "apps/api/src/modules/functions/assignments.routes.ts"
+    ]
+  },
+  {
+    "module": "gdpr",
+    "ts_files": 2,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 1,
+    "test_files": 0,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "health",
+    "ts_files": 3,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 0,
+    "test_files": 0,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "import",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "intelligence",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "notifications",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 0,
+    "service_files": 4,
+    "test_files": 2,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "onboarding",
+    "ts_files": 10,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 6,
+    "test_files": 0,
+    "endpoints": 51,
+    "route_paths": [
+      "apps/api/src/modules/onboarding/onboarding.routes.ts"
+    ]
+  },
+  {
+    "module": "organization",
+    "ts_files": 5,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 3,
+    "route_paths": [
+      "apps/api/src/modules/organization/organization.routes.ts"
+    ]
+  },
+  {
+    "module": "projects",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "requests",
+    "ts_files": 35,
+    "route_files": 8,
+    "controller_files": 6,
+    "service_files": 10,
+    "test_files": 5,
+    "endpoints": 83,
+    "route_paths": [
+      "apps/api/src/modules/requests/request-types.routes.ts",
+      "apps/api/src/modules/requests/delegation.routes.ts",
+      "apps/api/src/modules/requests/approval-chain.routes.ts",
+      "apps/api/src/modules/requests/trigger.routes.ts",
+      "apps/api/src/modules/requests/notification.routes.ts"
+    ]
+  },
+  {
+    "module": "resources",
+    "ts_files": 10,
+    "route_files": 0,
+    "controller_files": 3,
+    "service_files": 6,
+    "test_files": 2,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "roles",
+    "ts_files": 5,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 11,
+    "route_paths": [
+      "apps/api/src/modules/roles/role.routes.ts"
+    ]
+  },
+  {
+    "module": "timesheets",
+    "ts_files": 5,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 2,
+    "endpoints": 0,
+    "route_paths": []
+  },
+  {
+    "module": "users",
+    "ts_files": 5,
+    "route_files": 1,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 9,
+    "route_paths": [
+      "apps/api/src/modules/users/user.routes.ts"
+    ]
+  },
+  {
+    "module": "webhooks",
+    "ts_files": 4,
+    "route_files": 0,
+    "controller_files": 1,
+    "service_files": 2,
+    "test_files": 1,
+    "endpoints": 0,
+    "route_paths": []
+  }
+]

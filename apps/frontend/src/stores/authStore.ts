@@ -58,9 +58,9 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'rmgaas-auth',
       storage: createJSONStorage(() => sessionStorage),
+      // C-09: Only persist user info, NOT the access token (kept in memory only)
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (_state, _error) => {

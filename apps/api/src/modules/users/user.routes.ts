@@ -13,10 +13,10 @@ const router = Router();
 router.use(authenticate);
 
 // List users (for workflow assignment dropdowns and admin list)
-router.get('/', userController.listUsers);
+router.get('/', authorize('users:read'), userController.listUsers);
 
 // Get single user
-router.get('/:id', userController.getUserById);
+router.get('/:id', authorize('users:read'), userController.getUserById);
 
 // Create new user (admin only)
 router.post('/', authorize('users:create'), userController.createUser);

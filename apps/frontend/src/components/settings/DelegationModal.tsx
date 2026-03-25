@@ -133,7 +133,7 @@ export default function DelegationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" preventDismiss>
         <DialogHeader>
           <DialogTitle>Delegate Function</DialogTitle>
         </DialogHeader>

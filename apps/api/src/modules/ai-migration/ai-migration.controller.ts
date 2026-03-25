@@ -8,6 +8,16 @@ import { aiMigrationService } from './ai-migration.service';
 
 const router = Router();
 
+// Validate that a file path is within the expected upload directory
+function validateFilePath(filePath: string): string {
+  const uploadDir = path.resolve(process.cwd(), 'uploads', 'migrations');
+  const resolvedPath = path.resolve(filePath);
+  if (!resolvedPath.startsWith(uploadDir)) {
+    throw new Error('Invalid file path');
+  }
+  return resolvedPath;
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -19,7 +29,10 @@ const storage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    // Use only path.basename and sanitize to prevent path traversal
+    const safeName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const ext = path.extname(safeName).toLowerCase();
+    cb(null, uniqueSuffix + ext);
   },
 });
 
@@ -39,7 +52,7 @@ const upload = multer({
     const allowedExtensions = ['.csv', '.xlsx', '.xls', '.json', '.pdf', '.png', '.jpg', '.jpeg'];
     
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+    if (allowedTypes.includes(file.mimetype) && allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
       cb(new Error(`Unsupported file type: ${file.mimetype}`));
@@ -134,8 +147,11 @@ router.post(
         return;
       }
 
+      // Validate file path is within expected directory
+      const safePath = validateFilePath(job.sourceFilePath);
+
       // Read file content
-      const fileContent = fs.readFileSync(job.sourceFilePath);
+      const fileContent = fs.readFileSync(safePath);
 
       // Analyze with AI
       const analysis = await aiMigrationService.analyzeFile(
@@ -203,9 +219,12 @@ router.get(
         return;
       }
 
+      // Strip sensitive server filesystem path from response
+      const { sourceFilePath: _omit, ...safeJob } = job;
+
       res.json({
         success: true,
-        data: job,
+        data: safeJob,
       });
     } catch (error) {
       next(error);
@@ -269,8 +288,11 @@ router.post(
         return;
       }
 
+      // Validate file path is within expected directory
+      const safePath = validateFilePath(job.sourceFilePath);
+
       // Read file content
-      const fileContent = fs.readFileSync(job.sourceFilePath);
+      const fileContent = fs.readFileSync(safePath);
 
       // Execute import
       const result = await aiMigrationService.executeImport(

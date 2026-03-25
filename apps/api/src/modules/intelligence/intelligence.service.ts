@@ -722,12 +722,16 @@ export async function getUtilizationInsights(tenantId: string): Promise<Utilizat
     });
   }
 
+  const variance = currentUtilization - targetUtilization;
+  const trend: 'improving' | 'declining' | 'stable' =
+    variance >= 5 ? 'improving' : variance <= -5 ? 'declining' : 'stable';
+
   return {
     currentUtilization,
     targetUtilization,
     optimalUtilization,
-    variance: currentUtilization - targetUtilization,
-    trend: 'stable', // Would need historical data
+    variance,
+    trend,
     benchCount,
     benchCost,
     recommendations,

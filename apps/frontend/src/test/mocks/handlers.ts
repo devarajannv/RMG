@@ -313,6 +313,65 @@ export const handlers = [
     return HttpResponse.json({ success: true });
   }),
 
+  http.post(`${API_BASE}/auth/refresh`, () => {
+    return HttpResponse.json({
+      tokens: { accessToken: 'mock-jwt-token', expiresIn: 3600 },
+    });
+  }),
+
+  // Intelligence
+  http.get(`${API_BASE}/intelligence/utilization-insights`, () => {
+    return HttpResponse.json({
+      data: {
+        currentUtilization: 72,
+        targetUtilization: 75,
+        optimalUtilization: 80,
+        variance: -3,
+        benchCount: 2,
+        benchCost: 300000,
+        recommendations: [
+          {
+            type: 'action',
+            priority: 'medium',
+            message: 'Increase billable allocation for bench resources',
+            impact: 'Improve utilization by 2-3%',
+          },
+        ],
+        practiceBreakdown: [
+          {
+            practiceId: 'prac-1',
+            practiceName: 'Engineering',
+            utilization: 74,
+            target: 75,
+            status: 'below',
+            recommendation: 'Prioritize allocation matching',
+          },
+        ],
+      },
+    });
+  }),
+
+  http.get(`${API_BASE}/intelligence/skill-inventory`, () => {
+    return HttpResponse.json({
+      data: {
+        skills: [],
+        topInDemand: ['React', 'TypeScript'],
+        skillGaps: ['Go'],
+        recommendations: ['Upskill backend pool for Go demand'],
+      },
+    });
+  }),
+
+  // AI Migration
+  http.get(`${API_BASE}/ai-migration/jobs`, () => {
+    return HttpResponse.json({ data: [] });
+  }),
+
+  // Webhooks
+  http.get(`${API_BASE}/webhooks`, () => {
+    return HttpResponse.json({ data: [] });
+  }),
+
   // Resources
   http.get(`${API_BASE}/resources`, () => {
     return HttpResponse.json({ data: mockResources, total: mockResources.length });

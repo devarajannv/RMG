@@ -376,7 +376,7 @@ function DelegationRulesSection() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" preventDismiss>
           <DialogHeader>
             <DialogTitle>
               {editingRule ? 'Edit Delegation Rule' : 'Create Delegation Rule'}

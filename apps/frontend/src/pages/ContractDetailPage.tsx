@@ -21,7 +21,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 import { ContractStatusTimeline } from '@/components/contracts/ContractStatusTimeline';
 import { ContractMilestones } from '@/components/contracts/ContractMilestones';
 import { ContractDocuments } from '@/components/contracts/ContractDocuments';
@@ -238,23 +237,19 @@ export default function ContractDetailPage() {
   // Loading state
   if (isLoading) {
     return (
-      <MainLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
-      </MainLayout>
     );
   }
 
   // Error state
   if (error || !contract) {
     return (
-      <MainLayout>
         <div className="text-center py-12">
           <p className="text-red-600 mb-4">{error ? String(error) : 'Contract not found'}</p>
           <Button onClick={() => navigate('/contracts')}>Back to Contracts</Button>
         </div>
-      </MainLayout>
     );
   }
 
@@ -262,7 +257,6 @@ export default function ContractDetailPage() {
   const daysRemaining = getDaysRemaining(contract.endDate);
 
   return (
-    <MainLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
@@ -604,7 +598,6 @@ export default function ContractDetailPage() {
           onSuccess={() => refetch()}
         />
       </div>
-    </MainLayout>
   );
 }
 

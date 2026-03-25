@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, requireRoles } from '../../middleware/auth';
 import { asyncHandler } from '../../middleware/errorHandler';
 import * as controller from './notification.controller';
 
@@ -122,13 +122,13 @@ router.delete('/:id', asyncHandler(controller.deleteNotification));
  * @desc Cleanup old notifications (Admin)
  * @access Private (Admin)
  */
-router.post('/cleanup', asyncHandler(controller.cleanupNotifications));
+router.post('/cleanup', requireRoles('ADMIN'), asyncHandler(controller.cleanupNotifications));
 
 /**
  * @route POST /api/v1/notifications/test
  * @desc Create a test notification (Admin)
  * @access Private (Admin)
  */
-router.post('/test', asyncHandler(controller.createTestNotification));
+router.post('/test', requireRoles('ADMIN'), asyncHandler(controller.createTestNotification));
 
 export default router;

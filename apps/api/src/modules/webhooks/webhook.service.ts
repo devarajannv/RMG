@@ -16,6 +16,7 @@
 import { WebhookEvent, Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { logger } from '../../lib/logger';
+import { validateWebhookUrl } from '../../lib/url-validator';
 
 // ============================================================================
 // Types
@@ -42,7 +43,7 @@ export interface WebhookConfig {
 export interface WebhookPayload {
   event: WebhookEvent;
   timestamp: string;
-  tenantId: string;
+  // M-26: tenantId removed from outbound payload
   deliveryId: string;
   data: Record<string, unknown>;
 }
@@ -182,15 +183,16 @@ function isRateLimited(webhookId: string): boolean {
 interface PendingRetry {
   logId: string;
   webhookId: string;
+  tenantId: string;
   scheduledAt: Date;
 }
 
 const retryQueue: PendingRetry[] = [];
 let retryProcessorInterval: NodeJS.Timeout | null = null;
 
-function scheduleRetry(logId: string, webhookId: string, delaySeconds: number): void {
+function scheduleRetry(logId: string, webhookId: string, tenantId: string, delaySeconds: number): void {
   const scheduledAt = new Date(Date.now() + delaySeconds * 1000);
-  retryQueue.push({ logId, webhookId, scheduledAt });
+  retryQueue.push({ logId, webhookId, tenantId, scheduledAt });
   logger.info(`Scheduled retry for delivery ${logId} at ${scheduledAt.toISOString()}`);
 }
 
@@ -203,7 +205,7 @@ async function processRetryQueue(): Promise<void> {
     if (index > -1) retryQueue.splice(index, 1);
     
     try {
-      await retryDelivery(retry.logId);
+      await retryDelivery(retry.logId, retry.tenantId);
     } catch (error) {
       logger.error(`Failed to process retry for ${retry.logId}`, { error });
     }
@@ -248,11 +250,11 @@ export async function registerWebhook(
   userId: string,
   input: CreateWebhookInput
 ): Promise<WebhookConfig> {
-  // Validate URL
-  try {
-    new URL(input.url);
-  } catch {
-    throw new Error('Invalid webhook URL');
+  // H-04: Validate URL against SSRF
+  const isDev = process.env.NODE_ENV === 'development';
+  const urlError = validateWebhookUrl(input.url, isDev);
+  if (urlError) {
+    throw new Error(urlError);
   }
 
   // Validate events
@@ -317,7 +319,8 @@ export async function listWebhooks(
   ]);
 
   return {
-    webhooks: webhooks as WebhookConfig[],
+    // H-05: Strip secret from list response
+    webhooks: webhooks.map(({ secret: _secret, ...w }) => w) as WebhookConfig[],
     total,
   };
 }
@@ -332,8 +335,12 @@ export async function getWebhook(
   const webhook = await prisma.webhook.findFirst({
     where: { id: webhookId, tenantId },
   });
-  
-  return webhook as WebhookConfig | null;
+
+  if (!webhook) return null;
+
+  // H-05: Strip secret from GET response
+  const { secret: _secret, ...safeWebhook } = webhook;
+  return safeWebhook as WebhookConfig | null;
 }
 
 /**
@@ -344,12 +351,12 @@ export async function updateWebhook(
   webhookId: string,
   input: UpdateWebhookInput
 ): Promise<WebhookConfig | null> {
-  // Validate URL if provided
+  // H-04: Validate URL against SSRF
   if (input.url) {
-    try {
-      new URL(input.url);
-    } catch {
-      throw new Error('Invalid webhook URL');
+    const isDev = process.env.NODE_ENV === 'development';
+    const urlError = validateWebhookUrl(input.url, isDev);
+    if (urlError) {
+      throw new Error(urlError);
     }
   }
 
@@ -364,17 +371,24 @@ export async function updateWebhook(
   }
 
   try {
-    const webhook = await prisma.webhook.update({
-      where: { id: webhookId },
+    const updateResult = await prisma.webhook.updateMany({
+      where: { id: webhookId, tenantId },
       data: {
         ...input,
         updatedAt: new Date(),
       },
     });
 
-    // Verify tenant ownership
-    if (webhook.tenantId !== tenantId) {
-      throw new Error('Webhook not found');
+    if (updateResult.count === 0) {
+      return null;
+    }
+
+    const webhook = await prisma.webhook.findFirst({
+      where: { id: webhookId, tenantId },
+    });
+
+    if (!webhook) {
+      return null;
     }
 
     logger.info(`Webhook updated: ${webhook.id}`, { updates: Object.keys(input) });
@@ -467,7 +481,7 @@ export async function triggerWebhook(
         payload: {
           event,
           timestamp: new Date().toISOString(),
-          tenantId,
+          // M-26: tenantId removed from outbound payload
           data,
         } as Prisma.InputJsonValue,
       },
@@ -510,7 +524,7 @@ async function deliverWebhook(
   const payload: WebhookPayload = {
     event,
     timestamp: new Date().toISOString(),
-    tenantId,
+    // M-26: tenantId removed from outbound payload
     deliveryId: logId,
     data,
   };
@@ -619,7 +633,7 @@ async function deliverWebhook(
         },
       });
 
-      scheduleRetry(logId, webhook.id, delay);
+      scheduleRetry(logId, webhook.id, tenantId, delay);
     }
 
     return {
@@ -633,7 +647,7 @@ async function deliverWebhook(
 /**
  * Retry a failed delivery
  */
-export async function retryDelivery(logId: string): Promise<boolean> {
+export async function retryDelivery(logId: string, tenantId: string): Promise<boolean> {
   const log = await prisma.webhookLog.findUnique({
     where: { id: logId },
     include: { webhook: true },
@@ -643,9 +657,13 @@ export async function retryDelivery(logId: string): Promise<boolean> {
     return false; // Already delivered or not found
   }
 
+  // Verify the webhook belongs to the caller's tenant
+  if (log.webhook.tenantId !== tenantId) {
+    return false;
+  }
+
   const payload = log.payload as {
     event: WebhookEvent;
-    tenantId: string;
     data: Record<string, unknown>;
   };
 
@@ -653,7 +671,7 @@ export async function retryDelivery(logId: string): Promise<boolean> {
     log.webhook,
     logId,
     payload.event,
-    payload.tenantId,
+    tenantId,
     payload.data,
     log.attempt + 1
   );

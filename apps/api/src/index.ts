@@ -16,7 +16,8 @@ import { wsManager } from './lib/websocket';
 import authRoutes from './modules/auth/auth.controller';
 import microsoftAuthRoutes from './modules/auth/microsoft.controller';
 import { resourceRoutes, skillRoutes, importRoutes } from './modules/resources';
-import { clientRoutes, contractRoutes } from './modules/clients';
+import { clientRoutes } from './modules/clients';
+import { contractRoutes } from './modules/contracts';
 import { projectRoutes } from './modules/projects';
 import { allocationRoutes } from './modules/allocations';
 import { dashboardRoutes } from './modules/dashboard';
@@ -39,6 +40,9 @@ import { organizationRoutes } from './modules/organization';
 import { healthRoutes, recordRequest, incrementConnections, decrementConnections } from './modules/health';
 import { onboardingRoutes } from './modules/onboarding';
 import { functionsRoutes, assignmentsRoutes } from './modules/functions';
+import gdprRoutes from './modules/gdpr/gdpr.controller';
+import { scheduleDataRetention } from './lib/data-retention';
+import { csrfProtection } from './middleware/csrf';
 
 const app = express();
 
@@ -51,7 +55,19 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'https:'],
+        frameAncestors: ["'none'"],        // L-08
+        formAction: ["'self'"],             // L-09
       },
+    },
+    // L-06: HSTS with preload
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    // L-07: Cross-domain policies
+    permittedCrossDomainPolicies: {
+      permittedPolicies: 'none',
     },
   })
 );
@@ -61,17 +77,24 @@ app.use(
     origin: config.corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-XSRF-TOKEN', 'x-e2e-test-mode'],
   })
 );
 
 // Rate limiting
+const shouldSkipGlobalRateLimit = (req: { headers: Record<string, unknown> }) =>
+  process.env.NODE_ENV !== 'production' ||
+  process.env.E2E_TEST_MODE === 'true' ||
+  process.env.VITEST === 'true' ||
+  req.headers['x-e2e-test-mode'] === '1';
+
 const limiter = rateLimit({
   windowMs: config.rateLimitWindowMs,
-  max: config.rateLimitMaxRequests,
+  max: () => (process.env.NODE_ENV === 'production' ? config.rateLimitMaxRequests : 100000),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },
+  skip: shouldSkipGlobalRateLimit,
 });
 app.use(limiter);
 
@@ -79,6 +102,9 @@ app.use(limiter);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser(config.cookieSecret));
+
+// M-02: CSRF protection
+app.use(csrfProtection);
 
 // Request logging
 app.use(requestLogger);
@@ -104,21 +130,26 @@ app.get('/api/v1', (_req, res) => {
   res.json({
     name: 'RMGaaS API',
     version: '0.1.0',
-    docs: '/api-docs',
   });
 });
 
-// Swagger API Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'RMGaaS API Documentation',
-}));
+// Swagger API Documentation (disabled in production unless explicitly enabled)
+// M-13: Log warning if enabled in production
+if (!config.isProd || process.env.ENABLE_API_DOCS === 'true') {
+  if (config.isProd) {
+    logger.warn('⚠️ API documentation is enabled in production via ENABLE_API_DOCS');
+  }
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'RMGaaS API Documentation',
+  }));
 
-// OpenAPI spec endpoint
-app.get('/api-docs.json', (_req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpec);
-});
+  // OpenAPI spec endpoint
+  app.get('/api-docs.json', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
+}
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);
@@ -157,6 +188,7 @@ app.use('/api/v1/audit-logs', auditRoutes);
 app.use('/api/v1/organization', organizationRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
 app.use('/api/v1/functions', functionsRoutes);
+app.use('/api/v1/gdpr', gdprRoutes);
 app.use('/api/v1/assignments', assignmentsRoutes);
 
 // Error handling
@@ -175,6 +207,9 @@ server.listen(PORT, () => {
   logger.info(`📍 Environment: ${config.nodeEnv}`);
   logger.info(`🔗 API URL: ${config.apiUrl}`);
   logger.info(`🔌 WebSocket available at ws://localhost:${PORT}/ws`);
+  
+  // H-07: Schedule data retention purge jobs
+  scheduleDataRetention();
 });
 
 // Graceful shutdown

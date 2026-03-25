@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
 import { ArrowLeft, Building2, FileText, FolderKanban, User, Phone, Mail, Globe, Star } from 'lucide-react';
 
 // ============================================================================
@@ -172,22 +171,18 @@ export default function ClientDetailPage() {
 
   if (loading) {
     return (
-      <MainLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      </MainLayout>
     );
   }
 
   if (error || !client) {
     return (
-      <MainLayout>
         <div className="flex flex-col items-center justify-center h-64">
           <p className="text-red-600 mb-4">{error || 'Client not found'}</p>
           <Button onClick={() => navigate('/clients')}>Back to Clients</Button>
         </div>
-      </MainLayout>
     );
   }
 
@@ -196,7 +191,6 @@ export default function ClientDetailPage() {
   const activeProjects = client.projects.filter(p => p.status === 'ACTIVE').length;
 
   return (
-    <MainLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -480,7 +474,6 @@ export default function ClientDetailPage() {
           </Card>
         )}
       </div>
-    </MainLayout>
   );
 }
 

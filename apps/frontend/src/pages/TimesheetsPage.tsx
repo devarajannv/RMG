@@ -18,7 +18,6 @@ import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
 
 // ============================================================================
 // Types
@@ -235,7 +234,6 @@ export default function TimesheetsPage() {
   };
 
   return (
-    <MainLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -500,7 +498,6 @@ export default function TimesheetsPage() {
           </Card>
         </div>
       </div>
-    </MainLayout>
   );
 }
 

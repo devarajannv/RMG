@@ -220,7 +220,7 @@ interface AdminOnlyProps {
  */
 export function AdminOnly({ children, fallback = null }: AdminOnlyProps): React.ReactElement | null {
   return (
-    <Can anyRole={['Admin', 'Super Admin', 'admin']} fallback={fallback}>
+    <Can anyRole={['Admin', 'Super Admin', 'admin', 'ADMIN', 'ORG_ADMIN', 'Org Admin']} fallback={fallback}>
       {children}
     </Can>
   );
@@ -245,7 +245,7 @@ interface ManagerOnlyProps {
  */
 export function ManagerOnly({ children, fallback = null }: ManagerOnlyProps): React.ReactElement | null {
   return (
-    <Can anyRole={['Admin', 'Super Admin', 'admin', 'Manager', 'manager', 'Practice Lead', 'Delivery Head']} fallback={fallback}>
+    <Can anyRole={['Admin', 'Super Admin', 'admin', 'ADMIN', 'ORG_ADMIN', 'Org Admin', 'Manager', 'manager', 'Practice Lead', 'Delivery Head']} fallback={fallback}>
       {children}
     </Can>
   );
@@ -360,7 +360,11 @@ export function useRequirePermission(options: RequirePermissionOptions): {
       
       if (!isAllowed) {
         if (options.redirectTo) {
-          window.location.href = options.redirectTo;
+          // M-22: Prevent open redirect — only allow relative paths
+          const redirectTo = options.redirectTo;
+          if (redirectTo.startsWith('/') && !redirectTo.startsWith('//')) {
+            window.location.href = redirectTo;
+          }
         }
         if (options.onDenied) {
           options.onDenied();

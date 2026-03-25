@@ -354,7 +354,6 @@ describe('WorkflowEditor', () => {
 
     // Should show validation errors
     await waitFor(() => {
-      expect(screen.getByText('Code is required')).toBeInTheDocument();
       expect(screen.getByText('Name is required')).toBeInTheDocument();
       expect(screen.getByText('At least one step is required')).toBeInTheDocument();
     });

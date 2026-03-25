@@ -5,7 +5,9 @@
  * It exports `requirePermission` as an alias for cleaner API.
  */
 
-import { authorize } from './auth';
+import { Request, Response, NextFunction } from 'express';
+import { authorize, matchesPermission } from './auth';
+import { Errors } from './errorHandler';
 
 /**
  * Require specific permission(s) to access a route
@@ -21,10 +23,31 @@ import { authorize } from './auth';
 export const requirePermission = authorize;
 
 /**
- * Check if user has ANY of the specified permissions
+ * Check if user has ANY of the specified permissions (OR logic)
+ * Unlike authorize() which requires ALL permissions, this requires at least one.
  */
 export function requireAnyPermission(...permissions: string[]) {
-  return authorize(...permissions);
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(Errors.unauthorized('Authentication required'));
+    }
+
+    // Admin has all permissions
+    if (req.user.permissions.includes('*')) {
+      return next();
+    }
+
+    // Check if user has ANY of the required permissions
+    const hasAnyPermission = permissions.some((permission) =>
+      req.user!.permissions.some((userPermission) => matchesPermission(userPermission, permission))
+    );
+
+    if (!hasAnyPermission) {
+      return next(Errors.forbidden('Insufficient permissions'));
+    }
+
+    next();
+  };
 }
 
 // Re-export authorize for backwards compatibility

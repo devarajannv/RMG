@@ -242,7 +242,10 @@ export async function listResources(
   filters: ResourceFilters,
   pagination: PaginationOptions
 ) {
-  const { page, limit, sortBy = 'firstName', sortOrder = 'asc' } = pagination;
+  const { page, limit, sortBy: rawSortBy = 'firstName', sortOrder = 'asc' } = pagination;
+  // M-17: sortBy allowlist
+  const ALLOWED_RESOURCE_SORT = ['firstName', 'lastName', 'createdAt', 'updatedAt', 'status', 'employeeId', 'designation'];
+  const sortBy = ALLOWED_RESOURCE_SORT.includes(rawSortBy) ? rawSortBy : 'firstName';
   const skip = (page - 1) * limit;
 
   // Build where clause
@@ -552,6 +555,7 @@ export async function deleteResource(
   const activeAllocations = await prisma.allocation.count({
     where: {
       resourceId,
+      resource: { tenantId },
       status: { in: ['PROPOSED', 'CONFIRMED', 'ACTIVE'] },
       endDate: { gte: new Date() },
     },

@@ -1,7 +1,7 @@
 # Implementation Alignment Tracker
 
 > **Purpose:** Track how current implementation aligns with the Writer + Scribe architecture.  
-> **Last Updated:** December 31, 2025  
+> **Last Updated:** February 24, 2026 06:40:52 UTC  
 > **Reference:** See `ARCHITECTURE.md` for full architecture details.
 
 ---
@@ -17,7 +17,7 @@
 ## Alignment Summary
 
 ```
-WRITER (Core Product)         █████████████████████████  95% Complete
+WRITER (Core Product)         █████████████████████████ 100% Complete ✅
   └── Org Onboarding Module   █████████████████████████ 100% Complete ✅ RESOLVED
 SCRIBE (AI Layer)             ██░░░░░░░░░░░░░░░░░░░░░░   8% Complete
 PLATFORM PORTAL               ░░░░░░░░░░░░░░░░░░░░░░░░   0% Complete
@@ -124,14 +124,14 @@ The following modules now have comprehensive tests:
 | Webhooks E2E | ✅ Complete | Config, events, signatures |
 | Search E2E | ✅ Complete | Full-text, facets, pagination |
 
-### 1A.2 Performance Testing (75% Complete ⏳)
+### 1A.2 Performance Testing (100% Complete ✅)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Load Testing Utilities | ✅ Complete | Concurrency control, percentiles |
 | API Performance Tests | ✅ Complete | Latency, load, response time |
 | Web Vitals Budgets | ✅ Defined | LCP <2.5s, FID <100ms, CLS <0.1, TTFB <200ms |
-| Visual Regression | ❌ Pending | Puppeteer screenshot comparison |
+| Visual Regression | ✅ Complete | Puppeteer screenshot comparison, pixelmatch diffing, 10 pages × 4 viewports |
 
 ### 1A.3 Query Optimization (100% Complete ✅)
 
@@ -225,9 +225,9 @@ The Writer must be 100% functional without any AI.
 | Bench | ✅ Complete | ✅ Yes | - |
 | Reports | ✅ Complete | ✅ Yes | - |
 | Analytics | ✅ Complete | ✅ Yes | - |
-| Smart Search | ⚠️ Complete | ⚠️ Degraded | Uses simulated AI |
-| Data Management | ⚠️ Complete | ⚠️ Degraded | Uses simulated AI |
-| Settings | ✅ Complete | ✅ Yes | **Expanded with Users, Audit, Org** |
+| Smart Search | ✅ Complete | ✅ Yes | Rule-based intelligence (no AI dependency) |
+| Data Management | ✅ Complete | ✅ Yes | Export/Import/Webhooks = Writer; AI Migration = AI Assist (toggle-gated) |
+| Settings | ✅ Complete | ✅ Yes | **Current implementation mixes personal + tenant-admin concerns; approved IA target is `My Settings` (personal only) + `Organization Admin` (tenant-wide)** |
 | Requests | ✅ Complete | ✅ Yes | - |
 | Request Detail | ✅ Complete | ✅ Yes | - |
 | **Workflow Builder** | ✅ Complete | ✅ Yes | **NEW: Visual Canvas** |
@@ -278,6 +278,50 @@ Administration
   ├── Workflows
   └── Settings
 ```
+
+### 1.4A Tenant-App IA Realignment ⏳ APPROVED, NOT YET IMPLEMENTED (March 10, 2026)
+
+The current sidebar/settings implementation is functional, but semantically overloaded.
+
+**Approved target structure:**
+
+```
+Dashboard
+─────────────────
+Daily Work
+─────────────────
+Resource Management
+─────────────────
+Business
+─────────────────
+Intelligence
+─────────────────
+My Settings
+  ├── Profile
+  ├── Notifications
+  ├── Display
+  └── Security
+─────────────────
+Organization Admin
+  ├── Onboarding
+  ├── Users
+  ├── Roles
+  ├── Functions
+  ├── Request Types
+  ├── Workflows
+  ├── Currency
+  ├── Integrations
+  ├── Organization
+  ├── Audit Logs
+  └── Data Management
+```
+
+**Reason:** current `Settings` and `Administration` both act as tenant-admin surfaces, which weakens IA clarity. The approved fix is scope-based separation:
+
+- `My Settings` = personal only
+- `Organization Admin` = tenant-wide only
+
+**Workflow refinement:** workflow templates, SLA, escalation, and default workflow policies should be absorbed into the workflow domain under `Organization Admin > Workflows`, rather than remaining as a separate tenant-wide settings concept.
 
 ### 1.5 Critical Gaps for Writer Completion
 
@@ -493,10 +537,10 @@ function routeQuery(query: string) {
 
 | Requirement | Implemented? | Evidence |
 |-------------|--------------|----------|
-| Traditional UI is complete | ⚠️ Partial | Missing Workflow Builder only |
+| Traditional UI is complete | ✅ Yes | All pages including Workflow Builder complete |
 | Every action possible without AI | ✅ Yes | Request flow complete, permissions in place |
 | AI outputs feed into traditional UI | ⚠️ Partial | Agent widget shows results, no form pre-fill |
-| AI is optional toggle | ⚠️ Partial | Agent can be ignored, but no explicit toggle |
+| AI is optional toggle | ✅ Yes | AI Assist store with toggle in Settings, gated AI Migration tab |
 | Same data, same rules | ✅ Yes | All flows through same API |
 | AI cannot bypass validation | ✅ Yes | API validates all requests |
 | AI cannot bypass permissions | ✅ Yes | Auth middleware + frontend permission gates |
@@ -535,17 +579,21 @@ Week 1: ✅ COMPLETE
 Week 2: ✅ COMPLETE
 ├── Day 1-2: Permission System (Frontend) ✅
 ├── Day 3-4: Real-time Notifications ✅
-└── Day 5: Settings Expansion ⏳
+└── Day 5: Settings Expansion ✅
 
 Week 3: ✅ COMPLETE
 ├── Day 1-3: Workflow Builder (Visual Canvas) ✅
-├── Day 4-5: Workflow Templates ⏳
-└── End: Writer is 95% complete ✅
+├── Day 4-5: Workflow Templates ✅
+└── End: Writer is 100% complete ✅
 ```
 
-**Writer Status:** 95% Complete
-- All critical P0 items done
-- Minor enhancements remaining (Settings expansion, Workflow templates)
+**Writer Status:** 100% Complete ✅
+- All P0 and P1 items complete
+- Settings expanded (14 tabs: Notifications, Integrations, Workflow Settings, AI Assist)
+- Workflow Templates integrated into Workflow Builder
+- Smart Search & Data Management independent of AI
+- AI Assist toggle implemented (enable/disable AI features)
+- Visual regression testing infrastructure created
 
 ### Sprint 2: Add the Scribe (2-3 weeks)
 
@@ -649,6 +697,31 @@ Week 7:
 | 2025-12-18 | Sidebar reorganized with logical groupings |
 | 2025-12-18 | Pending approvals badge added to navigation |
 | 2025-12-18 | Initial alignment tracker created |
+| 2026-02-19 | **Writer 95% → 100%** - Closed remaining 5% gap (6 items from implementation plan) |
+| 2026-02-19 | **Settings Expansion Wired** - NotificationSettings, IntegrationSettings, WorkflowSettings integrated into SettingsPage (14 tabs total) |
+| 2026-02-19 | **Workflow Templates Integrated** - WorkflowTemplates gallery accessible from Workflow Builder with template-to-editor conversion |
+| 2026-02-19 | **Smart Search Independence** - Removed AI labeling from rule-based intelligence service |
+| 2026-02-19 | **Data Management Independence** - AI Migration tab gated behind AI Assist toggle, Export/Import/Webhooks fully Writer |
+| 2026-02-19 | **AI Assist Toggle** - Zustand store (aiAssistStore.ts) + Settings AI Assist tab + conditional rendering in Data Management |
+| 2026-02-19 | **Visual Regression Testing** - Puppeteer + pixelmatch screenshot comparison (10 pages × 4 viewports), Performance Testing → 100% |
+| 2026-02-23 | **Audit Item 8 Sprint Board** - Added execution artifact: docs/AUDIT_TRAIL_SPRINT_BOARD.md (epics, stories, acceptance criteria, rollout gates) |
+| 2026-02-23 | **Items 1–7 Sprint Board** - Added execution artifact for approved decision items and audit coverage closure plan |
+| 2026-02-23 | **Audit Coverage Slice Implemented** - Canonical audit helper adoption in allocations, timesheet lifecycle audit events, currency/FX governance audit events, request dual-write to canonical audit |
+| 2026-02-23 | **Audit Taxonomy Extended** - Added `AuditAction` values for request-return/cancel and override outcomes + migration `20260223115000_extend_audit_action_taxonomy` |
+| 2026-02-23 | **Implementation Tracking Artifacts Updated** - Added timestamped detailed plan + TODO execution documents and outcome updates |
+| 2026-02-23 | **Request Handler Audit Refactor** - Migrated request entity handlers and post-approval LOG_AUDIT to canonical `createAuditLog` helper |
+| 2026-02-23 | **Scoped Audit Bypass Guard** - Added `scripts/check-audit-bypass.sh` + API npm script `audit:check:bypass` to prevent direct audit writes in scoped modules |
+| 2026-02-23 | **Request Comprehensive Test Harness Fixed** - Updated request service comprehensive tests to mock `requestType.findFirst`, restoring REQ-001..REQ-005 coverage |
+| 2026-02-23 | **Delegation Override Workflow Implemented (WS-4 Slice)** - Added approve/reject delegation endpoints with permission gates, lifecycle expiry handling, and immutable override audit events (`OVERRIDE_APPROVED`, `OVERRIDE_REJECTED`, `OVERRIDE_CANCELLED`, `OVERRIDE_EXPIRED`) |
+| 2026-02-23 | **WS-6 Rollout Evidence Added** - Added request audit reconciliation command (`audit:reconcile:requests`) and runbook `WS6_MIGRATION_RECONCILIATION_RUNBOOK_2026-02-23_12-35-00_UTC.md`; reconciliation command executed successfully in current environment |
+| 2026-02-23 | **WS-6 Reconciliation Coverage Expanded** - Added domain integrity reconciliation command (`audit:reconcile:domains`) with tenant/action validation for `TimesheetPeriod`, `Currency`, and `ExchangeRate` canonical audit references |
+| 2026-02-23 | **WS-5 Reporting Dictionary Contract Added** - Added versioned metric dictionary source (`apps/api/src/config/reporting-dictionary.ts`), parity gate command (`reporting:check:parity`), and published contract doc (`REPORTING_DICTIONARY_CONTRACT_2026-02-23_13-10-00_UTC.md`) |
+| 2026-02-23 | **WS-1/WS-2/WS-3 Completed** - Added tenant billing taxonomy policy contract + organization API/UI controls, enforced taxonomy on request create/submit, introduced billability domain with partial attribution (`billableRatio`), and persisted as-was decision snapshots for request lifecycle history |
+| 2026-02-24 | **WS-8 Invoice-Linkage Foundation Completed** - Added canonical invoice-linkage event contract (`apps/api/src/config/invoice-linkage-events.ts`), validated audit emitter helper (`createInvoiceLinkageAuditEvent`), and reconciliation gate command (`audit:reconcile:invoice-linkage`) with passing validation |
+| 2026-02-24 | **WS-8 Runtime Invoice Linkage Implemented** - Added tenant-scoped request and timesheet invoice link/unlink API flows (`/requests/:id/invoice-link`, `/timesheets/:id/invoice-link`) with canonical invoice-linkage audit events, status guards, and targeted passing tests (28/28) |
+| 2026-02-24 | **WS-8 Period-Level Linkage + Reconciliation Hardened** - Added period invoice link/unlink API flows (`/timesheets/periods/:periodId/invoice-link`), linked/unlinked period entries by invoice reference, and strengthened `audit:reconcile:invoice-linkage` with referenced-entity integrity assertions |
+| 2026-02-24 | **WS-8 Reconciliation Query Filters Added** - Added `invoiceReference` list filtering for Requests (`requestData.invoiceReference`) and Timesheet entries (`customFields.invoiceReference`) with passing targeted tests (32/32) |
+| 2026-02-24 | **WS-8 Combined Reconciliation Report Endpoint Added** - Added `GET /api/v1/audit-logs/invoice-linkage/reconciliation-report` with tenant-scoped counts by `invoiceReference` across Request + TimesheetEntry + derived TimesheetPeriod, plus audit service tests (`AUDIT-017`, `AUDIT-018`) and passing validation (`18/18`, API type-check) |
 
 ---
 

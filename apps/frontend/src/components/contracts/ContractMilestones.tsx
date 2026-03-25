@@ -368,7 +368,7 @@ function MilestoneFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" preventDismiss>
         <DialogHeader>
           <DialogTitle>{milestone ? 'Edit Milestone' : 'Add Milestone'}</DialogTitle>
         </DialogHeader>

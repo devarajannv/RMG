@@ -581,6 +581,7 @@ class EmailService {
   private configs: Map<string, EmailConfig> = new Map();
   private defaultConfig: EmailConfig;
   private templates: Map<string, EmailTemplate> = new Map();
+  private queueHydrated = false;
 
   constructor() {
     // Default to MOCK provider for development
@@ -605,6 +606,7 @@ class EmailService {
    */
   setTenantConfig(tenantId: string, config: EmailConfig): void {
     this.configs.set(tenantId, config);
+    void this.persistTenantEmailConfig(tenantId, config);
     logger.info('Email config set for tenant', { tenantId, provider: config.provider });
   }
 
@@ -613,6 +615,38 @@ class EmailService {
    */
   getConfig(tenantId: string): EmailConfig {
     return this.configs.get(tenantId) || this.defaultConfig;
+  }
+
+  private async getConfigForTenant(tenantId: string): Promise<EmailConfig> {
+    const cached = this.configs.get(tenantId);
+    if (cached) {
+      return cached;
+    }
+
+    const tenantClient = (prisma as unknown as {
+      tenant?: {
+        findUnique?: typeof prisma.tenant.findUnique;
+      };
+    }).tenant;
+
+    if (!tenantClient?.findUnique) {
+      return this.defaultConfig;
+    }
+
+    const tenant = await tenantClient.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+
+    const settings = (tenant?.settings as Record<string, unknown> | null) ?? null;
+    const notifications = (settings?.notifications as Record<string, unknown> | null) ?? null;
+    const persistedConfig = (notifications?.emailConfig as EmailConfig | undefined) ?? undefined;
+    if (persistedConfig) {
+      this.configs.set(tenantId, persistedConfig);
+      return persistedConfig;
+    }
+
+    return this.defaultConfig;
   }
 
   /**
@@ -637,7 +671,7 @@ class EmailService {
    * Send an email immediately
    */
   async send(message: EmailMessage): Promise<EmailResult> {
-    const config = this.getConfig(message.tenantId);
+    const config = await this.getConfigForTenant(message.tenantId);
     
     try {
       // Process template if specified
@@ -688,6 +722,8 @@ class EmailService {
    * Queue an email for later delivery (more reliable)
    */
   async queue(message: EmailMessage, options?: { delay?: number; priority?: number }): Promise<string> {
+    await this.hydrateQueueFromPersistence();
+
     const queueId = crypto.randomUUID();
     
     const item: EmailQueueItem = {
@@ -705,6 +741,7 @@ class EmailService {
     };
 
     emailQueue.set(queueId, item);
+    await this.persistQueueItem(item);
     
     logger.info('Email queued', {
       queueId,
@@ -777,6 +814,13 @@ class EmailService {
 
     item.updatedAt = new Date();
     emailQueue.set(queueId, item);
+
+    if (item.status === 'SENT' || item.status === 'FAILED') {
+      await this.removeQueueItemFromPersistence(item.tenantId, queueId);
+      return;
+    }
+
+    await this.persistQueueItem(item);
   }
 
   /**
@@ -784,6 +828,8 @@ class EmailService {
    * This would be called by a cron job in production
    */
   async processQueue(): Promise<{ processed: number; sent: number; failed: number }> {
+    await this.hydrateQueueFromPersistence();
+
     let processed = 0;
     let sent = 0;
     let failed = 0;
@@ -805,6 +851,241 @@ class EmailService {
     }
 
     return { processed, sent, failed };
+  }
+
+  private async persistTenantEmailConfig(tenantId: string, config: EmailConfig): Promise<void> {
+    try {
+      const tenantClient = (prisma as unknown as {
+        tenant?: {
+          findUnique?: typeof prisma.tenant.findUnique;
+          update?: typeof prisma.tenant.update;
+        };
+      }).tenant;
+
+      if (!tenantClient?.findUnique || !tenantClient.update) {
+        return;
+      }
+
+      const tenant = await tenantClient.findUnique({
+        where: { id: tenantId },
+        select: { settings: true },
+      });
+
+      const settings = ((tenant?.settings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const notifications = ((settings.notifications as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+
+      await tenantClient.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            notifications: {
+              ...notifications,
+              emailConfig: config,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      logger.warn('Failed to persist tenant email config', {
+        tenantId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  private serializeQueueItem(item: EmailQueueItem): Record<string, unknown> {
+    return {
+      ...item,
+      nextAttemptAt: item.nextAttemptAt?.toISOString() ?? null,
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
+      message: {
+        ...item.message,
+        attachments: item.message.attachments?.map(attachment => ({
+          ...attachment,
+          content: Buffer.isBuffer(attachment.content)
+            ? attachment.content.toString('base64')
+            : attachment.content,
+          encoding: attachment.encoding ?? (Buffer.isBuffer(attachment.content) ? 'base64' : attachment.encoding),
+        })),
+      },
+    };
+  }
+
+  private deserializeQueueItem(raw: unknown): EmailQueueItem | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const source = raw as Record<string, unknown>;
+    if (typeof source.id !== 'string' || typeof source.tenantId !== 'string' || typeof source.status !== 'string') {
+      return null;
+    }
+
+    const message = source.message as EmailMessage;
+    if (!message || typeof message !== 'object') {
+      return null;
+    }
+
+    const attachments = message.attachments?.map(attachment => ({
+      ...attachment,
+      content: attachment.encoding === 'base64' && typeof attachment.content === 'string'
+        ? Buffer.from(attachment.content, 'base64')
+        : attachment.content,
+    }));
+
+    return {
+      id: source.id,
+      tenantId: source.tenantId,
+      status: source.status as EmailQueueItem['status'],
+      attempts: Number(source.attempts ?? 0),
+      maxAttempts: Number(source.maxAttempts ?? 3),
+      message: {
+        ...message,
+        attachments,
+      },
+      nextAttemptAt: typeof source.nextAttemptAt === 'string' ? new Date(source.nextAttemptAt) : undefined,
+      lastError: typeof source.lastError === 'string' ? source.lastError : undefined,
+      messageId: typeof source.messageId === 'string' ? source.messageId : undefined,
+      createdAt: typeof source.createdAt === 'string' ? new Date(source.createdAt) : new Date(),
+      updatedAt: typeof source.updatedAt === 'string' ? new Date(source.updatedAt) : new Date(),
+    };
+  }
+
+  private async persistQueueItem(item: EmailQueueItem): Promise<void> {
+    try {
+      const tenantClient = (prisma as unknown as {
+        tenant?: {
+          findUnique?: typeof prisma.tenant.findUnique;
+          update?: typeof prisma.tenant.update;
+        };
+      }).tenant;
+
+      if (!tenantClient?.findUnique || !tenantClient.update) {
+        return;
+      }
+
+      const tenant = await tenantClient.findUnique({
+        where: { id: item.tenantId },
+        select: { settings: true },
+      });
+
+      const settings = ((tenant?.settings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const notifications = ((settings.notifications as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const queueStore = ((notifications.emailQueue as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+
+      queueStore[item.id] = this.serializeQueueItem(item);
+
+      await tenantClient.update({
+        where: { id: item.tenantId },
+        data: {
+          settings: {
+            ...settings,
+            notifications: {
+              ...notifications,
+              emailQueue: queueStore,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      logger.warn('Failed to persist email queue item', {
+        queueId: item.id,
+        tenantId: item.tenantId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  private async removeQueueItemFromPersistence(tenantId: string, queueId: string): Promise<void> {
+    try {
+      const tenantClient = (prisma as unknown as {
+        tenant?: {
+          findUnique?: typeof prisma.tenant.findUnique;
+          update?: typeof prisma.tenant.update;
+        };
+      }).tenant;
+
+      if (!tenantClient?.findUnique || !tenantClient.update) {
+        return;
+      }
+
+      const tenant = await tenantClient.findUnique({
+        where: { id: tenantId },
+        select: { settings: true },
+      });
+
+      const settings = ((tenant?.settings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const notifications = ((settings.notifications as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const queueStore = ((notifications.emailQueue as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+
+      if (!(queueId in queueStore)) {
+        return;
+      }
+
+      delete queueStore[queueId];
+
+      await tenantClient.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            notifications: {
+              ...notifications,
+              emailQueue: queueStore,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      logger.warn('Failed to remove persisted email queue item', {
+        queueId,
+        tenantId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  private async hydrateQueueFromPersistence(): Promise<void> {
+    if (this.queueHydrated) {
+      return;
+    }
+
+    const tenantClient = (prisma as unknown as {
+      tenant?: {
+        findMany?: typeof prisma.tenant.findMany;
+      };
+    }).tenant;
+
+    if (!tenantClient?.findMany) {
+      this.queueHydrated = true;
+      return;
+    }
+
+    const tenants = await tenantClient.findMany({
+      select: { id: true, settings: true },
+    });
+
+    for (const tenant of tenants) {
+      const settings = (tenant.settings as Record<string, unknown> | null) ?? null;
+      const notifications = (settings?.notifications as Record<string, unknown> | null) ?? null;
+      const queueStore = (notifications?.emailQueue as Record<string, unknown> | null) ?? null;
+
+      if (!queueStore) {
+        continue;
+      }
+
+      for (const [queueId, queueItem] of Object.entries(queueStore)) {
+        if (emailQueue.has(queueId)) {
+          continue;
+        }
+
+        const deserialized = this.deserializeQueueItem(queueItem);
+        if (deserialized) {
+          emailQueue.set(queueId, deserialized);
+        }
+      }
+    }
+
+    this.queueHydrated = true;
   }
 
   // ============================================================================

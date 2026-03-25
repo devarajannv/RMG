@@ -10,6 +10,13 @@ import { Request, Response, NextFunction } from 'express';
 import * as functionsService from './functions.service';
 import { ApiError } from '../../middleware/errorHandler';
 import { EntityStatus, FunctionCategory, FunctionScopeType } from '@prisma/client';
+import {
+  createApprovalFunctionSchema,
+  updateApprovalFunctionSchema,
+  createAssignmentSchema,
+  delegateAssignmentSchema,
+  revokeAssignmentSchema,
+} from './functions.schemas';
 
 // =============================================================================
 // APPROVAL FUNCTION ENDPOINTS
@@ -26,19 +33,12 @@ export async function createApprovalFunction(req: Request, res: Response, next: 
       throw new ApiError('Tenant ID required', 400, 'TENANT_REQUIRED');
     }
 
+    const input = createApprovalFunctionSchema.parse(req.body);
+
     const func = await functionsService.createApprovalFunction(tenantId, {
-      code: req.body.code,
-      name: req.body.name,
-      description: req.body.description,
-      category: req.body.category,
-      scopeType: req.body.scopeType,
-      allowMultipleHolders: req.body.allowMultipleHolders,
-      requiresApproval: req.body.requiresApproval,
-      canDelegate: req.body.canDelegate,
-      maxDelegationDays: req.body.maxDelegationDays,
+      ...input,
       isSystem: false, // Only seed can create system functions
-      sortOrder: req.body.sortOrder,
-    });
+    } as any);
 
     res.status(201).json({
       success: true,
@@ -145,18 +145,9 @@ export async function updateApprovalFunction(req: Request, res: Response, next: 
       throw new ApiError('Tenant ID required', 400, 'TENANT_REQUIRED');
     }
 
-    const func = await functionsService.updateApprovalFunction(tenantId, req.params.functionId, {
-      name: req.body.name,
-      description: req.body.description,
-      category: req.body.category,
-      scopeType: req.body.scopeType,
-      allowMultipleHolders: req.body.allowMultipleHolders,
-      requiresApproval: req.body.requiresApproval,
-      canDelegate: req.body.canDelegate,
-      maxDelegationDays: req.body.maxDelegationDays,
-      status: req.body.status,
-      sortOrder: req.body.sortOrder,
-    });
+    const input = updateApprovalFunctionSchema.parse(req.body);
+
+    const func = await functionsService.updateApprovalFunction(tenantId, req.params.functionId, input as any);
 
     res.json({
       success: true,
@@ -202,17 +193,19 @@ export async function createAssignment(req: Request, res: Response, next: NextFu
       throw new ApiError('Authentication required', 401, 'AUTH_REQUIRED');
     }
 
+    const input = createAssignmentSchema.parse(req.body);
+
     const assignment = await functionsService.createFunctionAssignment(
       tenantId,
       userId,
       {
         functionId: req.params.functionId,
-        userId: req.body.userId,
-        scopeType: req.body.scopeType,
-        scopeEntityId: req.body.scopeEntityId,
-        effectiveFrom: req.body.effectiveFrom ? new Date(req.body.effectiveFrom) : undefined,
-        effectiveTo: req.body.effectiveTo ? new Date(req.body.effectiveTo) : undefined,
-      }
+        userId: input.userId,
+        scopeType: input.scopeType,
+        scopeEntityId: input.scopeEntityId,
+        effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : undefined,
+        effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : undefined,
+      } as any
     );
 
     res.status(201).json({
@@ -308,11 +301,13 @@ export async function revokeAssignment(req: Request, res: Response, next: NextFu
       throw new ApiError('Authentication required', 401, 'AUTH_REQUIRED');
     }
 
+    const input = revokeAssignmentSchema.parse(req.body);
+
     const assignment = await functionsService.revokeFunctionAssignment(
       tenantId,
       req.params.assignmentId,
       userId,
-      req.body.reason
+      input.reason
     );
 
     res.json({
@@ -336,22 +331,16 @@ export async function delegateAssignment(req: Request, res: Response, next: Next
       throw new ApiError('Authentication required', 401, 'AUTH_REQUIRED');
     }
 
-    if (!req.body.delegateUserId) {
-      throw new ApiError('Delegate user ID required', 400, 'DELEGATE_REQUIRED');
-    }
-
-    if (!req.body.effectiveTo) {
-      throw new ApiError('Effective end date required for delegation', 400, 'END_DATE_REQUIRED');
-    }
+    const input = delegateAssignmentSchema.parse(req.body);
 
     const delegation = await functionsService.delegateFunction(
       tenantId,
       req.params.assignmentId,
       userId,
       {
-        delegateUserId: req.body.delegateUserId,
-        effectiveTo: new Date(req.body.effectiveTo),
-        reason: req.body.reason,
+        delegateUserId: input.delegateUserId,
+        effectiveTo: new Date(input.effectiveTo),
+        reason: input.reason,
       }
     );
 

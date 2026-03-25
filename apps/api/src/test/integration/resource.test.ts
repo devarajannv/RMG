@@ -331,10 +331,13 @@ describe('Resource API Integration Tests', () => {
     });
 
     it('should handle resource with active allocations', async () => {
+      const futureEndDate = new Date();
+      futureEndDate.setDate(futureEndDate.getDate() + 30);
+
       const resourceWithAllocations = {
         id: 'resource-123',
         allocations: [
-          { status: 'ACTIVE', endDate: new Date('2025-12-31') },
+          { status: 'ACTIVE', endDate: futureEndDate },
         ],
       };
 

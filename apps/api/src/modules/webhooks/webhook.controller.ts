@@ -212,7 +212,7 @@ router.post(
   authorize('admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const success = await webhookService.retryDelivery(req.params.deliveryId);
+      const success = await webhookService.retryDelivery(req.params.deliveryId, req.tenantId!);
 
       if (!success) {
         res.status(400).json({ 

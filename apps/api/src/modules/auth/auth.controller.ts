@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as authService from './auth.service';
 import { authenticate } from '../../middleware/auth';
 import { config } from '../../config/env';
+import { loginLimiter, registerLimiter, refreshLimiter, passwordResetLimiter } from '../../middleware/rateLimiter';
 
 const router = Router();
 
@@ -102,6 +103,7 @@ function clearTokenCookies(res: Response) {
  */
 router.post(
   '/register',
+  registerLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const input = registerSchema.parse(req.body);
@@ -113,11 +115,6 @@ router.post(
       res.status(201).json({
         message: 'Registration successful',
         user: result.user,
-        // Also return tokens in body for non-cookie clients
-        tokens: {
-          accessToken: result.tokens.accessToken,
-          expiresIn: result.tokens.accessExpiresIn,
-        },
       });
     } catch (error) {
       next(error);
@@ -139,8 +136,8 @@ router.post(
  *           schema:
  *             $ref: '#/components/schemas/LoginRequest'
  *           example:
- *             email: admin@newvision.in
- *             password: Password123!@#
+ *             email: user@example.com
+ *             password: your-password-here
  *     responses:
  *       200:
  *         description: Login successful
@@ -157,10 +154,15 @@ router.post(
  */
 router.post(
   '/login',
+  loginLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const input = loginSchema.parse(req.body);
-      const result = await authService.login(input);
+      const result = await authService.login({
+        ...input,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       // Set cookies
       setTokenCookies(res, result.tokens);
@@ -168,10 +170,6 @@ router.post(
       res.json({
         message: 'Login successful',
         user: result.user,
-        tokens: {
-          accessToken: result.tokens.accessToken,
-          expiresIn: result.tokens.accessExpiresIn,
-        },
       });
     } catch (error) {
       next(error);
@@ -202,11 +200,11 @@ router.post(
  */
 router.post(
   '/refresh',
+  refreshLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Get refresh token from cookie or body
-      const refreshToken =
-        req.signedCookies?.refreshToken || req.body.refreshToken;
+      // L-15: Only accept refresh token from signed httpOnly cookie (no body fallback)
+      const refreshToken = req.signedCookies?.refreshToken;
 
       if (!refreshToken) {
         return res.status(401).json({
@@ -256,7 +254,7 @@ router.post(
         req.headers.authorization?.substring(7) ||
         req.signedCookies?.accessToken;
 
-      await authService.logout(req.user!.id, accessToken);
+      await authService.logout(req.user!.id, accessToken, undefined, req.tenantId);
 
       clearTokenCookies(res);
 
@@ -284,7 +282,7 @@ router.post(
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await authService.logoutAll(req.user!.id);
+      await authService.logoutAll(req.user!.id, req.tenantId);
 
       clearTokenCookies(res);
 
@@ -342,6 +340,113 @@ router.get(
         permissions: req.user!.permissions,
       },
     });
+  }
+);
+
+// ============================================================================
+// C-06: Password Change & Forgot Password Routes
+// ============================================================================
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(12).max(128),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(12).max(128),
+});
+
+/**
+ * C-06: Change password (authenticated)
+ */
+router.post(
+  '/change-password',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+      await authService.changePassword(req.user!.id, currentPassword, newPassword, req.tenantId);
+      clearTokenCookies(res);
+      res.json({ message: 'Password changed successfully. Please log in again.' });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * C-06: Forgot password (unauthenticated)
+ */
+router.post(
+  '/forgot-password',
+  passwordResetLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+      await authService.requestPasswordReset(email);
+      // Always return success to prevent email enumeration
+      res.json({ message: 'If an account exists with that email, a reset link has been sent.' });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * C-06: Reset password with token (unauthenticated)
+ */
+router.post(
+  '/reset-password',
+  passwordResetLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token, newPassword } = resetPasswordSchema.parse(req.body);
+      await authService.resetPasswordWithToken(token, newPassword);
+      res.json({ message: 'Password has been reset. Please log in with your new password.' });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ============================================================================
+// C-04: Email Verification Routes
+// ============================================================================
+
+/**
+ * C-04: Send/resend verification email (authenticated)
+ */
+router.post(
+  '/send-verification',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.sendVerificationEmail(req.user!.id, req.tenantId);
+      res.json({ message: 'Verification email sent.' });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * C-04: Verify email with token (public)
+ */
+router.post(
+  '/verify-email',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
+      await authService.verifyEmail(token);
+      res.json({ message: 'Email verified successfully.' });
+    } catch (error) {
+      next(error);
+    }
   }
 );
 

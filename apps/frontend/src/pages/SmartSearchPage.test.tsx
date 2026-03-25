@@ -27,7 +27,7 @@ describe('SmartSearchPage', () => {
       renderWithProviders(<SmartSearchPage />);
       
       await waitFor(() => {
-        expect(screen.getByText(/ai-powered/i)).toBeInTheDocument();
+        expect(screen.getByText(/resource matching and utilization insights/i)).toBeInTheDocument();
       });
     });
   });

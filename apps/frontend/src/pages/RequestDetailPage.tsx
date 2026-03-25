@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -40,7 +41,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 import { useAuthStore } from '@/stores/authStore';
 
 // ============================================================================
@@ -53,7 +53,7 @@ interface Request {
   typeCode: string;
   title: string;
   description?: string;
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'IN_PROGRESS' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'ON_HOLD';
+  status: 'DRAFT' | 'RETURNED' | 'PENDING_APPROVAL' | 'IN_PROGRESS' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'ON_HOLD';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   requestData: Record<string, unknown>;
   urgencyJustification?: string;
@@ -105,6 +105,24 @@ interface Request {
   watchers: RequestWatcher[];
   attachments: RequestAttachment[];
 }
+
+interface UpdateRequestPayload {
+  title: string;
+  description?: string;
+  priority: Request['priority'];
+  urgencyJustification?: string;
+  requestedCompletionDate?: string;
+}
+
+interface RequestDetailLocationState {
+  notice?: {
+    type: 'info' | 'success' | 'warning';
+    title: string;
+    message: string;
+  };
+}
+
+type EditRequestAction = 'save' | 'submit';
 
 interface RequestApproval {
   id: string;
@@ -173,6 +191,7 @@ interface RequestAttachment {
 
 const statusConfig: Record<Request['status'], { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
   DRAFT: { label: 'Draft', color: 'text-gray-700', bgColor: 'bg-gray-100', icon: FileText },
+  RETURNED: { label: 'Returned', color: 'text-orange-700', bgColor: 'bg-orange-100', icon: RotateCcw },
   PENDING_APPROVAL: { label: 'Pending Approval', color: 'text-amber-700', bgColor: 'bg-amber-100', icon: Clock },
   IN_PROGRESS: { label: 'In Progress', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: ArrowUpRight },
   APPROVED: { label: 'Approved', color: 'text-green-700', bgColor: 'bg-green-100', icon: CheckCircle2 },
@@ -210,6 +229,8 @@ function ActionModal({
   onAction,
   isLoading,
   requireComment = false,
+  commentLabel = 'Comments',
+  commentPlaceholder = 'Add your comments...',
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -220,8 +241,11 @@ function ActionModal({
   onAction: (comments: string) => void;
   isLoading: boolean;
   requireComment?: boolean;
+  commentLabel?: string;
+  commentPlaceholder?: string;
 }) {
   const [comments, setComments] = useState('');
+  const textareaId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-comments`;
 
   const handleAction = () => {
     onAction(comments);
@@ -235,20 +259,21 @@ function ActionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" preventDismiss>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <p className="text-sm text-gray-500 mb-4">{description}</p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Comments {requireComment && <span className="text-red-500">*</span>}
+            <label htmlFor={textareaId} className="block text-sm font-medium text-gray-700 mb-1">
+              {commentLabel} {requireComment && <span className="text-red-500">*</span>}
             </label>
             <textarea
+              id={textareaId}
               value={comments}
               onChange={(e) => setComments(e.target.value)}
-              placeholder="Add your comments..."
+              placeholder={commentPlaceholder}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
@@ -264,6 +289,191 @@ function ActionModal({
             disabled={isLoading || (requireComment && !comments.trim())}
           >
             {isLoading ? 'Processing...' : actionLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditRequestModal({
+  isOpen,
+  onClose,
+  request,
+  onSubmit,
+  isLoading,
+  pendingAction,
+  errorMessage,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  request: Request;
+  onSubmit: (data: UpdateRequestPayload, action: EditRequestAction) => void;
+  isLoading: boolean;
+  pendingAction: EditRequestAction | null;
+  errorMessage?: string | null;
+}) {
+  const [formData, setFormData] = useState({
+    title: request.title,
+    description: request.description ?? '',
+    priority: request.priority,
+    urgencyJustification: request.urgencyJustification ?? '',
+    requestedCompletionDate: request.requestedCompletionDate?.slice(0, 10) ?? '',
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setFormData({
+      title: request.title,
+      description: request.description ?? '',
+      priority: request.priority,
+      urgencyJustification: request.urgencyJustification ?? '',
+      requestedCompletionDate: request.requestedCompletionDate?.slice(0, 10) ?? '',
+    });
+  }, [isOpen, request]);
+
+  const handleSubmit = (action: EditRequestAction) => {
+    const trimmedTitle = formData.title.trim();
+    const trimmedDescription = formData.description.trim();
+    const trimmedUrgencyJustification = formData.urgencyJustification.trim();
+
+    const payload: UpdateRequestPayload = {
+      title: trimmedTitle,
+      priority: formData.priority,
+    };
+
+    if (trimmedDescription) {
+      payload.description = trimmedDescription;
+    }
+
+    if (trimmedUrgencyJustification) {
+      payload.urgencyJustification = trimmedUrgencyJustification;
+    }
+
+    if (formData.requestedCompletionDate) {
+      payload.requestedCompletionDate = new Date(`${formData.requestedCompletionDate}T00:00:00.000Z`).toISOString();
+    }
+
+    onSubmit(payload, action);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl" preventDismiss>
+        <DialogHeader>
+          <DialogTitle>
+            {request.status === 'RETURNED' ? 'Edit Returned Request' : 'Edit Request Draft'}
+          </DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          {errorMessage && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {errorMessage}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="edit-request-title" className="block text-sm font-medium text-gray-700 mb-1">
+                Title <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="edit-request-title"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter request title"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="edit-request-description" className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="edit-request-description"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Provide details about your request..."
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="edit-request-priority" className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  id="edit-request-priority"
+                  value={formData.priority}
+                  onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as Request['priority'] }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="edit-request-needed-by" className="block text-sm font-medium text-gray-700 mb-1">
+                  Needed By
+                </label>
+                <Input
+                  id="edit-request-needed-by"
+                  type="date"
+                  value={formData.requestedCompletionDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, requestedCompletionDate: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {formData.priority === 'CRITICAL' && (
+              <div>
+                <label htmlFor="edit-request-urgency" className="block text-sm font-medium text-gray-700 mb-1">
+                  Urgency Justification <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="edit-request-urgency"
+                  value={formData.urgencyJustification}
+                  onChange={(e) => setFormData(prev => ({ ...prev, urgencyJustification: e.target.value }))}
+                  placeholder="Explain why this request is critical and what impact delay would cause..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            )}
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleSubmit('save')}
+            disabled={
+              !formData.title.trim()
+              || isLoading
+              || (formData.priority === 'CRITICAL' && !formData.urgencyJustification.trim())
+            }
+          >
+            {isLoading && pendingAction === 'save' ? 'Saving...' : 'Save Changes'}
+          </Button>
+          <Button
+            onClick={() => handleSubmit('submit')}
+            disabled={
+              !formData.title.trim()
+              || isLoading
+              || (formData.priority === 'CRITICAL' && !formData.urgencyJustification.trim())
+            }
+          >
+            {isLoading && pendingAction === 'submit' ? 'Saving & Submitting...' : 'Save and Submit'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -359,6 +569,7 @@ function ApprovalTimeline({ approvals, currentUserId }: { approvals: RequestAppr
 export default function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   
@@ -366,6 +577,9 @@ export default function RequestDetailPage() {
   const [actionModal, setActionModal] = useState<{
     type: 'submit' | 'approve' | 'reject' | 'return' | 'cancel' | null;
   }>({ type: null });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [pendingEditAction, setPendingEditAction] = useState<EditRequestAction | null>(null);
+  const [pageNotice, setPageNotice] = useState<RequestDetailLocationState['notice'] | null>(null);
   const [newComment, setNewComment] = useState('');
 
   // Fetch request details
@@ -401,12 +615,29 @@ export default function RequestDetailPage() {
   // Action mutations
   const submitMutation = useMutation({
     mutationFn: async (comments: string) => {
-      return api.post(`/requests/${id}/submit`, { comments });
+      return api.post<{ data: Request }>(`/requests/${id}/submit`, { comments });
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      queryClient.setQueryData(['request', id], response.data);
       queryClient.invalidateQueries({ queryKey: ['request', id] });
       queryClient.invalidateQueries({ queryKey: ['request-history', id] });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['requests-dashboard'] });
       setActionModal({ type: null });
+      setPageNotice({
+        type: 'success',
+        title: 'Request submitted for approval',
+        message: 'The request has entered the workflow.',
+      });
+    },
+    onError: (error) => {
+      setPageNotice({
+        type: 'warning',
+        title: 'Submission failed',
+        message: error instanceof Error
+          ? error.message
+          : 'The request could not be submitted. Please try again.',
+      });
     },
   });
 
@@ -444,13 +675,32 @@ export default function RequestDetailPage() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async (comments: string) => {
-      return api.post(`/requests/${id}/cancel`, { comments });
+    mutationFn: async (reason: string) => {
+      return api.post(`/requests/${id}/cancel`, { reason });
     },
     onSuccess: () => {
+      queryClient.setQueryData(['request', id], (previous: Request | undefined) => previous
+        ? { ...previous, status: 'CANCELLED' }
+        : previous);
       queryClient.invalidateQueries({ queryKey: ['request', id] });
       queryClient.invalidateQueries({ queryKey: ['request-history', id] });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['requests-dashboard'] });
       setActionModal({ type: null });
+      setPageNotice({
+        type: 'success',
+        title: 'Request cancelled',
+        message: 'The request has been cancelled successfully.',
+      });
+    },
+    onError: (error) => {
+      setPageNotice({
+        type: 'warning',
+        title: 'Cancel failed',
+        message: error instanceof Error
+          ? error.message
+          : 'The request could not be cancelled. Please try again.',
+      });
     },
   });
 
@@ -464,27 +714,90 @@ export default function RequestDetailPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ data, action }: { data: UpdateRequestPayload; action: EditRequestAction }) => {
+      const updateResponse = await api.put<{ data: Request }>(`/requests/${id}`, data);
+
+      if (action === 'save') {
+        return {
+          action,
+          updateResponse,
+          submitSucceeded: false,
+        };
+      }
+
+      try {
+        const submitResponse = await api.post<{ data: Request }>(`/requests/${id}/submit`, { comments: '' });
+        return {
+          action,
+          updateResponse,
+          submitResponse,
+          submitSucceeded: true,
+        };
+      } catch (error) {
+        return {
+          action,
+          updateResponse,
+          submitSucceeded: false,
+          submitErrorMessage: error instanceof Error
+            ? error.message
+            : 'Changes were saved, but submission failed. Please try again.',
+        };
+      }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['request', id] });
+      queryClient.invalidateQueries({ queryKey: ['request-history', id] });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['requests-dashboard'] });
+      setIsEditModalOpen(false);
+
+      if (result.action === 'submit' && result.submitSucceeded) {
+        setPageNotice({
+          type: 'success',
+          title: 'Request submitted for approval',
+          message: 'Your changes were saved and the request has entered the workflow.',
+        });
+        return;
+      }
+
+      if (result.action === 'submit' && !result.submitSucceeded) {
+        setPageNotice({
+          type: 'warning',
+          title: 'Changes saved, but submission failed',
+          message: result.submitErrorMessage || 'Open the draft, review the issue, and submit again.',
+        });
+        return;
+      }
+
+      setPageNotice({
+        type: 'info',
+        title: 'Draft updated',
+        message: 'Your changes were saved. You can keep editing or submit when ready.',
+      });
+    },
+    onSettled: () => {
+      setPendingEditAction(null);
+    },
+  });
+
   if (isLoading) {
     return (
-      <MainLayout>
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-gray-200 rounded w-48" />
           <div className="h-64 bg-gray-200 rounded" />
         </div>
-      </MainLayout>
     );
   }
 
   if (error || !request) {
     return (
-      <MainLayout>
         <div className="text-center py-12">
           <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h2 className="text-lg font-medium text-gray-900 mb-2">Request not found</h2>
           <p className="text-gray-500 mb-4">The request you're looking for doesn't exist or you don't have access.</p>
           <Button onClick={() => navigate('/requests')}>Back to Requests</Button>
         </div>
-      </MainLayout>
     );
   }
 
@@ -493,19 +806,36 @@ export default function RequestDetailPage() {
   const StatusIcon = status.icon;
   
   const isRequester = request.requester?.id === user?.id;
-  const canEdit = request.status === 'DRAFT' && isRequester;
-  const canSubmit = request.status === 'DRAFT' && isRequester;
+  const canEdit = ['DRAFT', 'RETURNED'].includes(request.status) && isRequester;
+  const canSubmit = ['DRAFT', 'RETURNED'].includes(request.status) && isRequester;
   const canCancel = ['DRAFT', 'PENDING_APPROVAL'].includes(request.status) && isRequester;
   
   const currentApproval = request.approvals?.find(a => a.status === 'PENDING');
   const canApprove = currentApproval?.assignedTo?.id === user?.id;
 
+  const notice = pageNotice || (location.state as RequestDetailLocationState | null)?.notice;
+
   const comments = commentsData || request.comments || [];
   const history = historyData || request.history || [];
+  const downloadAttachment = (attachment: RequestAttachment) => {
+    window.open(`/api/v1/requests/${request.id}/attachments/${attachment.id}/download`, '_blank', 'noopener,noreferrer');
+  };
 
   return (
-    <MainLayout>
+    <>
       <div className="space-y-6">
+        {notice && (
+          <div className={cn(
+            'rounded-lg border p-4',
+            notice.type === 'warning' && 'border-amber-200 bg-amber-50 text-amber-900',
+            notice.type === 'success' && 'border-green-200 bg-green-50 text-green-900',
+            notice.type === 'info' && 'border-blue-200 bg-blue-50 text-blue-900'
+          )}>
+            <p className="text-sm font-medium">{notice.title}</p>
+            <p className="mt-1 text-sm opacity-90">{notice.message}</p>
+          </div>
+        )}
+
         {/* Back button and header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/requests')}>
@@ -552,7 +882,15 @@ export default function RequestDetailPage() {
             )}
             
             {canEdit && (
-              <Button variant="outline" onClick={() => navigate(`/requests/${id}/edit`)} className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  updateMutation.reset();
+                  setPendingEditAction(null);
+                  setIsEditModalOpen(true);
+                }}
+                className="gap-2"
+              >
                 <Edit className="w-4 h-4" />
                 Edit
               </Button>
@@ -561,7 +899,7 @@ export default function RequestDetailPage() {
             {canCancel && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" aria-label="More actions">
                     <MoreHorizontal className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -706,7 +1044,7 @@ export default function RequestDetailPage() {
                                 </p>
                               </div>
                             </div>
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" onClick={() => downloadAttachment(attachment)}>
                               <Download className="w-4 h-4" />
                             </Button>
                           </div>
@@ -982,7 +1320,29 @@ export default function RequestDetailPage() {
         actionVariant="destructive"
         onAction={cancelMutation.mutate}
         isLoading={cancelMutation.isPending}
+        requireComment
+        commentLabel="Reason"
+        commentPlaceholder="Explain why this request is being cancelled..."
       />
-    </MainLayout>
+
+      {request && (
+        <EditRequestModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            updateMutation.reset();
+            setPendingEditAction(null);
+            setIsEditModalOpen(false);
+          }}
+          request={request}
+          onSubmit={(data, action) => {
+            setPendingEditAction(action);
+            updateMutation.mutate({ data, action });
+          }}
+          isLoading={updateMutation.isPending}
+          pendingAction={pendingEditAction}
+          errorMessage={updateMutation.error instanceof Error ? updateMutation.error.message : null}
+        />
+      )}
+    </>
   );
 }

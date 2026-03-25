@@ -22,6 +22,7 @@ const createEntrySchema = z.object({
   taskType: z.string().max(100).optional(),
   description: z.string().max(1000).optional(),
   isBillable: z.boolean().optional(),
+  billableRatio: z.number().min(0).max(1).optional(),
   isOvertime: z.boolean().optional(),
 });
 
@@ -30,6 +31,7 @@ const updateEntrySchema = z.object({
   taskType: z.string().max(100).optional(),
   description: z.string().max(1000).optional(),
   isBillable: z.boolean().optional(),
+  billableRatio: z.number().min(0).max(1).optional(),
   isOvertime: z.boolean().optional(),
 });
 
@@ -41,6 +43,7 @@ const saveWeeklySchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     hours: z.number().min(0).max(24),
     isBillable: z.boolean().optional(),
+    billableRatio: z.number().min(0).max(1).optional(),
     description: z.string().max(1000).optional(),
   })),
 });
@@ -53,6 +56,23 @@ const submitTimesheetSchema = z.object({
 const approveRejectSchema = z.object({
   periodId: z.string().uuid(),
   reason: z.string().max(500).optional(),
+});
+
+const invoiceLinkSchema = z.object({
+  invoiceReference: z.string().trim().min(1).max(100),
+  reason: z.string().trim().max(500).optional(),
+  correlationId: z.string().trim().max(100).optional(),
+});
+
+const invoiceUnlinkSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+  correlationId: z.string().trim().max(100).optional(),
+});
+
+const periodInvoiceUnlinkSchema = z.object({
+  invoiceReference: z.string().trim().min(1).max(100),
+  reason: z.string().trim().max(500).optional(),
+  correlationId: z.string().trim().max(100).optional(),
 });
 
 // ============================================================================
@@ -77,7 +97,7 @@ router.get(
     const tenantId = req.user?.tenantId;
     if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { resourceId, projectId, startDate, endDate, status, page, limit } = req.query;
+    const { resourceId, projectId, invoiceReference, startDate, endDate, status, page, limit } = req.query;
 
     // Security: If user doesn't have timesheet:read:all, only allow their own or direct reports
     const userId = req.user!.id;
@@ -85,17 +105,36 @@ router.get(
                        req.user!.permissions.includes('timesheet:*') ||
                        req.user!.permissions.includes('*');
     
-    let effectiveResourceId: string | undefined = resourceId as string;
-    if (!hasReadAll && !resourceId) {
-      // Get user's linked resource ID or their direct reports
-      const linkedResource = await timesheetService.getLinkedResourceForUser(tenantId, userId);
-      effectiveResourceId = linkedResource?.id;
+    const requestedResourceId = typeof resourceId === 'string' ? resourceId : undefined;
+
+    let effectiveResourceId: string | undefined = requestedResourceId;
+    if (!hasReadAll) {
+      if (requestedResourceId) {
+        const canAccessRequestedResource = await timesheetService.canAccessResourceTimesheet(
+          tenantId,
+          userId,
+          requestedResourceId,
+          req.user!.permissions
+        );
+
+        if (!canAccessRequestedResource) {
+          return res.status(403).json({ error: 'Access denied to this resource timesheet data' });
+        }
+      } else {
+        const linkedResource = await timesheetService.getLinkedResourceForUser(tenantId, userId);
+        if (!linkedResource?.id) {
+          return res.status(403).json({ error: 'No linked resource found for scoped timesheet access' });
+        }
+
+        effectiveResourceId = linkedResource.id;
+      }
     }
 
     const result = await timesheetService.getTimesheetEntries({
       tenantId,
       resourceId: effectiveResourceId,
       projectId: projectId as string,
+      invoiceReference: invoiceReference as string,
       startDate: startDate ? parseISO(startDate as string) : undefined,
       endDate: endDate ? parseISO(endDate as string) : undefined,
       status: status ? (status as string).split(',') as any : undefined,
@@ -174,6 +213,7 @@ router.post(
       taskType: validated.taskType,
       description: validated.description,
       isBillable: validated.isBillable,
+      billableRatio: validated.billableRatio,
       isOvertime: validated.isOvertime,
     });
 
@@ -234,6 +274,74 @@ router.delete(
   })
 );
 
+// Link timesheet entry to invoice
+router.post(
+  '/:id/invoice-link',
+  authorize('timesheet:approve'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const validated = invoiceLinkSchema.parse(req.body);
+
+    const result = await timesheetService.linkTimesheetEntryToInvoice(tenantId, id, userId, validated);
+    return res.json({ data: result, message: 'Timesheet entry linked to invoice successfully' });
+  })
+);
+
+// Unlink timesheet entry from invoice
+router.delete(
+  '/:id/invoice-link',
+  authorize('timesheet:approve'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const validated = invoiceUnlinkSchema.parse(req.body ?? {});
+
+    const result = await timesheetService.unlinkTimesheetEntryFromInvoice(tenantId, id, userId, validated);
+    return res.json({ data: result, message: 'Timesheet entry invoice linkage removed successfully' });
+  })
+);
+
+// Link full timesheet period to invoice
+router.post(
+  '/periods/:periodId/invoice-link',
+  authorize('timesheet:approve'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { periodId } = req.params;
+    const validated = invoiceLinkSchema.parse(req.body);
+
+    const result = await timesheetService.linkTimesheetPeriodToInvoice(tenantId, periodId, userId, validated);
+    return res.json({ data: result, message: 'Timesheet period linked to invoice successfully' });
+  })
+);
+
+// Unlink full timesheet period from invoice
+router.delete(
+  '/periods/:periodId/invoice-link',
+  authorize('timesheet:approve'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { periodId } = req.params;
+    const validated = periodInvoiceUnlinkSchema.parse(req.body ?? {});
+
+    const result = await timesheetService.unlinkTimesheetPeriodFromInvoice(tenantId, periodId, userId, validated);
+    return res.json({ data: result, message: 'Timesheet period invoice linkage removed successfully' });
+  })
+);
+
 // Save weekly timesheet (bulk)
 router.post(
   '/weekly/save',
@@ -290,7 +398,8 @@ router.post(
     const result = await timesheetService.submitTimesheet(
       tenantId,
       validated.resourceId,
-      parseISO(validated.weekStart)
+      parseISO(validated.weekStart),
+      req.user!.id
     );
 
     return res.json({ data: result, message: 'Timesheet submitted for approval' });

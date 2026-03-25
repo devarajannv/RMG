@@ -70,6 +70,7 @@ class WebSocketManager {
 
   /**
    * Handle new WebSocket connection
+   * C-08: Supports both URL query auth (legacy) and message-based auth
    */
   private async handleConnection(ws: WebSocket, request: { url?: string }): Promise<void> {
     const client = ws as AuthenticatedWebSocket;
@@ -77,46 +78,82 @@ class WebSocketManager {
     client.lastHeartbeat = Date.now();
 
     try {
-      // Extract token from URL query string
+      // Check for legacy URL query token (backwards compatibility)
       const url = parseUrl(request.url || '', true);
       const token = url.query.token as string;
 
-      if (!token) {
-        this.sendError(client, 'Authentication required');
-        client.close(4001, 'Authentication required');
-        return;
+      if (token) {
+        // Legacy: token in URL query (will be deprecated)
+        const payload = verifyToken(token);
+        if (!payload || !payload.userId || !payload.tenantId) {
+          this.sendError(client, 'Invalid token');
+          client.close(4002, 'Invalid token');
+          return;
+        }
+        client.userId = payload.userId;
+        client.tenantId = payload.tenantId;
+        this.addClient(client);
+        this.send(client, {
+          type: 'connected',
+          payload: { userId: client.userId, message: 'WebSocket connection established' },
+        });
+        logger.info('WebSocket client connected (legacy URL auth)', { userId: client.userId });
+      } else {
+        // C-08: Wait for auth message — hold in unauthenticated state
+        this.send(client, { type: 'auth_required', payload: { message: 'Send auth message with token' } });
+        
+        // Set a 10-second timeout for auth message
+        const authTimeout = setTimeout(() => {
+          if (!client.userId) {
+            this.sendError(client, 'Authentication timeout');
+            client.close(4003, 'Authentication timeout');
+          }
+        }, 10000);
+
+        // Temporary message handler for auth
+        const authHandler = (data: RawData) => {
+          try {
+            const message = JSON.parse(data.toString()) as WebSocketMessage;
+            if (message.type === 'auth') {
+              const authPayload = message.payload as { token: string };
+              if (!authPayload?.token) {
+                this.sendError(client, 'Token required');
+                return;
+              }
+              const payload = verifyToken(authPayload.token);
+              if (!payload || !payload.userId || !payload.tenantId) {
+                this.sendError(client, 'Invalid token');
+                client.close(4002, 'Invalid token');
+                return;
+              }
+              clearTimeout(authTimeout);
+              client.userId = payload.userId;
+              client.tenantId = payload.tenantId;
+              this.addClient(client);
+              this.send(client, {
+                type: 'connected',
+                payload: { userId: client.userId, message: 'WebSocket connection established' },
+              });
+              logger.info('WebSocket client connected (message auth)', { userId: client.userId });
+              
+              // Remove auth handler, set up normal handlers
+              client.removeListener('message', authHandler);
+              client.on('message', (msgData) => this.handleMessage(client, msgData));
+            }
+          } catch {
+            this.sendError(client, 'Invalid auth message');
+          }
+        };
+
+        client.on('message', authHandler);
       }
 
-      // Verify JWT token
-      const payload = verifyToken(token);
-      if (!payload || !payload.userId || !payload.tenantId) {
-        this.sendError(client, 'Invalid token');
-        client.close(4002, 'Invalid token');
-        return;
+      // Setup common event handlers
+      if (token) {
+        // Legacy path: set up message handler immediately (already authenticated)
+        client.on('message', (data) => this.handleMessage(client, data));
       }
-
-      client.userId = payload.userId;
-      client.tenantId = payload.tenantId;
-
-      // Add to client maps
-      this.addClient(client);
-
-      // Send connection success
-      this.send(client, {
-        type: 'connected',
-        payload: { 
-          userId: client.userId,
-          message: 'WebSocket connection established',
-        },
-      });
-
-      logger.info('WebSocket client connected', { 
-        userId: client.userId, 
-        tenantId: client.tenantId,
-      });
-
-      // Setup event handlers
-      client.on('message', (data) => this.handleMessage(client, data));
+      // For message-auth path, message handler is set up after successful auth
       client.on('close', () => this.handleClose(client));
       client.on('error', (error) => this.handleError(client, error));
       client.on('pong', () => {

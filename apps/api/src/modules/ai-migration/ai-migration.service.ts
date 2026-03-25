@@ -2,6 +2,7 @@ import prisma from '../../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import * as XLSX from 'xlsx';
+import { logger } from '../../lib/logger';
 
 // ============================================================================
 // Types
@@ -875,35 +876,39 @@ export const aiMigrationService = {
         const rowNum = i + 2; // 1-indexed + header
 
         try {
-          const importResult = await this.importRow(
-            tenantId,
-            job.userId,
-            row,
-            mappingLookup,
-            primaryEntity,
-            job.importPurpose as any,
-            jobId
-          );
+          const importResult = await prisma.$transaction(async tx => {
+            const rowImportResult = await this.importRow(
+              tenantId,
+              job.userId,
+              row,
+              mappingLookup,
+              primaryEntity,
+              job.importPurpose as any,
+              jobId,
+              tx as any
+            );
+
+            await tx.importJobRecord.create({
+              data: {
+                importJobId: jobId,
+                rowNumber: rowNum,
+                sourceData: row,
+                targetEntity: primaryEntity,
+                targetId: rowImportResult.recordId,
+                status: rowImportResult.imported ? 'IMPORTED' : rowImportResult.skipped ? 'SKIPPED' : 'ERROR',
+                wasCreated: rowImportResult.wasCreated,
+                previousData: rowImportResult.previousData,
+              },
+            });
+
+            return rowImportResult;
+          });
 
           if (importResult.imported) {
             result.importedRecords++;
           } else if (importResult.skipped) {
             result.skippedRecords++;
           }
-
-          // Record result
-          await prisma.importJobRecord.create({
-            data: {
-              importJobId: jobId,
-              rowNumber: rowNum,
-              sourceData: row,
-              targetEntity: primaryEntity,
-              targetId: importResult.recordId,
-              status: importResult.imported ? 'IMPORTED' : importResult.skipped ? 'SKIPPED' : 'ERROR',
-              wasCreated: importResult.wasCreated,
-              previousData: importResult.previousData,
-            },
-          });
         } catch (error) {
           result.errorRecords++;
           result.errors.push({
@@ -1016,7 +1021,8 @@ export const aiMigrationService = {
     mappings: Record<string, { targetEntity: string; targetField: string }>,
     primaryEntity: string,
     importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL',
-    _jobId: string
+    _jobId: string,
+    db: any = prisma
   ): Promise<{ imported: boolean; skipped: boolean; recordId?: string; wasCreated: boolean; previousData?: any }> {
     // Build entity data from mappings
     const entityData: Record<string, any> = {};
@@ -1029,18 +1035,18 @@ export const aiMigrationService = {
 
     // Resolve references
     entityData.tenantId = tenantId;
-    await this.resolveReferences(tenantId, entityData, primaryEntity);
+    await this.resolveReferences(tenantId, entityData, primaryEntity, db);
 
     // Handle based on entity type
     switch (primaryEntity) {
       case 'resource':
-        return this.importResource(tenantId, entityData, importPurpose);
+        return this.importResource(tenantId, entityData, importPurpose, db);
       case 'project':
-        return this.importProject(tenantId, entityData, importPurpose);
+        return this.importProject(tenantId, entityData, importPurpose, db);
       case 'allocation':
-        return this.importAllocation(tenantId, userId, entityData, importPurpose);
+        return this.importAllocation(tenantId, userId, entityData, importPurpose, db);
       case 'client':
-        return this.importClient(tenantId, entityData, importPurpose);
+        return this.importClient(tenantId, entityData, importPurpose, db);
       default:
         throw new Error(`Unsupported entity type: ${primaryEntity}`);
     }
@@ -1081,7 +1087,7 @@ export const aiMigrationService = {
   },
 
   // Resolve reference fields to IDs
-  async resolveReferences(tenantId: string, data: Record<string, any>, entity: string) {
+  async resolveReferences(tenantId: string, data: Record<string, any>, entity: string, db: any = prisma) {
     const entityDef = ENTITY_DEFINITIONS[entity as keyof typeof ENTITY_DEFINITIONS];
     if (!entityDef?.referenceFields) return;
 
@@ -1091,7 +1097,7 @@ export const aiMigrationService = {
       
       if (value && typeof value === 'string' && !value.match(/^[0-9a-f-]{36}$/i)) {
         // It's a code/name, need to resolve to ID
-        const resolved = await this.resolveReferenceId(tenantId, refEntity, value);
+        const resolved = await this.resolveReferenceId(tenantId, refEntity, value, db);
         if (resolved) {
           data[field] = resolved;
         }
@@ -1101,10 +1107,10 @@ export const aiMigrationService = {
   },
 
   // Resolve a reference value to its ID
-  async resolveReferenceId(tenantId: string, entity: string, value: string): Promise<string | null> {
+  async resolveReferenceId(tenantId: string, entity: string, value: string, db: any = prisma): Promise<string | null> {
     switch (entity) {
       case 'practice': {
-        const practice = await prisma.practice.findFirst({
+        const practice = await db.practice.findFirst({
           where: { tenantId, OR: [
             { code: { equals: value, mode: 'insensitive' } },
             { name: { equals: value, mode: 'insensitive' } },
@@ -1113,7 +1119,7 @@ export const aiMigrationService = {
         return practice?.id || null;
       }
       case 'location': {
-        const location = await prisma.location.findFirst({
+        const location = await db.location.findFirst({
           where: { tenantId, OR: [
             { code: { equals: value, mode: 'insensitive' } },
             { name: { equals: value, mode: 'insensitive' } },
@@ -1122,7 +1128,7 @@ export const aiMigrationService = {
         return location?.id || null;
       }
       case 'client': {
-        const client = await prisma.client.findFirst({
+        const client = await db.client.findFirst({
           where: { tenantId, OR: [
             { code: { equals: value, mode: 'insensitive' } },
             { name: { equals: value, mode: 'insensitive' } },
@@ -1131,7 +1137,7 @@ export const aiMigrationService = {
         return client?.id || null;
       }
       case 'resource': {
-        const resource = await prisma.resource.findFirst({
+        const resource = await db.resource.findFirst({
           where: { tenantId, OR: [
             { employeeId: { equals: value, mode: 'insensitive' } },
             { email: { equals: value, mode: 'insensitive' } },
@@ -1140,7 +1146,7 @@ export const aiMigrationService = {
         return resource?.id || null;
       }
       case 'project': {
-        const project = await prisma.project.findFirst({
+        const project = await db.project.findFirst({
           where: { tenantId, code: { equals: value, mode: 'insensitive' } },
         });
         return project?.id || null;
@@ -1150,13 +1156,52 @@ export const aiMigrationService = {
     }
   },
 
+  // M-07: Field whitelists for mass assignment prevention
+  _allowedFields: {
+    resource: new Set([
+      'name', 'firstName', 'lastName', 'email', 'phone', 'employeeId',
+      'title', 'designation', 'band', 'employmentType', 'status',
+      'dateOfJoining', 'joinDate', 'location', 'department', 'skills',
+      'costRate', 'billRate', 'currency', 'managerId', 'departmentId',
+      'clientId', 'projectId', 'benchSince', 'availableDate',
+    ]),
+    project: new Set([
+      'name', 'code', 'description', 'type', 'status', 'clientId',
+      'startDate', 'endDate', 'budget', 'currency', 'managerId',
+      'priority', 'tags',
+    ]),
+    allocation: new Set([
+      'resourceId', 'projectId', 'startDate', 'endDate', 'percentage',
+      'role', 'status', 'isBillable', 'billRate', 'costRate', 'notes',
+    ]),
+    client: new Set([
+      'name', 'code', 'description', 'status', 'industry', 'website',
+      'contactName', 'contactEmail', 'contactPhone', 'address',
+      'city', 'state', 'country', 'postalCode', 'notes', 'tags',
+    ]),
+  } as Record<string, Set<string>>,
+
+  _sanitizeData(entityType: string, data: Record<string, any>): Record<string, any> {
+    const allowedFields = this._allowedFields[entityType];
+    if (!allowedFields) return data;
+    const sanitized: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (allowedFields.has(key)) {
+        sanitized[key] = value;
+      }
+    }
+    return sanitized;
+  },
+
   // Import resource
   async importResource(
     tenantId: string,
-    data: Record<string, any>,
-    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL'
+    rawData: Record<string, any>,
+    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL',
+    db: any = prisma
   ) {
-    const existing = await prisma.resource.findFirst({
+    const data = this._sanitizeData('resource', rawData);
+    const existing = await db.resource.findFirst({
       where: {
         tenantId,
         OR: [
@@ -1172,7 +1217,7 @@ export const aiMigrationService = {
       }
       if (importPurpose === 'SYNC') {
         const previousData = { ...existing };
-        await prisma.resource.update({
+        await db.resource.update({
           where: { id: existing.id },
           data: {
             ...data,
@@ -1186,7 +1231,7 @@ export const aiMigrationService = {
     }
 
     // Create new
-    const resource = await prisma.resource.create({
+    const resource = await db.resource.create({
       data: {
         ...data,
         employmentType: data.employmentType || 'FTE',
@@ -1204,10 +1249,12 @@ export const aiMigrationService = {
   // Import project
   async importProject(
     tenantId: string,
-    data: Record<string, any>,
-    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL'
+    rawData: Record<string, any>,
+    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL',
+    db: any = prisma
   ) {
-    const existing = await prisma.project.findFirst({
+    const data = this._sanitizeData('project', rawData);
+    const existing = await db.project.findFirst({
       where: { tenantId, code: data.code },
     });
 
@@ -1217,7 +1264,7 @@ export const aiMigrationService = {
       }
       if (importPurpose === 'SYNC') {
         const previousData = { ...existing };
-        await prisma.project.update({
+        await db.project.update({
           where: { id: existing.id },
           data: { ...data, tenantId: undefined },
         });
@@ -1226,7 +1273,7 @@ export const aiMigrationService = {
       return { imported: false, skipped: true, wasCreated: false };
     }
 
-    const project = await prisma.project.create({
+    const project = await db.project.create({
       data: {
         ...data,
         type: data.type || 'BILLABLE',
@@ -1242,14 +1289,16 @@ export const aiMigrationService = {
   async importAllocation(
     tenantId: string,
     userId: string,
-    data: Record<string, any>,
-    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL'
+    rawData: Record<string, any>,
+    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL',
+    db: any = prisma
   ) {
+    const data = this._sanitizeData('allocation', rawData);
     if (!data.resourceId || !data.projectId) {
       throw new Error('Resource and Project are required for allocation');
     }
 
-    const existing = await prisma.allocation.findFirst({
+    const existing = await db.allocation.findFirst({
       where: {
         tenantId,
         resourceId: data.resourceId,
@@ -1265,7 +1314,7 @@ export const aiMigrationService = {
       }
       if (importPurpose === 'SYNC') {
         const previousData = { ...existing };
-        await prisma.allocation.update({
+        await db.allocation.update({
           where: { id: existing.id },
           data: { ...data, tenantId: undefined },
         });
@@ -1274,7 +1323,7 @@ export const aiMigrationService = {
       return { imported: false, skipped: true, wasCreated: false };
     }
 
-    const allocation = await prisma.allocation.create({
+    const allocation = await db.allocation.create({
       data: {
         ...data,
         requestedById: userId,
@@ -1290,10 +1339,12 @@ export const aiMigrationService = {
   // Import client
   async importClient(
     tenantId: string,
-    data: Record<string, any>,
-    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL'
+    rawData: Record<string, any>,
+    importPurpose: 'MIGRATION' | 'SYNC' | 'MANUAL',
+    db: any = prisma
   ) {
-    const existing = await prisma.client.findFirst({
+    const data = this._sanitizeData('client', rawData);
+    const existing = await db.client.findFirst({
       where: { tenantId, code: data.code },
     });
 
@@ -1303,7 +1354,7 @@ export const aiMigrationService = {
       }
       if (importPurpose === 'SYNC') {
         const previousData = { ...existing };
-        await prisma.client.update({
+        await db.client.update({
           where: { id: existing.id },
           data: { ...data, tenantId: undefined },
         });
@@ -1312,7 +1363,7 @@ export const aiMigrationService = {
       return { imported: false, skipped: true, wasCreated: false };
     }
 
-    const client = await prisma.client.create({
+    const client = await db.client.create({
       data: {
         ...data,
         status: data.status || 'ACTIVE',
@@ -1333,22 +1384,29 @@ export const aiMigrationService = {
     if (!job.canRollback) throw new Error('This import cannot be rolled back');
     if (job.status === 'ROLLED_BACK') throw new Error('Import already rolled back');
 
+    const rollbackErrors: Array<{ recordId: string; error: string }> = [];
+
     // Rollback each record
     for (const record of job.records) {
       if (record.status === 'IMPORTED' || record.status === 'UPDATED') {
         try {
-          if (record.wasCreated && record.targetId) {
-            // Delete created record
-            await this.deleteRecord(record.targetEntity, record.targetId);
-          } else if (record.previousData && record.targetId) {
-            // Restore previous data
-            await this.restoreRecord(record.targetEntity, record.targetId, record.previousData as any);
-          }
+          await prisma.$transaction(async tx => {
+            if (record.wasCreated && record.targetId) {
+              await this.deleteRecord(record.targetEntity, record.targetId, tx as any);
+            } else if (record.previousData && record.targetId) {
+              await this.restoreRecord(record.targetEntity, record.targetId, record.previousData as any, tx as any);
+            }
+          });
         } catch (e) {
-          // Log but continue
-          console.error(`Failed to rollback record ${record.id}:`, e);
+          const errorMessage = e instanceof Error ? e.message : 'Unknown';
+          rollbackErrors.push({ recordId: record.id, error: errorMessage });
+          logger.error('Failed to rollback record', { recordId: record.id, error: errorMessage });
         }
       }
+    }
+
+    if (rollbackErrors.length > 0) {
+      throw new Error(`Rollback incomplete. Failed records: ${rollbackErrors.map(e => `${e.recordId}:${e.error}`).join('; ')}`);
     }
 
     // Update job status
@@ -1365,39 +1423,39 @@ export const aiMigrationService = {
   },
 
   // Delete a record
-  async deleteRecord(entity: string, id: string) {
+  async deleteRecord(entity: string, id: string, db: any = prisma) {
     switch (entity) {
       case 'resource':
-        await prisma.resource.delete({ where: { id } });
+        await db.resource.delete({ where: { id } });
         break;
       case 'project':
-        await prisma.project.delete({ where: { id } });
+        await db.project.delete({ where: { id } });
         break;
       case 'allocation':
-        await prisma.allocation.delete({ where: { id } });
+        await db.allocation.delete({ where: { id } });
         break;
       case 'client':
-        await prisma.client.delete({ where: { id } });
+        await db.client.delete({ where: { id } });
         break;
     }
   },
 
   // Restore a record to previous state
-  async restoreRecord(entity: string, id: string, data: Record<string, any>) {
+  async restoreRecord(entity: string, id: string, data: Record<string, any>, db: any = prisma) {
     const { id: _id, createdAt, updatedAt, ...restoreData } = data;
     
     switch (entity) {
       case 'resource':
-        await prisma.resource.update({ where: { id }, data: restoreData });
+        await db.resource.update({ where: { id }, data: restoreData });
         break;
       case 'project':
-        await prisma.project.update({ where: { id }, data: restoreData });
+        await db.project.update({ where: { id }, data: restoreData });
         break;
       case 'allocation':
-        await prisma.allocation.update({ where: { id }, data: restoreData });
+        await db.allocation.update({ where: { id }, data: restoreData });
         break;
       case 'client':
-        await prisma.client.update({ where: { id }, data: restoreData });
+        await db.client.update({ where: { id }, data: restoreData });
         break;
     }
   },

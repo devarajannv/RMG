@@ -131,7 +131,7 @@ enum ApprovalMode {
 
 ### Request CRUD
 ```
-POST   /api/v1/requests              - Create request (draft)
+POST   /api/v1/requests              - Create request (draft by default, optional immediate submit)
 GET    /api/v1/requests              - List requests with filters
 GET    /api/v1/requests/:id          - Get single request
 PUT    /api/v1/requests/:id          - Update request
@@ -222,6 +222,14 @@ POST   /api/v1/notifications/preferences/reset - Reset to defaults
 POST   /api/v1/notifications/cleanup         - Cleanup old notifications
 POST   /api/v1/notifications/test            - Create test notification
 ```
+
+### Create Request Modes
+
+- Default create saves a request in `DRAFT`
+- `submitForApproval: true` on create tells the backend to:
+  1. create the draft
+  2. run the normal submit flow
+- If draft creation succeeds but submission fails, the draft is retained and returned so the user can fix and resubmit
 
 ## Request Lifecycle
 

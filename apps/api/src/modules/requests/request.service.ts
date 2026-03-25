@@ -4,6 +4,9 @@
  */
 
 import { Prisma, RequestStatus, Priority, RequestAction } from '@prisma/client';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
@@ -13,6 +16,15 @@ import {
 } from './approval-chain.service';
 import { createNotification, notifyApprovalDecision } from './notification.service';
 import { executePostApprovalActions, buildActionContext } from './post-approval-actions.service';
+import { createAuditLog, createInvoiceLinkageAuditEvent } from '../audit/audit.service';
+import {
+  getTenantBillingTaxonomyPolicy,
+  evaluateBillingTaxonomyCompliance,
+  resolveBillingType,
+  resolveInvoicingModel,
+  type BillingTaxonomyEvaluationInput,
+} from '../../config/billing-taxonomy';
+import { resolveBillabilityDomain } from '../../config/billability-domain';
 
 // ============================================================================
 // Types
@@ -51,6 +63,7 @@ export interface RequestFilters {
   status?: RequestStatus[];
   typeCode?: string[];
   priority?: Priority[];
+  invoiceReference?: string;
   requesterId?: string;
   resourceId?: string;
   projectId?: string;
@@ -71,6 +84,44 @@ export interface RequestListOptions {
   sortOrder?: 'asc' | 'desc';
   search?: string;
 }
+
+export interface InvoiceLinkageInput {
+  invoiceReference: string;
+  reason?: string;
+  correlationId?: string;
+}
+
+const LIFECYCLE_PREREQUISITE_BY_TYPE: Record<string, string> = {
+  MSA_CREATION: 'CUSTOMER_ONBOARDING',
+  SOW_CREATION: 'MSA_CREATION',
+  PROJECT_SETUP: 'SOW_CREATION',
+  RESOURCE_ALLOCATION_BATCH: 'PROJECT_SETUP',
+};
+
+const REQUEST_ATTACHMENT_UPLOAD_DIR = process.env.REQUEST_ATTACHMENT_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'requests');
+
+const REQUEST_ATTACHMENT_ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/zip',
+  'application/x-zip-compressed',
+];
+
+const REQUEST_ATTACHMENT_ALLOWED_EXTENSIONS = [
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt', '.csv', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.zip',
+];
 
 // ============================================================================
 // Helper Functions
@@ -135,10 +186,67 @@ function validateRequestData(
   // TODO: Add full JSON Schema validation using ajv
 }
 
+async function enforceBillingTaxonomy(
+  tenantId: string,
+  input: BillingTaxonomyEvaluationInput
+): Promise<void> {
+  const policy = await getTenantBillingTaxonomyPolicy(tenantId);
+  const evaluation = evaluateBillingTaxonomyCompliance(policy, input);
+  if (!evaluation.allowed) {
+    throw new ApiError(
+      evaluation.reason ?? 'Request violates tenant billing taxonomy policy',
+      400,
+      'BILLING_TAXONOMY_VIOLATION'
+    );
+  }
+}
+
+async function buildDecisionContextSnapshot(
+  tenantId: string,
+  input: BillingTaxonomyEvaluationInput,
+  action: string
+): Promise<Record<string, unknown>> {
+  const policy = await getTenantBillingTaxonomyPolicy(tenantId);
+  const evaluation = evaluateBillingTaxonomyCompliance(policy, input);
+  const requestData = input.requestData ?? {};
+  const billability = resolveBillabilityDomain({
+    isBillable: requestData.isBillable as boolean | undefined,
+    billableRatio: requestData.billableRatio as number | undefined,
+  });
+
+  return {
+    action,
+    asWasCapturedAt: new Date().toISOString(),
+    policyVersion: policy.version,
+    invoicingModel: resolveInvoicingModel(input),
+    billingType: resolveBillingType(input),
+    taxonomyCompliant: evaluation.allowed,
+    billability,
+  };
+}
+
+function ensureRequestAttachmentDirectoryExists(dirPath: string): void {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+function resolveRequestAttachmentPath(filePath: string): string {
+  const basePath = path.resolve(REQUEST_ATTACHMENT_UPLOAD_DIR);
+  const resolvedPath = path.resolve(filePath);
+
+  if (!resolvedPath.startsWith(`${basePath}${path.sep}`) && resolvedPath !== basePath) {
+    throw new ApiError('Invalid attachment path', 400, 'INVALID_ATTACHMENT_PATH');
+  }
+
+  return resolvedPath;
+}
+
 /**
  * Record action in request history
  */
 async function recordHistory(
+  tenantId: string,
   requestId: string,
   userId: string,
   action: RequestAction,
@@ -160,6 +268,62 @@ async function recordHistory(
       userAgent,
     },
   });
+
+  const auditActionMap: Partial<Record<RequestAction, 'CREATE' | 'UPDATE' | 'SUBMIT' | 'APPROVE' | 'REJECT' | 'REQUEST_RETURNED' | 'REQUEST_CANCELLED'>> = {
+    CREATED: 'CREATE',
+    UPDATED: 'UPDATE',
+    SUBMITTED: 'SUBMIT',
+    APPROVED: 'APPROVE',
+    REJECTED: 'REJECT',
+    RETURNED: 'REQUEST_RETURNED',
+    CANCELLED: 'REQUEST_CANCELLED',
+    COMPLETED: 'UPDATE',
+    ON_HOLD: 'UPDATE',
+    RESUMED: 'UPDATE',
+    ESCALATED: 'UPDATE',
+    REASSIGNED: 'UPDATE',
+    DELEGATED: 'UPDATE',
+    COMMENTED: 'UPDATE',
+    ATTACHMENT_ADDED: 'UPDATE',
+    ATTACHMENT_REMOVED: 'UPDATE',
+    WATCHER_ADDED: 'UPDATE',
+    WATCHER_REMOVED: 'UPDATE',
+    ROLLBACK_INITIATED: 'UPDATE',
+    ROLLBACK_COMPLETED: 'UPDATE',
+    ROLLBACK_FAILED: 'UPDATE',
+    PRIORITY_CHANGED: 'UPDATE',
+    SLA_BREACHED: 'UPDATE',
+  };
+
+  const mappedAuditAction = auditActionMap[action] ?? 'UPDATE';
+
+  try {
+    await createAuditLog(
+      tenantId,
+      userId,
+      'Request',
+      requestId,
+      mappedAuditAction,
+      {
+        requestAction: action,
+        fromStatus,
+        toStatus,
+        details,
+      },
+      {
+        source: 'request-history-dual-write',
+        ipAddress,
+        userAgent,
+      }
+    );
+  } catch (error) {
+    logger.error('Failed to dual-write request action to canonical audit log', {
+      requestId,
+      tenantId,
+      action,
+      error,
+    });
+  }
 }
 
 // ============================================================================
@@ -242,6 +406,12 @@ export async function createRequest(
     }
   }
 
+  await enforceBillingTaxonomy(tenantId, {
+    contractId: input.contractId,
+    projectId: input.projectId,
+    requestData: input.requestData,
+  });
+
   // Generate request number
   const requestNumber = await generateRequestNumber(tenantId);
 
@@ -287,7 +457,7 @@ export async function createRequest(
   });
 
   // Record history
-  await recordHistory(request.id, userId, 'CREATED', undefined, 'DRAFT', {
+  await recordHistory(tenantId, request.id, userId, 'CREATED', undefined, 'DRAFT', {
     requestType: requestType.code,
   });
 
@@ -307,15 +477,31 @@ export async function createRequest(
 export async function getRequest(
   tenantId: string,
   requestId: string,
-  _userId: string
+  userId: string
 ): Promise<Record<string, unknown>> {
   const request = await prisma.request.findFirst({
     where: { id: requestId, tenantId, deletedAt: null },
     include: {
       type: true,
-      requester: { select: { id: true, firstName: true, lastName: true, email: true } },
-      onBehalfOf: { select: { id: true, firstName: true, lastName: true, email: true } },
-      resource: { select: { id: true, firstName: true, lastName: true, employeeId: true, email: true } },
+      requester: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          resource: { select: { practiceId: true } },
+        },
+      },
+      onBehalfOf: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          resource: { select: { practiceId: true } },
+        },
+      },
+      resource: { select: { id: true, firstName: true, lastName: true, employeeId: true, email: true, practiceId: true } },
       project: { select: { id: true, code: true, name: true, client: { select: { name: true } } } },
       allocation: { select: { id: true, role: true, percentage: true, startDate: true, endDate: true } },
       contract: { select: { id: true, contractNumber: true, name: true } },
@@ -361,7 +547,78 @@ export async function getRequest(
     throw new ApiError('Request not found', 404, 'REQUEST_NOT_FOUND');
   }
 
-  // TODO: Check visibility based on type.visibilityScope
+  const currentUser = await prisma.user.findFirst({
+    where: { id: userId, tenantId, deletedAt: null },
+    select: {
+      id: true,
+      resource: { select: { practiceId: true } },
+      roles: {
+        select: {
+          role: {
+            select: { name: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!currentUser) {
+    throw new ApiError('User not found', 401, 'UNAUTHORIZED');
+  }
+
+  const isAdminUser = currentUser.roles.some(({ role }) =>
+    ['ADMIN', 'ORG_ADMIN'].includes(role.name.toUpperCase())
+  );
+
+  const participantIds = new Set<string>([
+    request.requesterId,
+    request.onBehalfOfId ?? '',
+    ...request.approvals.map((approval) => approval.approverId),
+    ...request.watchers.map((watcher) => watcher.userId),
+  ]);
+  const isParticipant = participantIds.has(userId);
+
+  const visibilityScope = request.type.visibilityScope;
+  if (visibilityScope === 'TENANT') {
+    return request as unknown as Record<string, unknown>;
+  }
+
+  if (visibilityScope === 'PARTICIPANTS') {
+    if (isParticipant || isAdminUser) {
+      return request as unknown as Record<string, unknown>;
+    }
+
+    throw new ApiError('You do not have access to this request', 403, 'FORBIDDEN');
+  }
+
+  if (visibilityScope === 'CONFIDENTIAL') {
+    const confidentialParticipantIds = new Set<string>([
+      request.requesterId,
+      request.onBehalfOfId ?? '',
+      ...request.approvals.map((approval) => approval.approverId),
+    ]);
+
+    if (confidentialParticipantIds.has(userId) || isAdminUser) {
+      return request as unknown as Record<string, unknown>;
+    }
+
+    throw new ApiError('You do not have access to this request', 403, 'FORBIDDEN');
+  }
+
+  if (visibilityScope === 'PRACTICE') {
+    const userPracticeId = currentUser.resource?.practiceId ?? null;
+    const requestPracticeIds = new Set<string>([
+      request.resource?.practiceId ?? '',
+      request.requester.resource?.practiceId ?? '',
+      request.onBehalfOf?.resource?.practiceId ?? '',
+    ]);
+
+    if (isParticipant || isAdminUser || (userPracticeId !== null && requestPracticeIds.has(userPracticeId))) {
+      return request as unknown as Record<string, unknown>;
+    }
+
+    throw new ApiError('You do not have access to this request', 403, 'FORBIDDEN');
+  }
 
   return request as unknown as Record<string, unknown>;
 }
@@ -375,7 +632,10 @@ export async function listRequests(
   filters: RequestFilters = {},
   options: RequestListOptions = {}
 ): Promise<{ data: Record<string, unknown>[]; total: number; page: number; limit: number }> {
-  const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc', search } = options;
+  const { page = 1, limit = 20, sortBy: rawSortBy = 'createdAt', sortOrder = 'desc', search } = options;
+  // M-17: Validate sortBy against allowlist
+  const ALLOWED_SORT_FIELDS = ['createdAt', 'updatedAt', 'status', 'priority', 'requestNumber', 'title', 'submittedAt'];
+  const sortBy = ALLOWED_SORT_FIELDS.includes(rawSortBy) ? rawSortBy : 'createdAt';
   const skip = (page - 1) * limit;
 
   // Build where clause
@@ -394,6 +654,13 @@ export async function listRequests(
 
   if (filters.priority?.length) {
     where.priority = { in: filters.priority };
+  }
+
+  if (filters.invoiceReference) {
+    where.requestData = {
+      path: ['invoiceReference'],
+      equals: filters.invoiceReference,
+    };
   }
 
   if (filters.requesterId) {
@@ -538,7 +805,7 @@ export async function updateRequest(
   });
 
   // Record history
-  await recordHistory(requestId, userId, 'UPDATED', undefined, undefined, {
+  await recordHistory(tenantId, requestId, userId, 'UPDATED', undefined, undefined, {
     changes: input,
   });
 
@@ -581,6 +848,223 @@ export async function deleteRequest(
   });
 }
 
+function readRequestInvoiceReference(requestData: Prisma.JsonValue): string | null {
+  const root = (requestData as Record<string, unknown> | null) ?? null;
+  const invoiceReference = root?.invoiceReference;
+  return typeof invoiceReference === 'string' && invoiceReference.trim().length > 0
+    ? invoiceReference.trim()
+    : null;
+}
+
+function buildRequestInvoiceLinkedData(
+  currentRequestData: Prisma.JsonValue,
+  invoiceReference: string,
+  userId: string,
+  reason?: string
+): Prisma.InputJsonValue {
+  const root = ((currentRequestData as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  return {
+    ...root,
+    invoiceReference,
+    invoiceLinkage: {
+      invoiceReference,
+      linkedAt: new Date().toISOString(),
+      linkedBy: userId,
+      reason: reason ?? null,
+    },
+  } as Prisma.InputJsonValue;
+}
+
+function buildRequestInvoiceUnlinkedData(
+  currentRequestData: Prisma.JsonValue,
+  userId: string,
+  reason?: string
+): Prisma.InputJsonValue {
+  const root = ((currentRequestData as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const { invoiceReference: _discardedInvoiceReference, ...withoutInvoiceReference } = root;
+  const currentInvoiceLinkage = (root.invoiceLinkage as Record<string, unknown> | undefined) ?? undefined;
+
+  return {
+    ...withoutInvoiceReference,
+    invoiceLinkage: {
+      ...(currentInvoiceLinkage ?? {}),
+      invoiceReference: null,
+      unlinkedAt: new Date().toISOString(),
+      unlinkedBy: userId,
+      unlinkReason: reason ?? null,
+    },
+  } as Prisma.InputJsonValue;
+}
+
+export async function linkRequestToInvoice(
+  tenantId: string,
+  requestId: string,
+  userId: string,
+  input: InvoiceLinkageInput
+): Promise<Record<string, unknown>> {
+  const invoiceReference = input.invoiceReference.trim();
+  if (!invoiceReference) {
+    throw new ApiError('invoiceReference is required', 400, 'INVOICE_REFERENCE_REQUIRED');
+  }
+
+  const request = await prisma.request.findFirst({
+    where: { id: requestId, tenantId, deletedAt: null },
+    select: {
+      id: true,
+      status: true,
+      requestData: true,
+      type: { select: { code: true } },
+    },
+  });
+
+  if (!request) {
+    throw new ApiError('Request not found', 404, 'REQUEST_NOT_FOUND');
+  }
+
+  if (request.status !== 'APPROVED' && request.status !== 'COMPLETED') {
+    await createInvoiceLinkageAuditEvent({
+      tenantId,
+      userId,
+      eventType: 'INVOICE_LINK_REJECTED',
+      invoiceReference,
+      linkedEntityType: 'Request',
+      linkedEntityId: requestId,
+      reason: 'Request must be APPROVED or COMPLETED before invoice linkage',
+      correlationId: input.correlationId,
+      metadata: {
+        requestStatus: request.status,
+      },
+    });
+    throw new ApiError(
+      'Request must be APPROVED or COMPLETED before invoice linkage',
+      400,
+      'REQUEST_NOT_INVOICE_LINKABLE'
+    );
+  }
+
+  const currentInvoiceReference = readRequestInvoiceReference(request.requestData);
+  if (currentInvoiceReference && currentInvoiceReference !== invoiceReference) {
+    await createInvoiceLinkageAuditEvent({
+      tenantId,
+      userId,
+      eventType: 'INVOICE_LINK_REJECTED',
+      invoiceReference,
+      linkedEntityType: 'Request',
+      linkedEntityId: requestId,
+      reason: 'Request already linked to a different invoice reference',
+      correlationId: input.correlationId,
+      metadata: {
+        currentInvoiceReference,
+      },
+    });
+    throw new ApiError(
+      `Request already linked to invoice ${currentInvoiceReference}`,
+      400,
+      'REQUEST_ALREADY_INVOICED'
+    );
+  }
+
+  const updated = await prisma.request.update({
+    where: { id: requestId },
+    data: {
+      requestData: buildRequestInvoiceLinkedData(request.requestData, invoiceReference, userId, input.reason),
+      version: { increment: 1 },
+    },
+    include: {
+      type: { select: { code: true, name: true } },
+      requester: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+  });
+
+  await createInvoiceLinkageAuditEvent({
+    tenantId,
+    userId,
+    eventType: 'INVOICE_LINKED',
+    invoiceReference,
+    linkedEntityType: 'Request',
+    linkedEntityId: requestId,
+    reason: input.reason,
+    correlationId: input.correlationId,
+    metadata: {
+      requestTypeCode: request.type.code,
+      requestStatus: request.status,
+    },
+  });
+
+  await recordHistory(tenantId, requestId, userId, 'UPDATED', request.status, request.status, {
+    invoiceLinkage: {
+      eventType: 'INVOICE_LINKED',
+      invoiceReference,
+      reason: input.reason ?? null,
+    },
+  });
+
+  return updated as unknown as Record<string, unknown>;
+}
+
+export async function unlinkRequestFromInvoice(
+  tenantId: string,
+  requestId: string,
+  userId: string,
+  input?: Omit<InvoiceLinkageInput, 'invoiceReference'>
+): Promise<Record<string, unknown>> {
+  const request = await prisma.request.findFirst({
+    where: { id: requestId, tenantId, deletedAt: null },
+    select: {
+      id: true,
+      status: true,
+      requestData: true,
+      type: { select: { code: true } },
+    },
+  });
+
+  if (!request) {
+    throw new ApiError('Request not found', 404, 'REQUEST_NOT_FOUND');
+  }
+
+  const currentInvoiceReference = readRequestInvoiceReference(request.requestData);
+  if (!currentInvoiceReference) {
+    throw new ApiError('Request is not linked to any invoice', 400, 'REQUEST_NOT_INVOICED');
+  }
+
+  const updated = await prisma.request.update({
+    where: { id: requestId },
+    data: {
+      requestData: buildRequestInvoiceUnlinkedData(request.requestData, userId, input?.reason),
+      version: { increment: 1 },
+    },
+    include: {
+      type: { select: { code: true, name: true } },
+      requester: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+  });
+
+  await createInvoiceLinkageAuditEvent({
+    tenantId,
+    userId,
+    eventType: 'INVOICE_UNLINKED',
+    invoiceReference: currentInvoiceReference,
+    linkedEntityType: 'Request',
+    linkedEntityId: requestId,
+    reason: input?.reason,
+    correlationId: input?.correlationId,
+    metadata: {
+      requestTypeCode: request.type.code,
+      requestStatus: request.status,
+    },
+  });
+
+  await recordHistory(tenantId, requestId, userId, 'UPDATED', request.status, request.status, {
+    invoiceLinkage: {
+      eventType: 'INVOICE_UNLINKED',
+      invoiceReference: currentInvoiceReference,
+      reason: input?.reason ?? null,
+    },
+  });
+
+  return updated as unknown as Record<string, unknown>;
+}
+
 // ============================================================================
 // Workflow Operations
 // ============================================================================
@@ -598,7 +1082,7 @@ export async function submitRequest(
     include: {
       type: {
         include: {
-          tenantConfigs: { where: { tenantId } },
+          tenantConfigs: true,
         },
       },
       resource: {
@@ -619,13 +1103,95 @@ export async function submitRequest(
     throw new ApiError('Only the requester can submit this request', 403, 'FORBIDDEN');
   }
 
+  const requestData = (request.requestData as Record<string, unknown> | null) ?? {};
+  await enforceBillingTaxonomy(tenantId, {
+    contractId: request.contractId,
+    projectId: request.projectId,
+    requestData,
+  });
+
+  const decisionContext = await buildDecisionContextSnapshot(
+    tenantId,
+    {
+      contractId: request.contractId,
+      projectId: request.projectId,
+      requestData,
+    },
+    'SUBMITTED'
+  );
+
   // Check dependencies
-  if (request.dependsOnId) {
-    const dependency = await prisma.request.findUnique({
-      where: { id: request.dependsOnId },
+  let resolvedDependsOnId = request.dependsOnId ?? null;
+  const prerequisiteTypeCode = LIFECYCLE_PREREQUISITE_BY_TYPE[request.type.code];
+
+  if (prerequisiteTypeCode) {
+    if (request.dependsOnId) {
+      const dependency = await prisma.request.findFirst({
+        where: { id: request.dependsOnId, tenantId, deletedAt: null },
+        select: {
+          status: true,
+          requestNumber: true,
+          type: { select: { code: true } },
+        },
+      });
+
+      if (!dependency) {
+        throw new ApiError('Dependent request not found', 404, 'DEPENDENCY_NOT_FOUND');
+      }
+
+      if (dependency.type.code !== prerequisiteTypeCode) {
+        throw new ApiError(
+          `Cannot submit: ${request.type.code} requires dependency type ${prerequisiteTypeCode}`,
+          400,
+          'DEPENDENCY_TYPE_MISMATCH'
+        );
+      }
+
+      if (dependency.status !== 'COMPLETED') {
+        throw new ApiError(
+          `Cannot submit: dependent request ${dependency.requestNumber} is not completed`,
+          400,
+          'DEPENDENCY_NOT_MET'
+        );
+      }
+    } else {
+      const prerequisiteCandidates = await prisma.request.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          status: 'COMPLETED',
+          type: { code: prerequisiteTypeCode },
+        },
+        select: { id: true, requestNumber: true },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: 2,
+      });
+
+      if (prerequisiteCandidates.length === 1) {
+        resolvedDependsOnId = prerequisiteCandidates[0].id;
+      } else if (prerequisiteCandidates.length === 0) {
+        throw new ApiError(
+          `Cannot submit: ${request.type.code} requires a completed ${prerequisiteTypeCode} request`,
+          400,
+          'DEPENDENCY_NOT_MET'
+        );
+      } else {
+        throw new ApiError(
+          `Cannot submit: multiple completed ${prerequisiteTypeCode} requests found; set dependsOnId explicitly`,
+          400,
+          'DEPENDENCY_AMBIGUOUS'
+        );
+      }
+    }
+  } else if (request.dependsOnId) {
+    const dependency = await prisma.request.findFirst({
+      where: { id: request.dependsOnId, tenantId, deletedAt: null },
       select: { status: true, requestNumber: true },
     });
-    if (dependency && dependency.status !== 'COMPLETED') {
+    if (!dependency) {
+      throw new ApiError('Dependent request not found', 404, 'DEPENDENCY_NOT_FOUND');
+    }
+    if (dependency.status !== 'COMPLETED') {
       throw new ApiError(
         `Cannot submit: dependent request ${dependency.requestNumber} is not completed`,
         400,
@@ -636,7 +1202,7 @@ export async function submitRequest(
 
   // Calculate SLA deadlines
   const now = new Date();
-  const tenantConfig = request.type.tenantConfigs[0];
+  const tenantConfig = request.type.tenantConfigs.find((config) => config.tenantId === tenantId);
   const responseSlaHours = tenantConfig?.responseSlaHours || request.type.responseSlaHours;
   const resolutionSlaHours = tenantConfig?.resolutionSlaHours || request.type.resolutionSlaHours;
 
@@ -742,6 +1308,7 @@ export async function submitRequest(
       rollbackDeadline,
       approvalChainId,
       approvalChainVersion,
+      dependsOnId: resolvedDependsOnId,
       currentStepOrder: 1,
     },
     include: {
@@ -751,7 +1318,9 @@ export async function submitRequest(
   });
 
   // Record history
-  await recordHistory(requestId, userId, 'SUBMITTED', 'DRAFT', newStatus);
+  await recordHistory(tenantId, requestId, userId, 'SUBMITTED', request.status, newStatus, {
+    decisionContext,
+  });
 
   logger.info(`Request submitted: ${request.requestNumber}`, {
     requestId,
@@ -830,8 +1399,10 @@ export async function approveRequest(
   
   if (!pendingApproval) {
     // Check for delegation - user might be a delegate
+    // C-01: Include tenantId to prevent cross-tenant delegation bypass
     const delegation = await prisma.delegation.findFirst({
       where: {
+        tenantId,
         delegateId: userId,
         approvalStatus: 'APPROVED',
         revokedAt: null,
@@ -885,11 +1456,13 @@ export async function approveRequest(
   const isFirstResponse = !request.firstResponseAt;
 
   // Check if more approvals needed at current step
+  // L-08: Add tenant scoping via request relation for defense-in-depth
   const remainingAtCurrentStep = await prisma.requestApproval.count({
     where: {
       requestId,
       stepOrder: currentStepOrder,
       status: 'PENDING',
+      request: { tenantId },
     },
   });
 
@@ -964,11 +1537,22 @@ export async function approveRequest(
   });
 
   // Record history
-  await recordHistory(requestId, userId, 'APPROVED', 'PENDING_APPROVAL', newStatus, {
+  const decisionContext = await buildDecisionContextSnapshot(
+    tenantId,
+    {
+      contractId: request.contractId,
+      projectId: request.projectId,
+      requestData: (request.requestData as Record<string, unknown> | null) ?? {},
+    },
+    'APPROVED'
+  );
+
+  await recordHistory(tenantId, requestId, userId, 'APPROVED', 'PENDING_APPROVAL', newStatus, {
     approvalId: pendingApproval.id,
     stepOrder: currentStepOrder,
     nextStepOrder: nextStepOrder !== currentStepOrder ? nextStepOrder : undefined,
     comments: input.comments,
+    decisionContext,
   });
 
   logger.info(`Request approved at step ${currentStepOrder}: ${request.requestNumber}`, {
@@ -1113,10 +1697,21 @@ export async function rejectRequest(
   });
 
   // Record history
-  await recordHistory(requestId, userId, 'REJECTED', 'PENDING_APPROVAL', 'REJECTED', {
+  const decisionContext = await buildDecisionContextSnapshot(
+    tenantId,
+    {
+      contractId: request.contractId,
+      projectId: request.projectId,
+      requestData: (request.requestData as Record<string, unknown> | null) ?? {},
+    },
+    'REJECTED'
+  );
+
+  await recordHistory(tenantId, requestId, userId, 'REJECTED', 'PENDING_APPROVAL', 'REJECTED', {
     approvalId: pendingApproval.id,
     stepOrder: pendingApproval.stepOrder,
     comments: input.comments,
+    decisionContext,
   });
 
   logger.info(`Request rejected: ${request.requestNumber}`, {
@@ -1220,7 +1815,7 @@ export async function returnRequest(
   });
 
   // Record history
-  await recordHistory(requestId, userId, 'RETURNED', 'PENDING_APPROVAL', 'RETURNED', {
+  await recordHistory(tenantId, requestId, userId, 'RETURNED', 'PENDING_APPROVAL', 'RETURNED', {
     approvalId: pendingApproval.id,
     comments: input.comments,
   });
@@ -1290,7 +1885,7 @@ export async function cancelRequest(
   });
 
   // Record history
-  await recordHistory(requestId, userId, 'CANCELLED', previousStatus, 'CANCELLED', {
+  await recordHistory(tenantId, requestId, userId, 'CANCELLED', previousStatus, 'CANCELLED', {
     reason,
   });
 
@@ -1351,7 +1946,7 @@ export async function addComment(
   });
 
   // Record history
-  await recordHistory(requestId, userId, 'COMMENTED', undefined, undefined, {
+  await recordHistory(tenantId, requestId, userId, 'COMMENTED', undefined, undefined, {
     commentId: comment.id,
     isInternal,
   });
@@ -1403,6 +1998,146 @@ export async function getComments(
   });
 
   return comments as unknown as Record<string, unknown>[];
+}
+
+/**
+ * Add an attachment to a request
+ */
+export async function addAttachment(
+  tenantId: string,
+  requestId: string,
+  userId: string,
+  file: {
+    buffer: Buffer;
+    mimetype: string;
+    originalname: string;
+    size: number;
+  }
+): Promise<Record<string, unknown>> {
+  const request = await prisma.request.findFirst({
+    where: { id: requestId, tenantId, deletedAt: null },
+    include: {
+      type: {
+        select: {
+          allowAttachments: true,
+          maxAttachments: true,
+          maxAttachmentSizeMb: true,
+        },
+      },
+    },
+  });
+
+  if (!request) {
+    throw new ApiError('Request not found', 404, 'REQUEST_NOT_FOUND');
+  }
+
+  if (!request.type.allowAttachments) {
+    throw new ApiError('Attachments are disabled for this request type', 400, 'ATTACHMENTS_DISABLED');
+  }
+
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!REQUEST_ATTACHMENT_ALLOWED_MIME_TYPES.includes(file.mimetype) || !REQUEST_ATTACHMENT_ALLOWED_EXTENSIONS.includes(ext)) {
+    throw new ApiError('File type not allowed', 400, 'ATTACHMENT_TYPE_NOT_ALLOWED');
+  }
+
+  const maxAttachmentSizeMb = request.type.maxAttachmentSizeMb ?? 10;
+  const maxAttachmentSizeBytes = maxAttachmentSizeMb * 1024 * 1024;
+
+  if (file.size > maxAttachmentSizeBytes) {
+    throw new ApiError(
+      `Attachment exceeds maximum size of ${maxAttachmentSizeMb}MB`,
+      400,
+      'ATTACHMENT_TOO_LARGE'
+    );
+  }
+
+  const attachmentCount = await prisma.requestAttachment.count({
+    where: { requestId, deletedAt: null },
+  });
+
+  const maxAttachments = request.type.maxAttachments ?? 5;
+  if (attachmentCount >= maxAttachments) {
+    throw new ApiError(
+      `This request already has the maximum of ${maxAttachments} attachments`,
+      400,
+      'ATTACHMENT_LIMIT_REACHED'
+    );
+  }
+
+  const requestDir = path.join(REQUEST_ATTACHMENT_UPLOAD_DIR, tenantId, requestId);
+  ensureRequestAttachmentDirectoryExists(requestDir);
+
+  const storageFileName = `${crypto.randomUUID()}${ext}`;
+  const storagePath = path.join(requestDir, storageFileName);
+  const checksum = crypto.createHash('sha256').update(file.buffer).digest('hex');
+
+  fs.writeFileSync(storagePath, file.buffer);
+
+  const attachment = await prisma.requestAttachment.create({
+    data: {
+      requestId,
+      fileName: file.originalname,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      filePath: storagePath,
+      checksum,
+      uploadedById: userId,
+    },
+    include: {
+      uploadedBy: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  });
+
+  await recordHistory(tenantId, requestId, userId, 'ATTACHMENT_ADDED', undefined, undefined, {
+    attachmentId: attachment.id,
+    fileName: attachment.fileName,
+    fileSize: attachment.fileSize,
+  });
+
+  return attachment as unknown as Record<string, unknown>;
+}
+
+/**
+ * Download a request attachment
+ */
+export async function downloadAttachment(
+  tenantId: string,
+  requestId: string,
+  attachmentId: string,
+  _userId: string
+): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
+  const attachment = await prisma.requestAttachment.findFirst({
+    where: {
+      id: attachmentId,
+      requestId,
+      deletedAt: null,
+      request: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
+  });
+
+  if (!attachment) {
+    throw new ApiError('Attachment not found', 404, 'ATTACHMENT_NOT_FOUND');
+  }
+
+  const resolvedPath = resolveRequestAttachmentPath(attachment.filePath);
+  if (!fs.existsSync(resolvedPath)) {
+    throw new ApiError('Attachment file not found', 404, 'ATTACHMENT_FILE_NOT_FOUND');
+  }
+
+  return {
+    buffer: fs.readFileSync(resolvedPath),
+    filename: attachment.fileName,
+    mimeType: attachment.mimeType,
+  };
 }
 
 // ============================================================================
@@ -1546,11 +2281,15 @@ export async function listRequestTypes(
   tenantId: string
 ): Promise<Record<string, unknown>[]> {
   const types = await prisma.requestType.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      OR: [
+        { tenantId: null, isSystemType: true },
+        { tenantId },
+      ],
+    },
     include: {
-      tenantConfigs: {
-        where: { tenantId },
-      },
+      tenantConfigs: true,
     },
     orderBy: [{ category: 'asc' }, { name: 'asc' }],
   });
@@ -1558,25 +2297,27 @@ export async function listRequestTypes(
   // Filter out types disabled for this tenant
   return types
     .filter(t => {
-      const config = t.tenantConfigs[0];
+      const config = t.tenantConfigs.find((tenantConfig) => tenantConfig.tenantId === tenantId);
       return !config || config.isEnabled;
     })
     .map(t => ({
+      tenantConfig: t.tenantConfigs.find((tenantConfig) => tenantConfig.tenantId === tenantId),
       id: t.id,
       code: t.code,
       name: t.name,
       description: t.description,
       category: t.category,
-      defaultPriority: t.tenantConfigs[0]?.defaultPriority || t.defaultPriority,
-      responseSlaHours: t.tenantConfigs[0]?.responseSlaHours || t.responseSlaHours,
-      resolutionSlaHours: t.tenantConfigs[0]?.resolutionSlaHours || t.resolutionSlaHours,
+      defaultPriority: t.tenantConfigs.find((tenantConfig) => tenantConfig.tenantId === tenantId)?.defaultPriority || t.defaultPriority,
+      responseSlaHours: t.tenantConfigs.find((tenantConfig) => tenantConfig.tenantId === tenantId)?.responseSlaHours || t.responseSlaHours,
+      resolutionSlaHours: t.tenantConfigs.find((tenantConfig) => tenantConfig.tenantId === tenantId)?.resolutionSlaHours || t.resolutionSlaHours,
       formSchema: t.formSchema,
       requiredFields: t.requiredFields,
       requiresApproval: t.requiresApproval,
       allowAttachments: t.allowAttachments,
       maxAttachmentSizeMb: t.maxAttachmentSizeMb,
       maxAttachments: t.maxAttachments,
-    })) as Record<string, unknown>[];
+    }))
+    .map(({ tenantConfig: _tenantConfig, ...requestType }) => requestType) as Record<string, unknown>[];
 }
 
 /**
@@ -1590,13 +2331,15 @@ export async function getRequestType(
   const type: any = await prisma.requestType.findFirst({
     where: { code },
     include: tenantId ? {
-      tenantConfigs: { where: { tenantId } },
+      tenantConfigs: true,
     } : undefined,
   });
 
   if (!type) return null;
 
-  const config = tenantId ? type.tenantConfigs?.[0] : undefined;
+  const config = tenantId
+    ? type.tenantConfigs?.find((tenantConfig: { tenantId: string }) => tenantConfig.tenantId === tenantId)
+    : undefined;
 
   return {
     id: type.id,

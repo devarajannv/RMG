@@ -580,7 +580,7 @@ function SLADialog({ open, onClose, config, onSave }: SLADialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent preventDismiss>
         <DialogHeader>
           <DialogTitle>Edit SLA Configuration</DialogTitle>
           <DialogDescription>
@@ -661,7 +661,7 @@ function EscalationDialog({ open, onClose, rule, onSave }: EscalationDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent preventDismiss>
         <DialogHeader>
           <DialogTitle>{rule ? 'Edit Escalation Rule' : 'Create Escalation Rule'}</DialogTitle>
           <DialogDescription>

@@ -70,7 +70,7 @@ export function generateRefreshToken(
   
   return jwt.sign(
     { ...payload, type: 'refresh' },
-    config.jwtSecret,
+    config.jwtRefreshSecret,
     {
       expiresIn,
       issuer: 'rmgaas',
@@ -118,6 +118,8 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
   const decoded = jwt.verify(token, config.jwtSecret, {
     issuer: 'rmgaas',
     audience: 'rmgaas-api',
+    algorithms: ['HS256'], // M-02: Enforce algorithm
+    clockTolerance: 30,    // L-11: Allow 30s clock drift
   }) as AccessTokenPayload;
 
   if (decoded.type !== 'access') {
@@ -131,9 +133,11 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
  * Verify and decode refresh token
  */
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  const decoded = jwt.verify(token, config.jwtSecret, {
+  const decoded = jwt.verify(token, config.jwtRefreshSecret, {
     issuer: 'rmgaas',
     audience: 'rmgaas-api',
+    algorithms: ['HS256'], // M-02: Enforce algorithm
+    clockTolerance: 30,    // L-11: Allow 30s clock drift
   }) as RefreshTokenPayload;
 
   if (decoded.type !== 'refresh') {

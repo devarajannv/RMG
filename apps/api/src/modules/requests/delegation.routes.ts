@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, requireRoles } from '../../middleware/auth';
 import { asyncHandler } from '../../middleware/errorHandler';
 import * as controller from './approval-chain.controller';
 
@@ -18,7 +18,21 @@ router.use(authenticate);
  * @desc Create delegation
  * @access Private
  */
-router.post('/', asyncHandler(controller.createDelegation));
+router.post('/', requireRoles('ADMIN', 'ORG_ADMIN', 'MANAGER'), asyncHandler(controller.createDelegation));
+
+/**
+ * @route POST /api/v1/delegations/:id/approve
+ * @desc Approve delegation
+ * @access Private
+ */
+router.post('/:id/approve', requireRoles('ADMIN', 'ORG_ADMIN'), asyncHandler(controller.approveDelegation));
+
+/**
+ * @route POST /api/v1/delegations/:id/reject
+ * @desc Reject delegation
+ * @access Private
+ */
+router.post('/:id/reject', requireRoles('ADMIN', 'ORG_ADMIN'), asyncHandler(controller.rejectDelegation));
 
 /**
  * @route GET /api/v1/delegations
@@ -32,6 +46,6 @@ router.get('/', asyncHandler(controller.listDelegations));
  * @desc Cancel delegation
  * @access Private
  */
-router.delete('/:id', asyncHandler(controller.cancelDelegation));
+router.delete('/:id', requireRoles('ADMIN', 'ORG_ADMIN', 'MANAGER'), asyncHandler(controller.cancelDelegation));
 
 export default router;

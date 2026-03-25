@@ -21,4 +21,11 @@ router.get('/', authorize('audit:read'), auditController.getAuditLogs);
 // Get distinct entity types for filter dropdown - ADMIN ONLY
 router.get('/entity-types', authorize('audit:read'), auditController.getEntityTypes);
 
+// Get invoice-linkage reconciliation report grouped by invoiceReference - ADMIN ONLY
+router.get(
+	'/invoice-linkage/reconciliation-report',
+	authorize('audit:read'),
+	auditController.getInvoiceLinkageReconciliationReport
+);
+
 export default router;

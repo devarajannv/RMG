@@ -35,6 +35,6 @@ router.delete('/:assignmentId', requireRoles('ADMIN', 'ORG_ADMIN'), controller.r
  * @desc    Delegate a function to another user
  * @access  Authenticated (only the holder can delegate)
  */
-router.post('/:assignmentId/delegate', controller.delegateAssignment);
+router.post('/:assignmentId/delegate', requireRoles('ADMIN', 'ORG_ADMIN', 'MANAGER'), controller.delegateAssignment);
 
 export default router;

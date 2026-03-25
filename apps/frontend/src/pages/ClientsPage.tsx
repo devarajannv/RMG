@@ -41,7 +41,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 
 interface Client {
   id: string;
@@ -225,7 +224,7 @@ function ClientFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" preventDismiss>
         <DialogHeader>
           <DialogTitle>{client ? 'Edit Client' : 'Add New Client'}</DialogTitle>
         </DialogHeader>
@@ -544,7 +543,7 @@ export default function ClientsPage() {
       setShowAddModal(false);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to create client');
+      console.error('API Error:', error); alert('Failed to create client. Please try again.');
     },
   });
 
@@ -560,7 +559,7 @@ export default function ClientsPage() {
       setSelectedClient(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to update client');
+      console.error('API Error:', error); alert('Failed to update client. Please try again.');
     },
   });
 
@@ -575,7 +574,7 @@ export default function ClientsPage() {
       setSelectedClient(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to delete client');
+      console.error('API Error:', error); alert('Failed to delete client. Please try again.');
     },
   });
 
@@ -668,7 +667,6 @@ export default function ClientsPage() {
   };
 
   return (
-    <MainLayout>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -981,6 +979,5 @@ export default function ClientsPage() {
           loading={deleteMutation.isPending}
         />
       </motion.div>
-    </MainLayout>
   );
 }

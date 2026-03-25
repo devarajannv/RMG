@@ -61,6 +61,11 @@ test.describe('Dashboard Screen', () => {
     expect(rolloffs).toBeGreaterThanOrEqual(0);
     expect(deployedResources).toBeGreaterThanOrEqual(0);
     expect(deployedResources).toBeLessThanOrEqual(totalResources);
+
+    // Cross-metric sanity: a populated dashboard should not report effectively empty utilization.
+    if (activeProjects >= 25 && activeAllocations >= 25 && totalResources >= 100) {
+      expect(utilizationRate).toBeGreaterThanOrEqual(10);
+    }
   });
 
   test('DASHBOARD-SCREEN-002: should allow currency selection', async ({ page }) => {

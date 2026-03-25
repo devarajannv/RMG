@@ -9,7 +9,8 @@
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { HandlerContext, HandlerResult } from './index';
-import { ContractStatus, ContractType, AuditAction } from '@prisma/client';
+import { ContractStatus, ContractType } from '@prisma/client';
+import { createAuditLog } from '../../audit/audit.service';
 
 // ============================================================================
 // CONTRACT_CREATION Handler
@@ -88,26 +89,23 @@ export async function executeContractHandler(ctx: HandlerContext): Promise<Handl
     },
   });
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.CREATE,
-      entityType: 'Contract',
-      entityId: contract.id,
-      changes: {
-        contractNumber,
-        type,
-        name,
-        clientId,
-        clientName: client.name,
-        value,
-        startDate: startDate.toISOString(),
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Contract',
+    contract.id,
+    'CREATE',
+    {
+      contractNumber,
+      type,
+      name,
+      clientId,
+      clientName: client.name,
+      value,
+      startDate: startDate.toISOString(),
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   logger.info('Contract created from request', {
     contractId: contract.id,
@@ -222,24 +220,21 @@ export async function executeContractAmendmentHandler(ctx: HandlerContext): Prom
     });
   }
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.UPDATE,
-      entityType: 'Contract',
-      entityId: contractId,
-      changes: {
-        amendmentId: amendment.id,
-        amendmentNumber,
-        amendmentType,
-        effectiveDate: effectiveDate.toISOString(),
-        reason,
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Contract',
+    contractId,
+    'UPDATE',
+    {
+      amendmentId: amendment.id,
+      amendmentNumber,
+      amendmentType,
+      effectiveDate: effectiveDate.toISOString(),
+      reason,
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   logger.info('Contract amended from request', {
     contractId,

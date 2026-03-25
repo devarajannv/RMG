@@ -142,8 +142,14 @@ export const logger = winston.createLogger({
   ],
 });
 
-// Prevent logging of sensitive fields
-const sensitiveFields = ['password', 'token', 'secret', 'authorization', 'cookie', 'apikey', 'bearer', 'jwt', 'session'];
+// LOG-01: Prevent logging of sensitive fields including PII
+const sensitiveFields = [
+  'password', 'passwordHash', 'token', 'refreshToken', 'resetToken',
+  'secret', 'mfaSecret', 'authorization', 'cookie', 'apikey',
+  'bearer', 'jwt', 'session',
+  'email', 'firstName', 'lastName', 'phone', 'ssn', 'dateOfBirth',
+  'creditCard', 'bankAccount',
+];
 
 export function sanitizeLogData(data: Record<string, unknown>): Record<string, unknown> {
   const sanitized = { ...data };

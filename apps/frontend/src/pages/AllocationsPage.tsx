@@ -41,7 +41,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Allocation {
@@ -199,7 +198,7 @@ function AllocationFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto" preventDismiss>
         <DialogHeader>
           <DialogTitle>{allocation ? 'Edit Allocation' : 'Create New Allocation'}</DialogTitle>
         </DialogHeader>
@@ -441,7 +440,7 @@ export default function AllocationsPage() {
       setShowAddModal(false);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to create allocation');
+      console.error('API Error:', error); alert('Failed to create allocation. Please try again.');
     },
   });
 
@@ -458,7 +457,7 @@ export default function AllocationsPage() {
       setSelectedAllocation(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to update allocation');
+      console.error('API Error:', error); alert('Failed to update allocation. Please try again.');
     },
   });
 
@@ -474,7 +473,7 @@ export default function AllocationsPage() {
       setSelectedAllocation(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to delete allocation');
+      console.error('API Error:', error); alert('Failed to delete allocation. Please try again.');
     },
   });
 
@@ -579,7 +578,6 @@ export default function AllocationsPage() {
   };
 
   return (
-    <MainLayout>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1004,6 +1002,5 @@ export default function AllocationsPage() {
           loading={deleteMutation.isPending}
         />
       </motion.div>
-    </MainLayout>
   );
 }

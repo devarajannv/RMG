@@ -43,6 +43,9 @@ vi.mock('../../lib/prisma', () => ({
       findFirst: vi.fn(),
       count: vi.fn(),
     },
+    request: {
+      findUnique: vi.fn(),
+    },
     delegation: {
       findFirst: vi.fn(),
     },
@@ -51,7 +54,7 @@ vi.mock('../../lib/prisma', () => ({
 
 // Mock request service
 vi.mock('./request.service', () => ({
-  submitRequest: vi.fn().mockResolvedValue({
+  createRequest: vi.fn().mockResolvedValue({
     id: 'request-123',
     requestNumber: 'REQ-001',
     title: 'Test Request',
@@ -105,6 +108,9 @@ const mockPrisma = prisma as unknown as {
     findFirst: ReturnType<typeof vi.fn>;
     count: ReturnType<typeof vi.fn>;
   };
+  request: {
+    findUnique: ReturnType<typeof vi.fn>;
+  };
   delegation: {
     findFirst: ReturnType<typeof vi.fn>;
   };
@@ -116,6 +122,7 @@ describe('Request Trigger Service', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.request.findUnique.mockResolvedValue({ requestNumber: 'REQ-001' });
   });
 
   // ============================================================================

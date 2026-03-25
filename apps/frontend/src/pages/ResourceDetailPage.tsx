@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 
 interface ResourceDetail {
   id: string;
@@ -82,24 +81,20 @@ export default function ResourceDetailPage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
-      </MainLayout>
     );
   }
 
   if (error || !resource) {
     return (
-      <MainLayout>
         <div className="flex h-64 flex-col items-center justify-center">
           <p className="text-muted-foreground">Resource not found</p>
           <Button variant="link" onClick={() => navigate('/resources')}>
             ← Back to Resources
           </Button>
         </div>
-      </MainLayout>
     );
   }
 
@@ -111,7 +106,6 @@ export default function ResourceDetailPage() {
   };
 
   return (
-    <MainLayout>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -373,7 +367,6 @@ export default function ResourceDetailPage() {
           </div>
         </div>
       </motion.div>
-    </MainLayout>
   );
 }
 

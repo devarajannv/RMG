@@ -455,7 +455,9 @@ export async function importResources(tenantId: string, rows: any[]) {
       });
       created++;
     } catch (error: any) {
-      errors.push(`${row.employeeId}: ${error.message}`);
+      // LOG-06: Don't expose internal error details to users
+      logger.error('Import row failed', { employeeId: row.employeeId, error: error.message });
+      errors.push(`${row.employeeId}: Failed to process — duplicate or invalid data`);
     }
   }
   
@@ -510,11 +512,13 @@ export async function getPeopleStats(tenantId: string) {
 // HELPERS
 // =============================================================================
 
-function generateTemporaryPassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+function generateTemporaryPassword(length = 16): string {
+  const { randomBytes } = require('crypto');
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
+  const bytes = randomBytes(length);
   let password = '';
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < length; i++) {
+    password += chars[bytes[i] % chars.length];
   }
   return password;
 }

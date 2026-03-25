@@ -158,6 +158,7 @@ const requestTypeConfigs: Map<string, SLAConfig> = new Map();
 class SLAEscalationService {
   private isRunning = false;
   private lastRunResult: EscalationJobResult | null = null;
+  private configHydrated = false;
 
   // ============================================================================
   // Configuration
@@ -168,6 +169,7 @@ class SLAEscalationService {
    */
   setTenantConfig(tenantId: string, config: SLAConfig): void {
     slaConfigs.set(tenantId, config);
+    void this.persistTenantConfig(tenantId, config);
     logger.info('SLA config set for tenant', { tenantId, slaHours: config.slaHours });
   }
 
@@ -176,6 +178,7 @@ class SLAEscalationService {
    */
   setRequestTypeConfig(requestTypeId: string, config: SLAConfig): void {
     requestTypeConfigs.set(requestTypeId, config);
+    void this.persistRequestTypeConfig(requestTypeId, config);
     logger.info('SLA config set for request type', { requestTypeId, slaHours: config.slaHours });
   }
 
@@ -195,6 +198,145 @@ class SLAEscalationService {
     return DEFAULT_SLA_CONFIG;
   }
 
+  private async hydrateConfigCaches(): Promise<void> {
+    if (this.configHydrated) {
+      return;
+    }
+
+    const tenantClient = (prisma as unknown as {
+      tenant?: {
+        findMany?: typeof prisma.tenant.findMany;
+      };
+    }).tenant;
+
+    if (!tenantClient?.findMany) {
+      this.configHydrated = true;
+      return;
+    }
+
+    const tenants = await tenantClient.findMany({
+      select: { id: true, settings: true },
+    });
+
+    for (const tenant of tenants) {
+      const settings = (tenant.settings as Record<string, unknown> | null) ?? null;
+      const notifications = (settings?.notifications as Record<string, unknown> | null) ?? null;
+
+      const tenantSla = notifications?.slaConfig as SLAConfig | undefined;
+      if (tenantSla) {
+        slaConfigs.set(tenant.id, tenantSla);
+      }
+
+      const requestTypeSlaConfigs = (notifications?.requestTypeSlaConfigs as Record<string, SLAConfig> | undefined) ?? {};
+      for (const [requestTypeId, requestTypeConfig] of Object.entries(requestTypeSlaConfigs)) {
+        requestTypeConfigs.set(requestTypeId, requestTypeConfig);
+      }
+    }
+
+    this.configHydrated = true;
+  }
+
+  private async persistTenantConfig(tenantId: string, config: SLAConfig): Promise<void> {
+    try {
+      const tenantClient = (prisma as unknown as {
+        tenant?: {
+          findUnique?: typeof prisma.tenant.findUnique;
+          update?: typeof prisma.tenant.update;
+        };
+      }).tenant;
+
+      if (!tenantClient?.findUnique || !tenantClient.update) {
+        return;
+      }
+
+      const tenant = await tenantClient.findUnique({
+        where: { id: tenantId },
+        select: { settings: true },
+      });
+
+      const settings = ((tenant?.settings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const notifications = ((settings.notifications as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+
+      await tenantClient.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            notifications: {
+              ...notifications,
+              tenantId,
+              slaConfig: config,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      logger.warn('Failed to persist tenant SLA configuration', {
+        tenantId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  private async persistRequestTypeConfig(requestTypeId: string, config: SLAConfig): Promise<void> {
+    try {
+      const requestTypeClient = (prisma as unknown as {
+        requestType?: {
+          findFirst?: typeof prisma.requestType.findFirst;
+        };
+      }).requestType;
+      const tenantClient = (prisma as unknown as {
+        tenant?: {
+          findUnique?: typeof prisma.tenant.findUnique;
+          update?: typeof prisma.tenant.update;
+        };
+      }).tenant;
+
+      if (!requestTypeClient?.findFirst || !tenantClient?.findUnique || !tenantClient.update) {
+        return;
+      }
+
+      const requestType = await requestTypeClient.findFirst({
+        where: { id: requestTypeId },
+        select: { tenantId: true },
+      });
+
+      if (!requestType?.tenantId) {
+        return;
+      }
+
+      const tenant = await tenantClient.findUnique({
+        where: { id: requestType.tenantId },
+        select: { settings: true },
+      });
+
+      const settings = ((tenant?.settings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const notifications = ((settings.notifications as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const requestTypeSlaConfigs =
+        ((notifications.requestTypeSlaConfigs as Record<string, SLAConfig> | null) ?? {}) as Record<string, SLAConfig>;
+
+      requestTypeSlaConfigs[requestTypeId] = config;
+
+      await tenantClient.update({
+        where: { id: requestType.tenantId },
+        data: {
+          settings: {
+            ...settings,
+            notifications: {
+              ...notifications,
+              requestTypeSlaConfigs,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      logger.warn('Failed to persist request type SLA configuration', {
+        requestTypeId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
   // ============================================================================
   // Main Job
   // ============================================================================
@@ -204,6 +346,8 @@ class SLAEscalationService {
    * This should be called by a cron job (e.g., every 15 minutes)
    */
   async runEscalationJob(): Promise<EscalationJobResult> {
+    await this.hydrateConfigCaches();
+
     if (this.isRunning) {
       logger.warn('SLA escalation job already running, skipping');
       return this.lastRunResult || {
@@ -617,8 +761,8 @@ class SLAEscalationService {
     switch (target.type) {
       case 'USER':
         if (target.userId) {
-          const user = await prisma.user.findUnique({
-            where: { id: target.userId },
+          const user = await prisma.user.findFirst({
+            where: { id: target.userId, tenantId },
             select: { id: true, email: true, firstName: true, lastName: true },
           });
           if (user) {
@@ -861,7 +1005,7 @@ class SLAEscalationService {
   /**
    * Get SLA status for a specific request
    */
-  async getRequestSLAStatus(requestId: string): Promise<{
+  async getRequestSLAStatus(requestId: string, tenantId?: string): Promise<{
     status: 'OK' | 'WARNING' | 'BREACHED';
     slaDeadline: Date | null;
     minutesRemaining: number | null;
@@ -869,14 +1013,30 @@ class SLAEscalationService {
     escalationLevel: number;
     nextEscalationAt: Date | null;
   }> {
-    const request = await prisma.request.findUnique({
-      where: { id: requestId },
-      include: {
-        type: true,
-      },
-    });
+    const requestClient = (prisma as unknown as {
+      request?: {
+        findFirst?: typeof prisma.request.findFirst;
+        findUnique?: typeof prisma.request.findUnique;
+      };
+    }).request;
 
-    if (!request) {
+    const request = requestClient?.findFirst
+      ? await requestClient.findFirst({
+          where: { id: requestId, ...(tenantId ? { tenantId } : {}) },
+          include: {
+            type: true,
+          },
+        })
+      : requestClient?.findUnique
+        ? await requestClient.findUnique({
+            where: { id: requestId },
+            include: {
+              type: true,
+            },
+          })
+        : null;
+
+    if (!request || (tenantId && request.tenantId !== tenantId)) {
       throw new Error('Request not found');
     }
 

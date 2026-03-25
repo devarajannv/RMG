@@ -306,7 +306,7 @@ function DepartmentsSection() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent preventDismiss>
           <DialogHeader>
             <DialogTitle>
               {editingDepartment ? 'Edit Department' : 'Create Department'}
@@ -558,7 +558,7 @@ function TeamsSection() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent preventDismiss>
           <DialogHeader>
             <DialogTitle>
               {editingTeam ? 'Edit Team' : 'Create Team'}
@@ -800,7 +800,7 @@ function CostCentersSection() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent preventDismiss>
           <DialogHeader>
             <DialogTitle>
               {editingCostCenter ? 'Edit Cost Center' : 'Create Cost Center'}

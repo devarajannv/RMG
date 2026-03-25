@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import type {
   RequestTypesListResponse,
   RequestTypeResponse,
+  RequestBlueprintResponse,
   TemplatesListResponse,
   TemplateResponse,
   ImportTemplateResponse,
@@ -32,6 +33,8 @@ export const requestTypeKeys = {
   list: (filters?: RequestTypeFilters) => [...requestTypeKeys.lists(), filters] as const,
   details: () => [...requestTypeKeys.all, 'detail'] as const,
   detail: (id: string) => [...requestTypeKeys.details(), id] as const,
+  blueprints: () => [...requestTypeKeys.all, 'blueprint'] as const,
+  blueprint: (code: string) => [...requestTypeKeys.blueprints(), code] as const,
   templates: () => [...requestTypeKeys.all, 'templates'] as const,
   template: (id: string) => [...requestTypeKeys.templates(), id] as const,
 };
@@ -78,6 +81,18 @@ export function useRequestType(id: string) {
     queryFn: () => api.get<RequestTypeResponse>(`/request-types/${id}`),
     select: (response) => response.data,
     enabled: !!id,
+  });
+}
+
+/**
+ * Fetch a blueprint by request type code
+ */
+export function useRequestBlueprint(code?: string | null) {
+  return useQuery({
+    queryKey: requestTypeKeys.blueprint(code || ''),
+    queryFn: () => api.get<RequestBlueprintResponse>(`/request-types/blueprints/${code}`),
+    select: (response) => response.data,
+    enabled: !!code,
   });
 }
 

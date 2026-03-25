@@ -6,12 +6,9 @@
  */
 
 import { OnboardingWizard } from '@/features/onboarding';
-import MainLayout from '@/components/layout/MainLayout';
 
 export default function OnboardingPage() {
   return (
-    <MainLayout>
       <OnboardingWizard />
-    </MainLayout>
   );
 }

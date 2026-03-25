@@ -39,7 +39,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
-import MainLayout from '../components/layout/MainLayout';
 import { usePermissions, PERMISSIONS } from '../hooks/usePermissions';
 import { Can } from '../components/permissions/Can';
 
@@ -204,7 +203,7 @@ function ResourceFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" preventDismiss>
         <DialogHeader>
           <DialogTitle>{resource ? 'Edit Resource' : 'Add New Resource'}</DialogTitle>
         </DialogHeader>
@@ -483,7 +482,7 @@ export default function ResourcesPage() {
       setShowAddModal(false);
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to create resource');
+      console.error('API Error:', error); alert('Failed to create resource. Please try again.');
     },
   });
 
@@ -498,7 +497,7 @@ export default function ResourcesPage() {
       setSelectedResource(null);
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to update resource');
+      console.error('API Error:', error); alert('Failed to update resource. Please try again.');
     },
   });
 
@@ -513,7 +512,7 @@ export default function ResourcesPage() {
       setSelectedResource(null);
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to delete resource');
+      console.error('API Error:', error); alert('Failed to delete resource. Please try again.');
     },
   });
 
@@ -679,18 +678,15 @@ export default function ResourcesPage() {
 
   if (error) {
     return (
-      <MainLayout>
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
             Failed to load resources. Please try again later.
           </div>
         </div>
-      </MainLayout>
     );
   }
 
   return (
-    <MainLayout>
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -1130,6 +1126,5 @@ export default function ResourcesPage() {
         loading={deleteMutation.isPending}
       />
       </div>
-    </MainLayout>
   );
 }

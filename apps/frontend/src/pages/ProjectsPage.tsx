@@ -41,7 +41,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Project {
@@ -192,7 +191,7 @@ function ProjectFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" preventDismiss>
         <DialogHeader>
           <DialogTitle>{project ? 'Edit Project' : 'Create New Project'}</DialogTitle>
         </DialogHeader>
@@ -492,7 +491,7 @@ export default function ProjectsPage() {
       setShowAddModal(false);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to create project');
+      console.error('API Error:', error); alert('Failed to create project. Please try again.');
     },
   });
 
@@ -508,7 +507,7 @@ export default function ProjectsPage() {
       setSelectedProject(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to update project');
+      console.error('API Error:', error); alert('Failed to update project. Please try again.');
     },
   });
 
@@ -523,7 +522,7 @@ export default function ProjectsPage() {
       setSelectedProject(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to delete project');
+      console.error('API Error:', error); alert('Failed to delete project. Please try again.');
     },
   });
 
@@ -623,7 +622,6 @@ export default function ProjectsPage() {
   };
 
   return (
-    <MainLayout>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -941,7 +939,6 @@ export default function ProjectsPage() {
           loading={deleteMutation.isPending}
         />
       </motion.div>
-    </MainLayout>
   );
 }
 

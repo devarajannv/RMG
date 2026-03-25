@@ -57,7 +57,7 @@ describe('ExportImportPage', () => {
       renderWithProviders(<ExportImportPage />);
       
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /🤖 ai migration/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /🤖.*ai migration/i })).toBeInTheDocument();
       });
     });
 
@@ -103,13 +103,13 @@ describe('ExportImportPage', () => {
       const { user } = renderWithProviders(<ExportImportPage />);
       
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /🤖 ai migration/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /🤖.*ai migration/i })).toBeInTheDocument();
       });
       
-      await user.click(screen.getByRole('button', { name: /🤖 ai migration/i }));
+      await user.click(screen.getByRole('button', { name: /🤖.*ai migration/i }));
       
       await waitFor(() => {
-        const aiTab = screen.getByRole('button', { name: /🤖 ai migration/i });
+        const aiTab = screen.getByRole('button', { name: /🤖.*ai migration/i });
         expect(aiTab).toHaveClass('bg-primary');
       });
     });

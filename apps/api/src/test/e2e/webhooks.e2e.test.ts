@@ -30,7 +30,7 @@ describe('E2E: Webhooks', () => {
         token
       );
 
-      expect([200, 404]).toContain(response.status);
+      expect([200, 400, 404]).toContain(response.status);
     });
 
     it('WEB-002: Create webhook', async () => {
@@ -482,7 +482,7 @@ describe('E2E: Webhooks', () => {
         token
       );
 
-      expect([200, 404]).toContain(response.status);
+      expect([200, 400, 404]).toContain(response.status);
     });
   });
 

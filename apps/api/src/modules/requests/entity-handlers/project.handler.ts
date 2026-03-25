@@ -9,7 +9,8 @@
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { HandlerContext, HandlerResult } from './index';
-import { ProjectStatus, AllocationStatus, AuditAction } from '@prisma/client';
+import { ProjectStatus, AllocationStatus } from '@prisma/client';
+import { createAuditLog } from '../../audit/audit.service';
 
 // ============================================================================
 // PROJECT_CREATION Handler
@@ -104,25 +105,22 @@ export async function executeProjectCreationHandler(ctx: HandlerContext): Promis
     },
   });
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.CREATE,
-      entityType: 'Project',
-      entityId: project.id,
-      changes: {
-        name,
-        code,
-        type,
-        clientId,
-        managerId,
-        startDate: startDate.toISOString(),
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Project',
+    project.id,
+    'CREATE',
+    {
+      name,
+      code,
+      type,
+      clientId,
+      managerId,
+      startDate: startDate.toISOString(),
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   logger.info('Project created from request', {
     projectId: project.id,
@@ -245,23 +243,20 @@ export async function executeProjectClosureHandler(ctx: HandlerContext): Promise
     }
   }
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.UPDATE,
-      entityType: 'Project',
-      entityId: projectId,
-      changes: {
-        closureDate: closureDate.toISOString(),
-        closureReason,
-        newStatus,
-        resourcesReleased: releasedCount,
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Project',
+    projectId,
+    'UPDATE',
+    {
+      closureDate: closureDate.toISOString(),
+      closureReason,
+      newStatus,
+      resourcesReleased: releasedCount,
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   logger.info('Project closed from request', {
     projectId,

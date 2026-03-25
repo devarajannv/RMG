@@ -19,6 +19,7 @@ NC='\033[0m' # No Color
 ENVIRONMENT="${1:-dev}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(basename "$PROJECT_ROOT" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')}"
 
 # Service check timeouts
 POSTGRES_TIMEOUT=30
@@ -101,10 +102,44 @@ is_container_running() {
     docker ps --filter "name=$container_name" --filter "status=running" --format "{{.Names}}" | grep -q "^${container_name}$"
 }
 
+find_service_container() {
+    local service_name="$1"
+    docker ps -a \
+    --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
+        --filter "label=com.docker.compose.service=${service_name}" \
+        --format "{{.Names}}" | head -n 1
+}
+
+is_service_running() {
+    local service_name="$1"
+    local container_name
+    container_name="$(find_service_container "$service_name")"
+
+    if [ -z "$container_name" ]; then
+        return 1
+    fi
+
+    docker ps --filter "name=$container_name" --filter "status=running" --format "{{.Names}}" | grep -q "^${container_name}$"
+}
+
 is_container_healthy() {
     local container_name="$1"
     local health=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "none")
     [[ "$health" == "healthy" ]]
+}
+
+start_existing_service_container() {
+    local service_name="$1"
+    local container_name
+    container_name="$(find_service_container "$service_name")"
+
+    if [ -z "$container_name" ]; then
+        return 1
+    fi
+
+    log_info "Starting existing ${service_name} container: ${container_name}"
+    docker start "$container_name" > /dev/null
+    return 0
 }
 
 wait_for_healthy() {
@@ -158,11 +193,13 @@ wait_for_port() {
 # =============================================================================
 
 start_postgres() {
-    local container="rmgaas-postgres"
+    local service="postgres"
+    local container
+    container="$(find_service_container "$service")"
     
     log_info "Checking PostgreSQL..."
     
-    if is_container_running "$container"; then
+    if [ -n "$container" ] && is_container_running "$container"; then
         if is_container_healthy "$container"; then
             log_success "PostgreSQL is already running and healthy"
             return 0
@@ -170,20 +207,25 @@ start_postgres() {
             log_warning "PostgreSQL container is running but not healthy, restarting..."
             docker restart "$container"
         fi
+    elif [ -n "$container" ]; then
+        start_existing_service_container "$service"
     else
         log_info "Starting PostgreSQL..."
         $DOCKER_COMPOSE up -d postgres
+        container="$(find_service_container "$service")"
     fi
     
     wait_for_healthy "$container" "$POSTGRES_TIMEOUT"
 }
 
 start_redis() {
-    local container="rmgaas-redis"
+    local service="redis"
+    local container
+    container="$(find_service_container "$service")"
     
     log_info "Checking Redis..."
     
-    if is_container_running "$container"; then
+    if [ -n "$container" ] && is_container_running "$container"; then
         if is_container_healthy "$container"; then
             log_success "Redis is already running and healthy"
             return 0
@@ -191,21 +233,28 @@ start_redis() {
             log_warning "Redis container is running but not healthy, restarting..."
             docker restart "$container"
         fi
+    elif [ -n "$container" ]; then
+        start_existing_service_container "$service"
     else
         log_info "Starting Redis..."
         $DOCKER_COMPOSE up -d redis
+        container="$(find_service_container "$service")"
     fi
     
     wait_for_healthy "$container" "$REDIS_TIMEOUT"
 }
 
 start_api() {
-    local container="rmgaas-api"
+    local service="api"
+    local container
+    container="$(find_service_container "$service")"
     
     log_info "Checking API server..."
     
-    if is_container_running "$container"; then
+    if [ -n "$container" ] && is_container_running "$container"; then
         log_success "API server is already running"
+    elif [ -n "$container" ]; then
+        start_existing_service_container "$service"
     else
         log_info "Starting API server..."
         $DOCKER_COMPOSE up -d api
@@ -215,12 +264,16 @@ start_api() {
 }
 
 start_frontend() {
-    local container="rmgaas-frontend"
+    local service="frontend"
+    local container
+    container="$(find_service_container "$service")"
     
     log_info "Checking Frontend..."
     
-    if is_container_running "$container"; then
+    if [ -n "$container" ] && is_container_running "$container"; then
         log_success "Frontend is already running"
+    elif [ -n "$container" ]; then
+        start_existing_service_container "$service"
     else
         log_info "Starting Frontend..."
         $DOCKER_COMPOSE up -d frontend
@@ -233,11 +286,11 @@ run_migrations() {
     log_info "Checking database migrations..."
     
     # Check if there are pending migrations
-    if docker exec rmgaas-api npx prisma migrate status 2>&1 | grep -q "Database schema is up to date"; then
+    if docker exec rmgaas-api sh -lc "cd /app/apps/api && npx prisma migrate status" 2>&1 | grep -q "Database schema is up to date"; then
         log_success "Database schema is up to date"
     else
         log_info "Running database migrations..."
-        docker exec rmgaas-api npx prisma migrate deploy
+        docker exec rmgaas-api sh -lc "cd /app/apps/api && npx prisma migrate deploy"
         log_success "Migrations completed"
     fi
 }
@@ -334,8 +387,9 @@ show_status() {
     echo ""
     
     echo "Health Checks:"
-    for container in rmgaas-postgres rmgaas-redis rmgaas-api rmgaas-frontend; do
-        if is_container_running "$container"; then
+    for service in postgres redis api frontend; do
+        container="$(find_service_container "$service")"
+        if [ -n "$container" ] && is_container_running "$container"; then
             health=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "no healthcheck")
             if [[ "$health" == "healthy" ]]; then
                 echo -e "  ${GREEN}✓${NC} $container: running (healthy)"
@@ -345,7 +399,7 @@ show_status() {
                 echo -e "  ${YELLOW}!${NC} $container: running ($health)"
             fi
         else
-            echo -e "  ${RED}✗${NC} $container: not running"
+            echo -e "  ${RED}✗${NC} ${service}: not running"
         fi
     done
     echo ""

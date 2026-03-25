@@ -58,7 +58,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const result = await authApi.login(data.email, data.password);
-      setUser(result.user, result.tokens.accessToken);
+      setUser(result.user, result.tokens?.accessToken ?? '');
       navigate('/');
     } catch (err) {
       setError((err as Error).message || 'Login failed');

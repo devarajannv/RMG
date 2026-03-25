@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
 
 // ============================================================================
 // Types
@@ -280,7 +279,6 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <MainLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <div className="text-center">
             <div className="relative w-16 h-16 mx-auto">
@@ -290,13 +288,11 @@ export default function DashboardPage() {
             <p className="mt-4 text-gray-500 font-medium">Loading dashboard...</p>
           </div>
         </div>
-      </MainLayout>
     );
   }
 
   if (error || !metrics) {
     return (
-      <MainLayout>
         <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center">
@@ -311,7 +307,6 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
-      </MainLayout>
     );
   }
 
@@ -330,7 +325,6 @@ export default function DashboardPage() {
   ];
 
   return (
-    <MainLayout>
       <div className="space-y-6 pb-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -792,6 +786,5 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
-    </MainLayout>
   );
 }

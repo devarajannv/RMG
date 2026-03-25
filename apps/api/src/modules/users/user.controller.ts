@@ -5,6 +5,15 @@
 
 import { Request, Response, NextFunction } from 'express';
 import * as userService from './user.service';
+import { validatePasswordStrength } from '../../lib/password';
+import {
+  assignRoleSchema,
+  createUserSchema,
+  resetPasswordSchema,
+  updateUserSchema,
+  userIdParamSchema,
+  userRoleParamSchema,
+} from './user.schemas';
 
 // List all users
 export async function listUsers(req: Request, res: Response, next: NextFunction) {
@@ -25,7 +34,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
 // Get single user
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const { id } = userIdParamSchema.parse(req.params);
     const tenantId = req.user!.tenantId;
     const user = await userService.getUserById(id, tenantId);
 
@@ -49,14 +58,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
 export async function createUser(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = req.user!.tenantId;
-    const { email, firstName, lastName, password, status, roleIds } = req.body;
-
-    if (!email || !firstName || !lastName || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email, firstName, lastName, and password are required',
-      });
-    }
+    const { email, firstName, lastName, password, status, roleIds } = createUserSchema.parse(req.body);
 
     const user = await userService.createUser(tenantId, {
       email,
@@ -78,6 +80,12 @@ export async function createUser(req: Request, res: Response, next: NextFunction
         error: error.message,
       });
     }
+    if (error instanceof Error && error.message.includes('roleIds')) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
     return next(error);
   }
 }
@@ -85,9 +93,9 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 // Update user
 export async function updateUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const { id } = userIdParamSchema.parse(req.params);
     const tenantId = req.user!.tenantId;
-    const { firstName, lastName, email, status } = req.body;
+    const { firstName, lastName, email, status } = updateUserSchema.parse(req.body);
 
     const user = await userService.updateUser(id, tenantId, {
       firstName,
@@ -107,6 +115,12 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
         error: error.message,
       });
     }
+    if (error instanceof Error && error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        error: error.message,
+      });
+    }
     return next(error);
   }
 }
@@ -114,7 +128,7 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
 // Delete user
 export async function deleteUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const { id } = userIdParamSchema.parse(req.params);
     const tenantId = req.user!.tenantId;
 
     // Prevent self-deletion
@@ -139,18 +153,20 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
 // Assign role to user
 export async function assignRole(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
-    const { roleId } = req.body;
+    const { id } = userIdParamSchema.parse(req.params);
+    const { roleId } = assignRoleSchema.parse(req.body);
     const assignedBy = req.user!.id;
 
-    if (!roleId) {
+    // M-23: Prevent self-role-assignment
+    if (id === assignedBy) {
       return res.status(400).json({
         success: false,
-        error: 'roleId is required',
+        error: 'Cannot assign roles to yourself',
       });
     }
 
-    await userService.assignRoleToUser(id, roleId, assignedBy);
+    const tenantId = req.user!.tenantId;
+    await userService.assignRoleToUser(id, roleId, assignedBy, tenantId);
 
     return res.json({
       success: true,
@@ -170,9 +186,10 @@ export async function assignRole(req: Request, res: Response, next: NextFunction
 // Remove role from user
 export async function removeRole(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id, roleId } = req.params;
+    const { id, roleId } = userRoleParamSchema.parse(req.params);
+    const tenantId = req.user!.tenantId;
 
-    await userService.removeRoleFromUser(id, roleId);
+    await userService.removeRoleFromUser(id, roleId, tenantId);
 
     res.json({
       success: true,
@@ -186,14 +203,17 @@ export async function removeRole(req: Request, res: Response, next: NextFunction
 // Reset user password
 export async function resetPassword(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const { id } = userIdParamSchema.parse(req.params);
     const tenantId = req.user!.tenantId;
-    const { newPassword } = req.body;
+    const { newPassword } = resetPasswordSchema.parse(req.body);
 
-    if (!newPassword || newPassword.length < 8) {
+    // M-18: Use full password strength validation instead of length-only check
+    const strengthErrors = validatePasswordStrength(newPassword);
+    if (strengthErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        error: 'Password must be at least 8 characters',
+        error: strengthErrors[0],
+        details: strengthErrors,
       });
     }
 
@@ -211,7 +231,7 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 // Toggle user status (active/inactive)
 export async function toggleStatus(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const { id } = userIdParamSchema.parse(req.params);
     const tenantId = req.user!.tenantId;
 
     // Prevent self-deactivation

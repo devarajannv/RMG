@@ -26,6 +26,40 @@ export interface LoginResponse {
   tokens: AuthTokens;
 }
 
+function getSetCookieHeaders(headers: Headers): string[] {
+  const headersWithGetSetCookie = headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+
+  if (typeof headersWithGetSetCookie.getSetCookie === 'function') {
+    return headersWithGetSetCookie.getSetCookie();
+  }
+
+  const raw = headers.get('set-cookie');
+  if (!raw) {
+    return [];
+  }
+
+  return raw.split(/,(?=\s*[^;]+=)/g);
+}
+
+function extractCookie(headers: Headers, cookieName: string): string | null {
+  const setCookieHeaders = getSetCookieHeaders(headers);
+  const cookie = setCookieHeaders.find((header) => header.startsWith(`${cookieName}=`));
+
+  if (!cookie) {
+    return null;
+  }
+
+  const value = cookie.split(';')[0];
+  const separatorIndex = value.indexOf('=');
+  if (separatorIndex === -1) {
+    return null;
+  }
+
+  return value.substring(separatorIndex + 1);
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   meta: {
@@ -47,6 +81,7 @@ export async function apiRequest<T = unknown>(
 ): Promise<ApiResponse<T>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'x-e2e-test-mode': '1',
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -80,15 +115,42 @@ export async function login(
   email = 'admin@newvision.in',
   password = 'Password123!@#'
 ): Promise<string | null> {
-  const response = await apiRequest<LoginResponse>('POST', '/api/v1/auth/login', {
-    email,
-    password,
+  const loginResponse = await fetch(`${API_URL}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-e2e-test-mode': '1',
+    },
+    body: JSON.stringify({ email, password }),
   });
 
-  if (response.status === 200) {
-    return response.data.tokens?.accessToken || null;
+  if (loginResponse.status !== 200) {
+    return null;
   }
-  return null;
+
+  const refreshCookie = extractCookie(loginResponse.headers, 'refreshToken');
+  if (!refreshCookie) {
+    return null;
+  }
+
+  const refreshResponse = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-e2e-test-mode': '1',
+      Cookie: `refreshToken=${refreshCookie}`,
+    },
+  });
+
+  if (refreshResponse.status !== 200) {
+    return null;
+  }
+
+  const refreshData = (await refreshResponse.json()) as {
+    tokens?: { accessToken?: string };
+  };
+
+  return refreshData.tokens?.accessToken || null;
 }
 
 /**

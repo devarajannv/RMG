@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
+import { createAuditLog } from '../audit/audit.service';
 
 // ============================================================================
 // Types
@@ -149,17 +150,14 @@ export async function createAllocation(
     await updateResourceBenchStatus(tenantId, input.resourceId);
   }
 
-  // Audit log
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId,
-      entityType: 'Allocation',
-      entityId: allocation.id,
-      action: 'CREATE',
-      changes: input as unknown as Prisma.JsonObject,
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    userId,
+    'Allocation',
+    allocation.id,
+    'CREATE',
+    input as unknown as Record<string, unknown>
+  );
 
   logger.info('Allocation created', { allocationId: allocation.id });
 
@@ -211,7 +209,10 @@ export async function listAllocations(
   filters: AllocationFilters,
   pagination: { page: number; limit: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) {
-  const { page, limit, sortBy = 'startDate', sortOrder = 'desc' } = pagination;
+  const { page, limit, sortBy: rawSortBy = 'startDate', sortOrder = 'desc' } = pagination;
+  // M-17: sortBy allowlist
+  const ALLOWED_ALLOC_SORT = ['startDate', 'endDate', 'createdAt', 'updatedAt', 'status', 'allocationPercentage'];
+  const sortBy = ALLOWED_ALLOC_SORT.includes(rawSortBy) ? rawSortBy : 'startDate';
   const skip = (page - 1) * limit;
 
   const where: Prisma.AllocationWhereInput = {
@@ -398,17 +399,14 @@ export async function updateAllocation(
   // Update resource bench status
   await updateResourceBenchStatus(tenantId, existing.resourceId);
 
-  // Audit log
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId,
-      entityType: 'Allocation',
-      entityId: allocation.id,
-      action: 'UPDATE',
-      changes: { before: existing, after: input } as unknown as Prisma.JsonObject,
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    userId,
+    'Allocation',
+    allocation.id,
+    'UPDATE',
+    { before: existing, after: input } as unknown as Record<string, unknown>
+  );
 
   return allocation;
 }
@@ -443,16 +441,14 @@ export async function deleteAllocation(
   // Update resource bench status
   await updateResourceBenchStatus(tenantId, existing.resourceId);
 
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId,
-      entityType: 'Allocation',
-      entityId: allocationId,
-      action: 'DELETE',
-      changes: { reason } as Prisma.JsonObject,
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    userId,
+    'Allocation',
+    allocationId,
+    'DELETE',
+    { reason }
+  );
 
   logger.info('Allocation deleted', { allocationId });
 }
@@ -672,7 +668,7 @@ export async function bulkCreateAllocations(
 
   for (let i = 0; i < allocations.length; i++) {
     try {
-      await createAllocation(tenantId, allocations[i], userId, true);
+      await createAllocation(tenantId, allocations[i], userId);
       results.created++;
     } catch (error) {
       results.failed++;

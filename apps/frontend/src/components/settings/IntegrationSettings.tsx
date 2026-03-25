@@ -14,9 +14,6 @@ import {
   XCircle,
   RefreshCw,
   ExternalLink,
-  Copy,
-  Eye,
-  EyeOff,
   Webhook,
   Cloud,
   Database,
@@ -269,7 +266,7 @@ export function IntegrationSettings({
                   </div>
                 </div>
                 <Button variant="outline" asChild>
-                  <a href="/api-docs" target="_blank">
+                  <a href="/api-docs" target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-4 h-4 mr-2" />
                     View Docs
                   </a>
@@ -312,8 +309,6 @@ interface WebhookCardProps {
 }
 
 function WebhookCard({ webhook, onEdit, onDelete, onTest, onToggle, isTesting }: WebhookCardProps) {
-  const [showSecret, setShowSecret] = useState(false);
-
   return (
     <div className={cn(
       'p-4 border rounded-lg',
@@ -386,24 +381,12 @@ function WebhookCard({ webhook, onEdit, onDelete, onTest, onToggle, isTesting }:
           <div className="flex items-center gap-2">
             <Label className="text-xs text-gray-500">Secret:</Label>
             <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-              {showSecret ? webhook.secret : '••••••••••••••••'}
+              {/* L-11: Only show last 4 characters of secret */}
+              {'••••••••' + (webhook.secret.length > 4 ? webhook.secret.slice(-4) : '••••')}
             </code>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setShowSecret(!showSecret)}
-            >
-              {showSecret ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => navigator.clipboard.writeText(webhook.secret || '')}
-            >
-              <Copy className="w-3 h-3" />
-            </Button>
+            <span className="text-xs text-gray-400 italic">
+              Full secret only shown at creation
+            </span>
           </div>
         </div>
       )}
@@ -443,7 +426,7 @@ function WebhookDialog({ open, onClose, webhook, onSave }: WebhookDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" preventDismiss>
         <DialogHeader>
           <DialogTitle>{webhook ? 'Edit Webhook' : 'Create Webhook'}</DialogTitle>
           <DialogDescription>

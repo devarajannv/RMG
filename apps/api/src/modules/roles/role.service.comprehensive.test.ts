@@ -5,34 +5,58 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
+const { mockInvalidateAllUserTokens } = vi.hoisted(() => ({
+  mockInvalidateAllUserTokens: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock Prisma
-const mockPrisma = {
-  role: {
-    findUnique: vi.fn(),
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
+    role: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    permission: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+    },
+    user: {
+      findFirst: vi.fn(),
+      count: vi.fn(),
+    },
+    userRole: {
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+      delete: vi.fn(),
+    },
+    rolePermission: {
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    roleAssignmentAudit: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+    },
+    auditLog: {
+      create: vi.fn(),
+    },
+    $transaction: vi.fn(),
   },
-  permission: {
-    findMany: vi.fn(),
-    findUnique: vi.fn(),
-  },
-  user: {
-    count: vi.fn(),
-  },
-  roleAssignmentAudit: {
-    create: vi.fn(),
-  },
-  auditLog: {
-    create: vi.fn(),
-  },
-};
+}));
 
 vi.mock('@prisma/client', () => ({
   PrismaClient: vi.fn(() => mockPrisma),
 }));
+
+vi.mock('../../lib/redis', () => ({
+  invalidateAllUserTokens: mockInvalidateAllUserTokens,
+}));
+
+import { roleService } from './role.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -164,6 +188,7 @@ function canManageRole(actorLevel: number, targetLevel: number): boolean {
 describe('Role Service - Comprehensive Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockInvalidateAllUserTokens.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -491,6 +516,31 @@ describe('Role Service - Comprehensive Tests', () => {
           }),
         })
       );
+    });
+  });
+
+  describe('Session Invalidation on Role Mutation', () => {
+    it('ROL-U-014: invalidates all user sessions when assigning a role', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', tenantId: 'tenant-1' });
+      mockPrisma.role.findFirst.mockResolvedValue({ id: 'role-1', tenantId: 'tenant-1' });
+      mockPrisma.userRole.upsert.mockResolvedValue({});
+      mockPrisma.roleAssignmentAudit.create.mockResolvedValue({});
+
+      await roleService.assignRole('user-1', 'role-1', 'admin-1', 'tenant-1');
+
+      expect(mockInvalidateAllUserTokens).toHaveBeenCalledTimes(1);
+      expect(mockInvalidateAllUserTokens).toHaveBeenCalledWith('user-1');
+    });
+
+    it('ROL-U-015: invalidates all user sessions when revoking a role', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', tenantId: 'tenant-1' });
+      mockPrisma.userRole.delete.mockResolvedValue({});
+      mockPrisma.roleAssignmentAudit.create.mockResolvedValue({});
+
+      await roleService.revokeRole('user-1', 'role-1', 'admin-1', 'tenant-1');
+
+      expect(mockInvalidateAllUserTokens).toHaveBeenCalledTimes(1);
+      expect(mockInvalidateAllUserTokens).toHaveBeenCalledWith('user-1');
     });
   });
 

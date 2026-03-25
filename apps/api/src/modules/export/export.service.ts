@@ -1,5 +1,6 @@
 import prisma from '../../lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
+import { sanitizeCellValue } from '../../lib/csv-sanitizer';
 
 // ============================================================================
 // Types
@@ -29,11 +30,12 @@ function escapeCSV(value: string | number | boolean | null | undefined | Date | 
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString().split('T')[0];
   if (typeof value === 'object' && 'toNumber' in value) return value.toNumber().toString();
-  const str = String(value);
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`;
+  // H-11: Sanitize to prevent CSV formula injection
+  const sanitized = sanitizeCellValue(value);
+  if (sanitized.includes(',') || sanitized.includes('"') || sanitized.includes('\n')) {
+    return `"${sanitized.replace(/"/g, '""')}"`;
   }
-  return str;
+  return sanitized;
 }
 
 function toCSV(headers: string[], rows: Array<Record<string, unknown>>): string {
