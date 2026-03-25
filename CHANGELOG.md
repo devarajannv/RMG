@@ -4,6 +4,27 @@ All notable changes to RMGaaS are documented in this file.
 
 ## [Unreleased]
 
+### March 25, 2026 - PMO Runtime Validation And Document Upload Hardening
+
+#### Added
+- Live PMO smoke coverage against the seeded `newvision` tenant for:
+   - Professional Services Core request-pack activation
+   - activated-only request blueprint visibility
+   - PMO operational exception request creation
+   - tenant document taxonomy retrieval
+   - invalid document upload rejection
+
+#### Changed
+- Hardened document upload routes so multipart validation failures now return client-safe `400` responses instead of falling through as generic `500 INTERNAL_ERROR` responses.
+
+**Backend**
+- `apps/api/src/modules/documents/document.routes.ts`
+   - Added route-level handling for `multer` upload failures
+   - Maps file-size failures to `FILE_SIZE_ERROR`
+   - Maps blocked file types to `FILE_TYPE_NOT_ALLOWED`
+- `apps/api/src/modules/documents/document.routes.integration.test.ts`
+   - Added upload route integration coverage for blocked file types and taxonomy violation propagation
+
 ### December 31, 2025 - Organization Onboarding Module ✅ COMPLETE
 
 #### Added - Organization Onboarding Backend (50+ Endpoints)

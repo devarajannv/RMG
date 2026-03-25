@@ -6,11 +6,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as organizationService from './organization.service';
 
+vi.mock('../audit/audit.service', () => ({
+  createAuditLog: vi.fn().mockResolvedValue({}),
+}));
+
 // Mock Prisma
 vi.mock('../../lib/prisma', () => ({
   default: {
     tenant: {
       findUnique: vi.fn(),
+      update: vi.fn(),
     },
     user: {
       groupBy: vi.fn(),
@@ -43,10 +48,10 @@ describe('Organization Service - Comprehensive Tests', () => {
     const mockTenant = {
       id: mockTenantId,
       name: 'Test Organization',
-      code: 'TEST',
+      slug: 'test-org',
       status: 'ACTIVE',
       createdAt: new Date('2024-01-01'),
-    };
+    } as any;
 
     const setupMocks = (overrides: Record<string, unknown> = {}) => {
       vi.mocked(prisma.tenant.findUnique).mockResolvedValue(mockTenant);
@@ -170,7 +175,7 @@ describe('Organization Service - Comprehensive Tests', () => {
         select: expect.objectContaining({
           id: true,
           name: true,
-          code: true,
+          slug: true,
           status: true,
           createdAt: true,
         }),
@@ -246,8 +251,71 @@ describe('Organization Service - Comprehensive Tests', () => {
 
       expect(result.tenant.createdAt).toEqual(new Date('2024-01-01'));
       expect(result.tenant.name).toBe('Test Organization');
-      expect(result.tenant.code).toBe('TEST');
+      expect(result.tenant.slug).toBe('test-org');
       expect(result.tenant.status).toBe('ACTIVE');
+    });
+  });
+
+  describe('billing taxonomy settings', () => {
+    it('ORG-BILL-001: should return default taxonomy when tenant settings are missing', async () => {
+      vi.mocked(prisma.tenant.findUnique).mockResolvedValue({ settings: null } as any);
+
+      const policy = await organizationService.getBillingTaxonomyPolicy(mockTenantId);
+
+      expect(policy.allowedInvoicingModels).toEqual(['CONTRACT_LED', 'PROJECT_LED', 'HYBRID']);
+      expect(policy.allowedBillingTypes).toContain('TM');
+      expect(policy.allowContractProjectLinkage).toBe(true);
+    });
+
+    it('ORG-BILL-002: should update tenant billing taxonomy in tenant-scoped settings', async () => {
+      vi.mocked(prisma.tenant.findUnique).mockResolvedValue({ settings: { existing: true } } as any);
+      vi.mocked(prisma.tenant.update).mockResolvedValue({ id: mockTenantId } as any);
+
+      const updated = await organizationService.updateBillingTaxonomyPolicy(
+        mockTenantId,
+        'user-1',
+        {
+          allowedInvoicingModels: ['PROJECT_LED'],
+          allowedBillingTypes: ['TM', 'FIXED'],
+          allowContractProjectLinkage: false,
+        }
+      );
+
+      expect(updated.allowedInvoicingModels).toEqual(['PROJECT_LED']);
+      expect(updated.allowedBillingTypes).toEqual(['TM', 'FIXED']);
+      expect(updated.allowContractProjectLinkage).toBe(false);
+      expect(prisma.tenant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTenantId },
+        })
+      );
+    });
+  });
+
+  describe('document taxonomy settings', () => {
+    it('ORG-DOC-001: should return default document taxonomy when tenant settings are missing', async () => {
+      vi.mocked(prisma.tenant.findUnique).mockResolvedValue({ settings: null } as any);
+
+      const policy = await organizationService.getDocumentTaxonomyPolicy(mockTenantId);
+
+      expect(policy.allowedCategories).toContain('NDA');
+      expect(policy.allowedCategories).toContain('MSA');
+    });
+
+    it('ORG-DOC-002: should update tenant document taxonomy in tenant-scoped settings', async () => {
+      vi.mocked(prisma.tenant.findUnique).mockResolvedValue({ settings: { existing: true } } as any);
+      vi.mocked(prisma.tenant.update).mockResolvedValue({ id: mockTenantId } as any);
+
+      const updated = await organizationService.updateDocumentTaxonomyPolicy(mockTenantId, 'user-1', {
+        allowedCategories: ['nda', 'sow', 'invoice'],
+      });
+
+      expect(updated.allowedCategories).toEqual(['NDA', 'SOW', 'INVOICE']);
+      expect(prisma.tenant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTenantId },
+        })
+      );
     });
   });
 });

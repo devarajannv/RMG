@@ -9,6 +9,8 @@ router.use(authenticate);
 
 // Role CRUD - only admins can manage roles
 router.get('/', authorize('role:read'), roleController.getRoles);
+router.get('/catalog', authorize('role:read'), roleController.getPermissionCatalog);
+router.post('/system/provision', authorize('role:admin'), roleController.provisionSystemRole);
 router.get('/:id', authorize('role:read'), roleController.getRole);
 router.post('/', authorize('role:write'), roleController.createRole);
 router.put('/:id', authorize('role:write'), roleController.updateRole);
@@ -18,9 +20,9 @@ router.delete('/:id', authorize('role:delete'), roleController.deleteRole);
 router.post('/assign', authorize('role:assign'), roleController.assignRole);
 router.post('/revoke', authorize('role:assign'), roleController.revokeRole);
 
-// Permissions - users can check their own, admins can check others
+// Permissions - L-04: users can only check their own, access controlled by middleware
 router.get('/permissions/user/:userId', authorize('role:read'), roleController.getUserPermissions);
-router.get('/permissions/check', roleController.checkPermission); // Users can check their own
+router.get('/permissions/check', roleController.checkPermission); // Scoped to own user by authenticate middleware
 router.post('/permissions/initialize', authorize('role:admin'), roleController.initializePermissions);
 
 // Audit - admin only

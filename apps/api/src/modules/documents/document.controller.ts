@@ -74,7 +74,7 @@ export const getDocument = async (req: Request, res: Response, next: NextFunctio
     }
 
     // Check view access
-    const hasAccess = await documentService.checkAccess(req.params.id, userId, 'view');
+    const hasAccess = await documentService.checkAccess(req.params.id, userId, 'view', tenantId);
     if (!hasAccess) {
       res.status(403).json({ error: 'Access denied' });
       return;
@@ -127,8 +127,12 @@ export const uploadDocument = async (req: Request, res: Response, next: NextFunc
       res.status(400).json({ error: 'Validation error', details: error.errors });
       return;
     }
+    if (error instanceof Error && error.message.includes('is not allowed by tenant policy')) {
+      res.status(400).json({ code: 'DOCUMENT_TAXONOMY_VIOLATION', error: error.message });
+      return;
+    }
     if (error instanceof Error && error.message.includes('File size')) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ code: 'FILE_SIZE_ERROR', error: error.message });
       return;
     }
     next(error);
@@ -192,8 +196,11 @@ export const downloadDocument = async (req: Request, res: Response, next: NextFu
       versionNumber
     );
 
+    // Sanitize filename for Content-Disposition header (prevent CRLF injection)
+    const safeFilename = filename.replace(/[^\w.\-]/g, '_').replace(/\.{2,}/g, '.');
+
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
     res.setHeader('Content-Length', buffer.length);
     res.send(buffer);
   } catch (error) {
@@ -233,6 +240,10 @@ export const updateDocument = async (req: Request, res: Response, next: NextFunc
       return;
     }
     if (error instanceof Error) {
+      if (error.message.includes('is not allowed by tenant policy')) {
+        res.status(400).json({ code: 'DOCUMENT_TAXONOMY_VIOLATION', error: error.message });
+        return;
+      }
       if (error.message === 'Document not found') {
         res.status(404).json({ error: error.message });
         return;
@@ -287,7 +298,7 @@ export const grantAccess = async (req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    const access = await documentService.grantAccess(req.params.id, userId, data);
+    const access = await documentService.grantAccess(req.params.id, userId, data, req.user!.tenantId);
     res.status(201).json(access);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -300,7 +311,12 @@ export const grantAccess = async (req: Request, res: Response, next: NextFunctio
 
 export const revokeAccess = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await documentService.revokeAccess(req.params.accessId);
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    await documentService.revokeAccess(req.params.accessId, tenantId);
     res.status(204).send();
   } catch (error) {
     next(error);

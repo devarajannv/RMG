@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { requirePermission } from '../../middleware/rbac';
+import { requireAnyPermission, requirePermission } from '../../middleware/rbac';
 import { asyncHandler } from '../../middleware/errorHandler';
 import * as controller from './request-types.controller';
 
@@ -48,14 +48,49 @@ router.post('/templates/:id/import', requirePermission('request-templates:import
  * @desc List available request types (system + tenant)
  * @access Private (request-types:read)
  */
-router.get('/', requirePermission('request-types:read'), asyncHandler(controller.listRequestTypes));
+router.get('/', requireAnyPermission('request-types:read', 'request:create', 'request:read'), asyncHandler(controller.listRequestTypes));
+
+/**
+ * @route GET /api/v1/request-types/packs
+ * @desc List available request packs and tenant activation state
+ * @access Private (request-types:read)
+ */
+router.get('/packs', requireAnyPermission('request-types:read', 'request:create', 'request:read'), asyncHandler(controller.listRequestPacks));
+
+/**
+ * @route GET /api/v1/request-types/packs/:code
+ * @desc Get a single request pack by code
+ * @access Private (request-types:read)
+ */
+router.get('/packs/:code', requireAnyPermission('request-types:read', 'request:create', 'request:read'), asyncHandler(controller.getRequestPack));
+
+/**
+ * @route POST /api/v1/request-types/packs/:code/activate
+ * @desc Activate a request pack for the tenant
+ * @access Private (request-types:update)
+ */
+router.post('/packs/:code/activate', requirePermission('request-types:update'), asyncHandler(controller.activateRequestPack));
+
+/**
+ * @route GET /api/v1/request-types/blueprints
+ * @desc List blueprint-backed request types visible to the tenant
+ * @access Private (request-types:read)
+ */
+router.get('/blueprints', requireAnyPermission('request-types:read', 'request:create', 'request:read'), asyncHandler(controller.listRequestBlueprints));
+
+/**
+ * @route GET /api/v1/request-types/blueprints/:code
+ * @desc Get a blueprint by request type code
+ * @access Private (request-types:read)
+ */
+router.get('/blueprints/:code', requireAnyPermission('request-types:read', 'request:create', 'request:read'), asyncHandler(controller.getRequestBlueprint));
 
 /**
  * @route GET /api/v1/request-types/:id
  * @desc Get a single request type by ID
  * @access Private (request-types:read)
  */
-router.get('/:id', requirePermission('request-types:read'), asyncHandler(controller.getRequestType));
+router.get('/:id', requireAnyPermission('request-types:read', 'request:create', 'request:read'), asyncHandler(controller.getRequestType));
 
 /**
  * @route POST /api/v1/request-types

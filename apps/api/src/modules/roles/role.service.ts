@@ -1,97 +1,27 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { invalidateAllUserTokens } from '../../lib/redis';
+import {
+  buildPermissionKey,
+  canonicalizePermissionKey,
+  expandPermissionKeys,
+  getPermissionCatalog,
+  getPermissionDefinition,
+  PERMISSION_CATALOG,
+} from './permission-catalog';
 
 const prisma = new PrismaClient();
 
-// Define all available permissions
-export const PERMISSIONS = {
-  // Resources
-  'resources:create': { module: 'resources', action: 'create', description: 'Create resources' },
-  'resources:read': { module: 'resources', action: 'read', description: 'View resources' },
-  'resources:update': { module: 'resources', action: 'update', description: 'Update resources' },
-  'resources:delete': { module: 'resources', action: 'delete', description: 'Delete resources' },
-  'resources:read:own': { module: 'resources', action: 'read', scope: 'OWN', description: 'View own profile' },
-  'resources:read:team': { module: 'resources', action: 'read', scope: 'TEAM', description: 'View team resources' },
-  'resources:read:practice': { module: 'resources', action: 'read', scope: 'PRACTICE', description: 'View practice resources' },
-  
-  // Projects
-  'projects:create': { module: 'projects', action: 'create', description: 'Create projects' },
-  'projects:read': { module: 'projects', action: 'read', description: 'View projects' },
-  'projects:update': { module: 'projects', action: 'update', description: 'Update projects' },
-  'projects:delete': { module: 'projects', action: 'delete', description: 'Delete projects' },
-  
-  // Allocations
-  'allocations:create': { module: 'allocations', action: 'create', description: 'Create allocations' },
-  'allocations:read': { module: 'allocations', action: 'read', description: 'View allocations' },
-  'allocations:update': { module: 'allocations', action: 'update', description: 'Update allocations' },
-  'allocations:delete': { module: 'allocations', action: 'delete', description: 'Delete allocations' },
-  'allocations:approve': { module: 'allocations', action: 'approve', description: 'Approve allocations' },
-  
-  // Timesheets (plural - legacy)
-  'timesheets:create': { module: 'timesheets', action: 'create', description: 'Create timesheets' },
-  'timesheets:read': { module: 'timesheets', action: 'read', description: 'View timesheets' },
-  'timesheets:update': { module: 'timesheets', action: 'update', description: 'Update timesheets' },
-  'timesheets:approve': { module: 'timesheets', action: 'approve', description: 'Approve timesheets' },
-  
-  // Timesheet (singular - current)
-  'timesheet:read': { module: 'timesheet', action: 'read', description: 'View timesheets' },
-  'timesheet:write': { module: 'timesheet', action: 'write', description: 'Create/update timesheets' },
-  'timesheet:approve': { module: 'timesheet', action: 'approve', description: 'Approve/reject timesheets' },
-  
-  // Clients
-  'clients:create': { module: 'clients', action: 'create', description: 'Create clients' },
-  'clients:read': { module: 'clients', action: 'read', description: 'View clients' },
-  'clients:update': { module: 'clients', action: 'update', description: 'Update clients' },
-  'clients:delete': { module: 'clients', action: 'delete', description: 'Delete clients' },
-  
-  // Contracts
-  'contracts:create': { module: 'contracts', action: 'create', description: 'Create contracts' },
-  'contracts:read': { module: 'contracts', action: 'read', description: 'View contracts' },
-  'contracts:update': { module: 'contracts', action: 'update', description: 'Update contracts' },
-  'contracts:delete': { module: 'contracts', action: 'delete', description: 'Delete contracts' },
-  'contracts:approve': { module: 'contracts', action: 'approve', description: 'Approve contracts' },
-  
-  // Reports
-  'reports:read': { module: 'reports', action: 'read', description: 'View reports' },
-  'reports:export': { module: 'reports', action: 'export', description: 'Export reports' },
-  
-  // Analytics
-  'analytics:read': { module: 'analytics', action: 'read', description: 'View analytics' },
-  'analytics:read:practice': { module: 'analytics', action: 'read', scope: 'PRACTICE', description: 'View practice analytics' },
-  
-  // Settings
-  'settings:read': { module: 'settings', action: 'read', description: 'View settings' },
-  'settings:update': { module: 'settings', action: 'update', description: 'Update settings' },
-  
-  // Roles (plural - legacy)
-  'roles:create': { module: 'roles', action: 'create', description: 'Create roles' },
-  'roles:read': { module: 'roles', action: 'read', description: 'View roles' },
-  'roles:update': { module: 'roles', action: 'update', description: 'Update roles' },
-  'roles:delete': { module: 'roles', action: 'delete', description: 'Delete roles' },
-  'roles:assign': { module: 'roles', action: 'assign', description: 'Assign roles to users' },
-  
-  // Role (singular - current)
-  'role:read': { module: 'role', action: 'read', description: 'View roles' },
-  'role:write': { module: 'role', action: 'write', description: 'Create/update roles' },
-  'role:delete': { module: 'role', action: 'delete', description: 'Delete roles' },
-  'role:assign': { module: 'role', action: 'assign', description: 'Assign/revoke roles' },
-  'role:admin': { module: 'role', action: 'admin', description: 'Full role administration' },
-  'role:audit': { module: 'role', action: 'audit', description: 'View role assignment audit' },
-  
-  // Audit (sensitive - admin only)
-  'audit:read': { module: 'audit', action: 'read', description: 'View audit logs (admin only)' },
-  'audit:export': { module: 'audit', action: 'export', description: 'Export audit logs (admin only)' },
-  
-  // CTC (Sensitive)
-  'ctc:read:own': { module: 'ctc', action: 'read', scope: 'OWN', description: 'View own CTC' },
-  'ctc:read:all': { module: 'ctc', action: 'read', scope: 'ALL', description: 'View all CTC (requires approval)' },
-  
-  // Documents
-  'documents:create': { module: 'documents', action: 'create', description: 'Upload documents' },
-  'documents:read': { module: 'documents', action: 'read', description: 'View documents' },
-  'documents:update': { module: 'documents', action: 'update', description: 'Update documents' },
-  'documents:delete': { module: 'documents', action: 'delete', description: 'Delete documents' },
-  'documents:approve': { module: 'documents', action: 'approve', description: 'Approve documents' },
-} as const;
+export const PERMISSIONS = Object.fromEntries(
+  PERMISSION_CATALOG.map((definition) => [
+    definition.key,
+    {
+      module: definition.key.split(':')[0],
+      action: definition.key.split(':')[1],
+      scope: definition.key.split(':')[2]?.toUpperCase(),
+      description: definition.description,
+    },
+  ])
+);
 
 export type PermissionKey = keyof typeof PERMISSIONS;
 
@@ -104,10 +34,94 @@ export const ROLE_LEVELS = {
   INDIVIDUAL: 4,    // Employee
 } as const;
 
+const SYSTEM_ROLE_PRESET_LEVELS: Record<string, number> = {
+  PMO: ROLE_LEVELS.DELIVERY,
+};
+
+function serializeRole(role: any) {
+  const relationalPermissions = role.rolePermissions?.flatMap((rolePermission: any) => {
+    if (!rolePermission.granted || !rolePermission.permission) {
+      return [];
+    }
+
+    return [
+      buildPermissionKey(
+        rolePermission.permission.module,
+        rolePermission.permission.action,
+        rolePermission.permission.scope
+      ),
+    ];
+  }) ?? [];
+
+  const legacyPermissions = Array.isArray(role.permissions) ? role.permissions : [];
+
+  return {
+    ...role,
+    permissions: expandPermissionKeys([...relationalPermissions, ...legacyPermissions]),
+  };
+}
+
+async function resolvePermissionIds(tenantId: string, permissionKeys: string[]): Promise<string[]> {
+  const canonicalKeys = Array.from(new Set(permissionKeys.map((permissionKey) => canonicalizePermissionKey(permissionKey))));
+
+  if (canonicalKeys.length === 0) {
+    return [];
+  }
+
+  await roleService.initializePermissions(tenantId);
+
+  const requestedDefinitions = canonicalKeys
+    .map((permissionKey) => getPermissionDefinition(permissionKey))
+    .filter((definition): definition is NonNullable<typeof definition> => Boolean(definition));
+
+  const storedPermissions = await prisma.permission.findMany({
+    where: {
+      tenantId,
+      OR: requestedDefinitions.map((definition) => {
+        const [module, action, scope] = definition.key.split(':');
+        return {
+          module,
+          action,
+          scope: scope?.toUpperCase() ?? 'ALL',
+        };
+      }),
+    },
+  });
+
+  const permissionIdByKey = new Map<string, string>();
+  for (const permission of storedPermissions) {
+    permissionIdByKey.set(buildPermissionKey(permission.module, permission.action, permission.scope), permission.id);
+  }
+
+  const missingPermissions = canonicalKeys.filter((permissionKey) => !permissionIdByKey.has(permissionKey));
+  if (missingPermissions.length > 0) {
+    throw new Error(`Unknown permissions: ${missingPermissions.join(', ')}`);
+  }
+
+  return canonicalKeys.map((permissionKey) => permissionIdByKey.get(permissionKey) as string);
+}
+
+async function replaceRolePermissions(roleId: string, permissionIds: string[]): Promise<void> {
+  await prisma.rolePermission.deleteMany({
+    where: { roleId },
+  });
+
+  if (permissionIds.length === 0) {
+    return;
+  }
+
+  await prisma.rolePermission.createMany({
+    data: permissionIds.map((permissionId) => ({
+      roleId,
+      permissionId,
+    })),
+  });
+}
+
 export const roleService = {
   // Get all roles for a tenant
-  async getRoles(tenantId: string): Promise<Role[]> {
-    return prisma.role.findMany({
+  async getRoles(tenantId: string): Promise<any[]> {
+    const roles = await prisma.role.findMany({
       where: { tenantId },
       include: {
         rolePermissions: {
@@ -117,11 +131,13 @@ export const roleService = {
       },
       orderBy: [{ level: 'asc' }, { name: 'asc' }],
     });
+
+    return roles.map((role) => serializeRole(role));
   },
 
   // Get a single role
-  async getRole(tenantId: string, id: string): Promise<Role | null> {
-    return prisma.role.findFirst({
+  async getRole(tenantId: string, id: string): Promise<any | null> {
+    const role = await prisma.role.findFirst({
       where: { id, tenantId },
       include: {
         rolePermissions: {
@@ -132,6 +148,8 @@ export const roleService = {
         _count: { select: { users: true } },
       },
     });
+
+    return role ? serializeRole(role) : null;
   },
 
   // Create a custom role
@@ -140,8 +158,9 @@ export const roleService = {
     description?: string;
     level?: number;
     parentRoleId?: string;
+    permissions?: string[];
     permissionIds?: string[];
-  }): Promise<Role> {
+  }): Promise<any> {
     const role = await prisma.role.create({
       data: {
         tenantId,
@@ -155,16 +174,17 @@ export const roleService = {
     });
 
     // Assign permissions if provided
-    if (data.permissionIds?.length) {
+    const permissionIds = data.permissionIds ?? (data.permissions ? await resolvePermissionIds(tenantId, data.permissions) : []);
+    if (permissionIds.length) {
       await prisma.rolePermission.createMany({
-        data: data.permissionIds.map(permissionId => ({
+        data: permissionIds.map(permissionId => ({
           roleId: role.id,
           permissionId,
         })),
       });
     }
 
-    return this.getRole(tenantId, role.id) as Promise<Role>;
+    return this.getRole(tenantId, role.id);
   },
 
   // Update a role
@@ -173,8 +193,9 @@ export const roleService = {
     description?: string;
     level?: number;
     parentRoleId?: string;
+    permissions?: string[];
     permissionIds?: string[];
-  }): Promise<Role> {
+  }): Promise<any> {
     const role = await prisma.role.findFirst({
       where: { id, tenantId },
     });
@@ -199,24 +220,67 @@ export const roleService = {
     });
 
     // Update permissions if provided
-    if (data.permissionIds !== undefined) {
-      // Remove existing permissions
-      await prisma.rolePermission.deleteMany({
-        where: { roleId: id },
-      });
+    if (data.permissionIds !== undefined || data.permissions !== undefined) {
+      const permissionIds = data.permissionIds ?? await resolvePermissionIds(tenantId, id ? (data.permissions ?? []) : []);
 
-      // Add new permissions
-      if (data.permissionIds.length) {
-        await prisma.rolePermission.createMany({
-          data: data.permissionIds.map(permissionId => ({
-            roleId: id,
-            permissionId,
-          })),
-        });
-      }
+      await replaceRolePermissions(id, permissionIds);
     }
 
-    return this.getRole(tenantId, id) as Promise<Role>;
+    return this.getRole(tenantId, id);
+  },
+
+  async provisionSystemRole(tenantId: string, presetCode: string): Promise<any> {
+    const preset = this.getPermissionCatalog().presets.find((candidate) => candidate.code === presetCode);
+    if (!preset) {
+      throw new Error(`Unknown role preset: ${presetCode}`);
+    }
+
+    await this.initializePermissions(tenantId);
+
+    const permissionIds = await resolvePermissionIds(tenantId, preset.permissionKeys);
+    const existingRole = await prisma.role.findFirst({
+      where: {
+        tenantId,
+        name: preset.name,
+      },
+      select: {
+        id: true,
+        isSystem: true,
+      },
+    });
+
+    if (existingRole && !existingRole.isSystem) {
+      throw new Error(`Role name ${preset.name} is already in use by a custom role`);
+    }
+
+    const level = SYSTEM_ROLE_PRESET_LEVELS[preset.code] ?? ROLE_LEVELS.TEAM;
+
+    const role = existingRole
+      ? await prisma.role.update({
+          where: { id: existingRole.id },
+          data: {
+            description: preset.description,
+            level,
+            isSystem: true,
+            permissions: [],
+          },
+          select: { id: true },
+        })
+      : await prisma.role.create({
+          data: {
+            tenantId,
+            name: preset.name,
+            description: preset.description,
+            level,
+            isSystem: true,
+            permissions: [],
+          },
+          select: { id: true },
+        });
+
+    await replaceRolePermissions(role.id, permissionIds);
+
+    return this.getRole(tenantId, role.id);
   },
 
   // Delete a role
@@ -238,23 +302,42 @@ export const roleService = {
       throw new Error('Cannot delete role with assigned users');
     }
 
-    await prisma.rolePermission.deleteMany({ where: { roleId: id } });
-    await prisma.role.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.rolePermission.deleteMany({ where: { roleId: id } }),
+      prisma.role.delete({ where: { id } }),
+    ]);
   },
 
   // Assign role to user
-  async assignRole(userId: string, roleId: string, assignedBy: string): Promise<void> {
+  async assignRole(userId: string, roleId: string, assignedBy: string, tenantId: string): Promise<void> {
+    // Verify user belongs to the caller's tenant
+    const user = await prisma.user.findFirst({
+      where: { id: userId, tenantId },
+    });
+    if (!user) {
+      throw new Error('User not found in this tenant');
+    }
+
+    // Verify role belongs to the same tenant
+    const role = await prisma.role.findFirst({
+      where: { id: roleId, tenantId },
+    });
+    if (!role) {
+      throw new Error('Role not found in this tenant');
+    }
+
     await prisma.userRole.upsert({
       where: { userId_roleId: { userId, roleId } },
       update: { assignedAt: new Date(), assignedBy },
       create: { userId, roleId, assignedBy },
     });
 
+    await invalidateAllUserTokens(userId);
+
     // Log the assignment
-    const role = await prisma.role.findUnique({ where: { id: roleId } });
     await prisma.roleAssignmentAudit.create({
       data: {
-        tenantId: role?.tenantId || '',
+        tenantId,
         userId,
         roleId,
         action: 'ASSIGNED',
@@ -264,16 +347,25 @@ export const roleService = {
   },
 
   // Revoke role from user
-  async revokeRole(userId: string, roleId: string, revokedBy: string, reason?: string): Promise<void> {
+  async revokeRole(userId: string, roleId: string, revokedBy: string, tenantId: string, reason?: string): Promise<void> {
+    // Verify user belongs to the caller's tenant
+    const user = await prisma.user.findFirst({
+      where: { id: userId, tenantId },
+    });
+    if (!user) {
+      throw new Error('User not found in this tenant');
+    }
+
     await prisma.userRole.delete({
       where: { userId_roleId: { userId, roleId } },
     });
 
+    await invalidateAllUserTokens(userId);
+
     // Log the revocation
-    const role = await prisma.role.findUnique({ where: { id: roleId } });
     await prisma.roleAssignmentAudit.create({
       data: {
-        tenantId: role?.tenantId || '',
+        tenantId,
         userId,
         roleId,
         action: 'REVOKED',
@@ -284,7 +376,15 @@ export const roleService = {
   },
 
   // Get user's permissions
-  async getUserPermissions(userId: string): Promise<string[]> {
+  async getUserPermissions(userId: string, tenantId: string): Promise<string[]> {
+    // Verify user belongs to the caller's tenant
+    const user = await prisma.user.findFirst({
+      where: { id: userId, tenantId },
+    });
+    if (!user) {
+      throw new Error('User not found in this tenant');
+    }
+
     const userRoles = await prisma.userRole.findMany({
       where: { userId },
       include: {
@@ -304,12 +404,7 @@ export const roleService = {
       // Add permissions from role permissions table
       for (const rp of userRole.role.rolePermissions) {
         if (rp.granted) {
-          const key = `${rp.permission.module}:${rp.permission.action}`;
-          if (rp.permission.scope !== 'ALL') {
-            permissions.add(`${key}:${rp.permission.scope.toLowerCase()}`);
-          } else {
-            permissions.add(key);
-          }
+          permissions.add(buildPermissionKey(rp.permission.module, rp.permission.action, rp.permission.scope));
         }
       }
       
@@ -320,12 +415,12 @@ export const roleService = {
       }
     }
 
-    return Array.from(permissions);
+    return expandPermissionKeys(Array.from(permissions));
   },
 
   // Check if user has permission
-  async hasPermission(userId: string, permission: string): Promise<boolean> {
-    const permissions = await this.getUserPermissions(userId);
+  async hasPermission(userId: string, permission: string, tenantId?: string): Promise<boolean> {
+    const permissions = await this.getUserPermissions(userId, tenantId || '');
     
     // Check exact match
     if (permissions.includes(permission)) return true;
@@ -339,27 +434,32 @@ export const roleService = {
 
   // Initialize permissions in database
   async initializePermissions(tenantId: string): Promise<void> {
-    for (const [_key, config] of Object.entries(PERMISSIONS)) {
+    for (const definition of PERMISSION_CATALOG) {
+      const [module, action, scope] = definition.key.split(':');
       await prisma.permission.upsert({
         where: {
           tenantId_module_action_scope: {
             tenantId,
-            module: config.module,
-            action: config.action,
-            scope: ('scope' in config ? config.scope : 'ALL') as string,
+            module,
+            action,
+            scope: scope?.toUpperCase() ?? 'ALL',
           },
         },
         update: {},
         create: {
           tenantId,
-          module: config.module,
-          action: config.action,
-          scope: ('scope' in config ? config.scope : 'ALL') as string,
-          description: config.description,
+          module,
+          action,
+          scope: scope?.toUpperCase() ?? 'ALL',
+          description: definition.description,
           isSystem: true,
         },
       });
     }
+  },
+
+  getPermissionCatalog() {
+    return getPermissionCatalog();
   },
 
   // Get role assignment audit log

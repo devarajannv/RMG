@@ -133,6 +133,41 @@ export const PERMISSIONS = {
   CTC_READ_ALL: 'ctc:read:all',
 } as const;
 
+const MODULE_ALIASES: Record<string, string[]> = {
+  resources: ['resource'],
+  resource: ['resources'],
+  projects: ['project'],
+  project: ['projects'],
+  allocations: ['allocation'],
+  allocation: ['allocations'],
+  timesheets: ['timesheet'],
+  timesheet: ['timesheets'],
+  clients: ['client'],
+  client: ['clients'],
+  contracts: ['contract'],
+  contract: ['contracts'],
+  documents: ['document'],
+  document: ['documents'],
+  requests: ['request'],
+  request: ['requests'],
+  roles: ['role'],
+  role: ['roles'],
+  workflows: ['workflow'],
+  workflow: ['workflows'],
+  reports: ['report'],
+  report: ['reports'],
+};
+
+function getPermissionVariants(permission: string): string[] {
+  const parts = permission.split(':');
+  if (parts.length < 2) {
+    return [permission];
+  }
+
+  const [module, ...rest] = parts;
+  return [module, ...(MODULE_ALIASES[module] ?? [])].map((variantModule) => [variantModule, ...rest].join(':'));
+}
+
 // ============================================================================
 // Permission Checking Utilities
 // ============================================================================
@@ -145,25 +180,25 @@ export const PERMISSIONS = {
 export function hasPermission(permissions: string[], permission: string): boolean {
   // Wildcard - has all permissions
   if (permissions.includes('*')) return true;
-  
-  // Exact match
-  if (permissions.includes(permission)) return true;
-  
-  // Check for module-level wildcard (e.g., 'resources:*' matches 'resources:read')
-  const parts = permission.split(':');
-  if (parts.length >= 2) {
-    const moduleWildcard = `${parts[0]}:*`;
-    if (permissions.includes(moduleWildcard)) return true;
-  }
-  
-  // Check for broader permission
-  // e.g., if user has 'resources:read', they implicitly have 'resources:read:own'
-  if (parts.length === 3) {
-    const broaderPermission = `${parts[0]}:${parts[1]}`;
-    if (permissions.includes(broaderPermission)) return true;
-  }
-  
-  return false;
+
+  return getPermissionVariants(permission).some((permissionVariant) => {
+    if (permissions.includes(permissionVariant)) {
+      return true;
+    }
+
+    const parts = permissionVariant.split(':');
+    if (parts.length >= 2) {
+      const moduleWildcard = `${parts[0]}:*`;
+      if (permissions.includes(moduleWildcard)) return true;
+    }
+
+    if (parts.length === 3) {
+      const broaderPermission = `${parts[0]}:${parts[1]}`;
+      if (permissions.includes(broaderPermission)) return true;
+    }
+
+    return false;
+  });
 }
 
 /**
@@ -198,7 +233,8 @@ export function hasAnyRole(roles: string[], requiredRoles: string[]): boolean {
  * Check if user can access a specific module (has any permission for it)
  */
 export function canAccessModule(permissions: string[], module: string): boolean {
-  return permissions.some(p => p.startsWith(`${module}:`));
+  const moduleVariants = [module, ...(MODULE_ALIASES[module] ?? [])];
+  return permissions.some((permission) => moduleVariants.some((variant) => permission.startsWith(`${variant}:`)));
 }
 
 // ============================================================================
@@ -208,7 +244,7 @@ export function canAccessModule(permissions: string[], module: string): boolean 
 const PERMISSIONS_QUERY_KEY = ['user-permissions'];
 
 export function usePermissions() {
-  const { isAuthenticated, accessToken, user } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const queryClient = useQueryClient();
   
   const { data, isLoading, error, refetch } = useQuery({
@@ -220,7 +256,8 @@ export function usePermissions() {
         roles: response.user.roles || [],
       };
     },
-    enabled: isAuthenticated && !!accessToken,
+    // Cookie-based auth is supported; don't require in-memory access token.
+    enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
     refetchOnWindowFocus: true,
@@ -262,7 +299,7 @@ export function usePermissions() {
     invalidate: () => queryClient.invalidateQueries({ queryKey: PERMISSIONS_QUERY_KEY }),
     
     // Admin check
-    isAdmin: hasAnyRole(roles, ['Admin', 'Super Admin', 'admin']),
+    isAdmin: hasAnyRole(roles, ['Admin', 'Super Admin', 'admin', 'ADMIN', 'ORG_ADMIN', 'Org Admin']),
     
     // Quick permission checks for common actions
     can: {

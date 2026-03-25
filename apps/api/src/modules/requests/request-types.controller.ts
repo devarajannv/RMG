@@ -55,6 +55,96 @@ export async function listRequestTypes(req: Request, res: Response): Promise<voi
 }
 
 /**
+ * List available request packs
+ * GET /api/v1/request-types/packs
+ */
+export async function listRequestPacks(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+
+  const packs = await requestTypesService.listRequestPacks(tenantId);
+
+  res.json({
+    success: true,
+    data: packs,
+  });
+}
+
+/**
+ * Get a single request pack by code
+ * GET /api/v1/request-types/packs/:code
+ */
+export async function getRequestPack(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const code = req.params.code;
+
+  const pack = await requestTypesService.getRequestPackByCode(tenantId, code);
+
+  if (!pack) {
+    throw new ApiError('Request pack not found', 404, 'NOT_FOUND');
+  }
+
+  res.json({
+    success: true,
+    data: pack,
+  });
+}
+
+/**
+ * Activate a request pack for the tenant
+ * POST /api/v1/request-types/packs/:code/activate
+ */
+export async function activateRequestPack(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const userId = req.user!.id;
+  const code = req.params.code;
+
+  const pack = await requestTypesService.activateRequestPack(tenantId, code, userId);
+
+  res.status(200).json({
+    success: true,
+    data: pack,
+    message: 'Request pack activated successfully',
+  });
+}
+
+/**
+ * List request blueprints visible to the tenant
+ * GET /api/v1/request-types/blueprints
+ */
+export async function listRequestBlueprints(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+
+  const blueprints = await requestTypesService.listRequestBlueprints(tenantId, {
+    onlyActivated: req.query.onlyActivated === 'true',
+  });
+
+  res.json({
+    success: true,
+    data: blueprints,
+  });
+}
+
+/**
+ * Get a blueprint by request type code
+ * GET /api/v1/request-types/blueprints/:code
+ */
+export async function getRequestBlueprint(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const code = req.params.code;
+
+  const blueprint = await requestTypesService.getRequestBlueprintByRequestTypeCode(tenantId, code);
+
+  if (!blueprint) {
+    throw new ApiError('Request blueprint not found', 404, 'NOT_FOUND');
+  }
+
+  res.json({
+    success: true,
+    data: blueprint,
+  });
+}
+
+/**
  * Get a single request type
  * GET /api/v1/request-types/:id
  */
@@ -91,12 +181,12 @@ export async function createRequestType(req: Request, res: Response): Promise<vo
   const userId = req.user!.id;
 
   // Validate required fields
-  if (!req.body.code || !req.body.name || !req.body.category) {
-    throw new ApiError('Code, name, and category are required', 400, 'VALIDATION_ERROR');
+  if (!req.body.name || !req.body.category) {
+    throw new ApiError('Name and category are required', 400, 'VALIDATION_ERROR');
   }
 
   const input: requestTypesService.CreateRequestTypeInput = {
-    code: req.body.code.toUpperCase(),
+    code: typeof req.body.code === 'string' ? req.body.code.toUpperCase() : undefined,
     name: req.body.name,
     description: req.body.description,
     category: req.body.category,

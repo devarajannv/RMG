@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, AccessTokenPayload } from '../lib/jwt';
 import { isTokenBlacklisted } from '../lib/redis';
-import { Errors } from './errorHandler';
+import { ApiError, Errors } from './errorHandler';
 import { logger } from '../lib/logger';
 import prisma from '../lib/prisma';
+import { buildPermissionKey, canonicalizePermissionKey, expandPermissionKeys } from '../modules/roles/permission-catalog';
 
 export interface AuthUser {
   id: string;
@@ -11,6 +12,59 @@ export interface AuthUser {
   email: string;
   roles: string[];
   permissions: string[];
+}
+
+const PERMISSION_MODULE_ALIASES: Record<string, string[]> = {
+  resource: ['resources'],
+  resources: ['resource'],
+  project: ['projects'],
+  projects: ['project'],
+  allocation: ['allocations'],
+  allocations: ['allocation'],
+  timesheet: ['timesheets'],
+  timesheets: ['timesheet'],
+  client: ['clients'],
+  clients: ['client'],
+  contract: ['contracts'],
+  contracts: ['contract'],
+  document: ['documents'],
+  documents: ['document'],
+  request: ['requests'],
+  requests: ['request'],
+  role: ['roles'],
+  roles: ['role'],
+  workflow: ['workflows'],
+  workflows: ['workflow'],
+  report: ['reports'],
+  reports: ['report'],
+};
+
+function getPermissionVariants(permission: string): string[] {
+  const parts = permission.split(':');
+  if (parts.length < 2) {
+    return [permission];
+  }
+
+  const [module, ...rest] = parts;
+  const moduleVariants = [module, ...(PERMISSION_MODULE_ALIASES[module] ?? [])];
+
+  return moduleVariants.map((moduleVariant) => [moduleVariant, ...rest].join(':'));
+}
+
+export function matchesPermission(userPermission: string, requiredPermission: string): boolean {
+  const normalizedUserPermission = canonicalizePermissionKey(userPermission);
+  const requiredVariants = getPermissionVariants(canonicalizePermissionKey(requiredPermission));
+
+  return requiredVariants.some((variant) => {
+    if (normalizedUserPermission === variant) {
+      return true;
+    }
+
+    const userParts = normalizedUserPermission.split(':');
+    const variantParts = variant.split(':');
+
+    return userParts[0] === variantParts[0] && userParts[1] === '*';
+  });
 }
 
 /**
@@ -54,7 +108,7 @@ export async function authenticate(
       throw Errors.unauthorized('Invalid or expired token');
     }
 
-    // Load user with roles
+    // Load user with roles (exclude sensitive fields from memory)
     const user = await prisma.user.findFirst({
       where: {
         id: payload.sub,
@@ -62,10 +116,23 @@ export async function authenticate(
         status: 'ACTIVE',
         deletedAt: null,
       },
-      include: {
+      select: {
+        id: true,
+        tenantId: true,
+        email: true,
+        emailVerified: true,
+        status: true,
         roles: {
           include: {
-            role: true,
+            role: {
+              include: {
+                rolePermissions: {
+                  include: {
+                    permission: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -75,14 +142,44 @@ export async function authenticate(
       throw Errors.unauthorized('User not found or inactive');
     }
 
+    const emailVerificationExemptPaths = ['/api/v1/auth/send-verification'];
+    const currentPath = req.originalUrl || req.path || '';
+    const isEmailVerificationExempt = emailVerificationExemptPaths.some((path) =>
+      currentPath.startsWith(path)
+    );
+
+    if (!user.emailVerified && !isEmailVerificationExempt) {
+      throw new ApiError('Email verification required', 403, 'EMAIL_NOT_VERIFIED');
+    }
+
     // Extract roles and permissions
     const roles = user.roles.map((ur) => ur.role.name);
     const permissions = new Set<string>();
     
     for (const userRole of user.roles) {
-      const rolePermissions = userRole.role.permissions as string[];
-      rolePermissions.forEach((p) => permissions.add(p));
+      for (const rolePermission of userRole.role.rolePermissions) {
+        if (!rolePermission.granted) {
+          continue;
+        }
+
+        permissions.add(
+          buildPermissionKey(
+            rolePermission.permission.module,
+            rolePermission.permission.action,
+            rolePermission.permission.scope
+          )
+        );
+      }
+
+      const legacyPermissions = Array.isArray(userRole.role.permissions)
+        ? (userRole.role.permissions as string[])
+        : [];
+      for (const permission of legacyPermissions) {
+        permissions.add(permission);
+      }
     }
+
+    const effectivePermissions = expandPermissionKeys(Array.from(permissions));
 
     // Attach user to request
     req.user = {
@@ -90,7 +187,7 @@ export async function authenticate(
       tenantId: user.tenantId,
       email: user.email,
       roles,
-      permissions: Array.from(permissions),
+      permissions: effectivePermissions,
     };
     req.tenantId = user.tenantId;
 
@@ -121,6 +218,11 @@ export async function optionalAuth(
  * Check if user has required permissions
  */
 export function authorize(...requiredPermissions: string[]) {
+  // M-08: Prevent accidental authorization bypass with zero arguments
+  if (requiredPermissions.length === 0) {
+    throw new Error('authorize() requires at least one permission argument');
+  }
+
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(Errors.unauthorized('Authentication required'));
@@ -133,20 +235,14 @@ export function authorize(...requiredPermissions: string[]) {
 
     // Check each required permission
     const hasAllPermissions = requiredPermissions.every((permission) => {
-      // Support wildcard matching (e.g., 'resource:*' matches 'resource:read')
-      const parts = permission.split(':');
-      return req.user!.permissions.some((p) => {
-        if (p === permission) return true;
-        const pParts = p.split(':');
-        return pParts[0] === parts[0] && pParts[1] === '*';
-      });
+      return req.user!.permissions.some((userPermission) =>
+        matchesPermission(userPermission, permission)
+      );
     });
 
     if (!hasAllPermissions) {
       return next(
-        Errors.forbidden(
-          `Missing required permissions: ${requiredPermissions.join(', ')}`
-        )
+        Errors.forbidden('Insufficient permissions')
       );
     }
 
@@ -163,13 +259,16 @@ export function requireRoles(...requiredRoles: string[]) {
       return next(Errors.unauthorized('Authentication required'));
     }
 
+    const normalizeRole = (role: string) => role.replace(/[\s_-]+/g, '').toUpperCase();
+    const normalizedUserRoles = new Set(req.user.roles.map((role) => normalizeRole(role)));
+
     const hasRole = requiredRoles.some((role) =>
-      req.user!.roles.includes(role)
+      normalizedUserRoles.has(normalizeRole(role))
     );
 
     if (!hasRole) {
       return next(
-        Errors.forbidden(`Required role: ${requiredRoles.join(' or ')}`)
+        Errors.forbidden('Insufficient permissions')
       );
     }
 
