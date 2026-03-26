@@ -4,6 +4,17 @@
  */
 
 import prisma from '../../lib/prisma';
+import {
+  TenantBillingTaxonomyPolicy,
+  getTenantBillingTaxonomyPolicy,
+  updateTenantBillingTaxonomyPolicy,
+} from '../../config/billing-taxonomy';
+import {
+  TenantDocumentTaxonomyPolicy,
+  getTenantDocumentTaxonomyPolicy,
+  updateTenantDocumentTaxonomyPolicy,
+} from '../../config/document-taxonomy';
+import { createAuditLog } from '../audit/audit.service';
 
 export interface OrganizationStats {
   tenant: {
@@ -136,4 +147,66 @@ export async function getOrganizationStats(tenantId: string): Promise<Organizati
       documentsCount: documentCount,
     },
   };
+}
+
+export async function getBillingTaxonomyPolicy(tenantId: string): Promise<TenantBillingTaxonomyPolicy> {
+  return getTenantBillingTaxonomyPolicy(tenantId);
+}
+
+export async function updateBillingTaxonomyPolicy(
+  tenantId: string,
+  userId: string,
+  input: {
+    allowedInvoicingModels?: TenantBillingTaxonomyPolicy['allowedInvoicingModels'];
+    allowedBillingTypes?: string[];
+    allowContractProjectLinkage?: boolean;
+  }
+): Promise<TenantBillingTaxonomyPolicy> {
+  const updated = await updateTenantBillingTaxonomyPolicy(tenantId, input, userId);
+
+  await createAuditLog(
+    tenantId,
+    userId,
+    'Tenant',
+    tenantId,
+    'UPDATE',
+    {
+      area: 'billing-taxonomy',
+      policyVersion: updated.version,
+      allowedInvoicingModels: updated.allowedInvoicingModels,
+      allowedBillingTypes: updated.allowedBillingTypes,
+      allowContractProjectLinkage: updated.allowContractProjectLinkage,
+    }
+  );
+
+  return updated;
+}
+
+export async function getDocumentTaxonomyPolicy(tenantId: string): Promise<TenantDocumentTaxonomyPolicy> {
+  return getTenantDocumentTaxonomyPolicy(tenantId);
+}
+
+export async function updateDocumentTaxonomyPolicy(
+  tenantId: string,
+  userId: string,
+  input: {
+    allowedCategories?: string[];
+  }
+): Promise<TenantDocumentTaxonomyPolicy> {
+  const updated = await updateTenantDocumentTaxonomyPolicy(tenantId, input, userId);
+
+  await createAuditLog(
+    tenantId,
+    userId,
+    'Tenant',
+    tenantId,
+    'UPDATE',
+    {
+      area: 'document-taxonomy',
+      policyVersion: updated.version,
+      allowedCategories: updated.allowedCategories,
+    }
+  );
+
+  return updated;
 }

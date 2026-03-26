@@ -10,7 +10,8 @@
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { HandlerContext, HandlerResult } from './index';
-import { AllocationStatus, AuditAction } from '@prisma/client';
+import { AllocationStatus } from '@prisma/client';
+import { createAuditLog } from '../../audit/audit.service';
 
 // ============================================================================
 // RESOURCE_ALLOCATION Handler
@@ -116,24 +117,21 @@ export async function executeAllocationHandler(ctx: HandlerContext): Promise<Han
     logger.info('Resource removed from bench', { resourceId, totalAllocated });
   }
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.CREATE,
-      entityType: 'Allocation',
-      entityId: allocation.id,
-      changes: {
-        resourceId,
-        projectId,
-        percentage,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Allocation',
+    allocation.id,
+    'CREATE',
+    {
+      resourceId,
+      projectId,
+      percentage,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   return {
     success: true,
@@ -200,25 +198,22 @@ export async function executeExtensionHandler(ctx: HandlerContext): Promise<Hand
     },
   });
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.UPDATE,
-      entityType: 'Allocation',
-      entityId: allocationId,
-      changes: {
-        oldEndDate: oldEndDate.toISOString(),
-        newEndDate: newEndDate.toISOString(),
-        oldPercentage,
-        newPercentage: percentageChange ?? oldPercentage,
-        oldBillRate: oldBillRate?.toString(),
-        newBillRate: (billRateChange ?? oldBillRate)?.toString(),
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Allocation',
+    allocationId,
+    'UPDATE',
+    {
+      oldEndDate: oldEndDate.toISOString(),
+      newEndDate: newEndDate.toISOString(),
+      oldPercentage,
+      newPercentage: percentageChange ?? oldPercentage,
+      oldBillRate: oldBillRate?.toString(),
+      newBillRate: (billRateChange ?? oldBillRate)?.toString(),
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   return {
     success: true,
@@ -299,22 +294,19 @@ export async function executeReleaseHandler(ctx: HandlerContext): Promise<Handle
     logger.info('Resource moved to bench', { resourceId: allocation.resourceId });
   }
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.UPDATE,
-      entityType: 'Allocation',
-      entityId: allocationId,
-      changes: {
-        originalEndDate: originalEndDate.toISOString(),
-        releaseDate: releaseDate.toISOString(),
-        reason,
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Allocation',
+    allocationId,
+    'UPDATE',
+    {
+      originalEndDate: originalEndDate.toISOString(),
+      releaseDate: releaseDate.toISOString(),
+      reason,
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   return {
     success: true,

@@ -4,9 +4,31 @@
  */
 
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { ApiError } from '../../middleware/errorHandler';
 import * as requestService from './request.service';
 import { RequestStatus, Priority } from '@prisma/client';
+import {
+  createRequestSchema,
+  updateRequestSchema,
+  approveRejectSchema,
+  addCommentSchema,
+  requestAttachmentParamSchema,
+  requestIdParamSchema,
+  cancelRequestSchema,
+  includeInternalCommentsSchema,
+} from './request.schemas';
+
+const invoiceLinkSchema = z.object({
+  invoiceReference: z.string().trim().min(1).max(100),
+  reason: z.string().trim().max(500).optional(),
+  correlationId: z.string().trim().max(100).optional(),
+});
+
+const invoiceUnlinkSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+  correlationId: z.string().trim().max(100).optional(),
+});
 
 // ============================================================================
 // Request CRUD
@@ -20,31 +42,83 @@ export async function createRequest(req: Request, res: Response): Promise<void> 
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
 
+  const input = createRequestSchema.parse(req.body);
+
   const request = await requestService.createRequest(tenantId, userId, {
-    typeCode: req.body.typeCode,
-    title: req.body.title,
-    description: req.body.description,
-    requestData: req.body.requestData,
-    priority: req.body.priority,
-    urgencyJustification: req.body.urgencyJustification,
-    requestedCompletionDate: req.body.requestedCompletionDate
-      ? new Date(req.body.requestedCompletionDate)
+    typeCode: input.typeCode,
+    title: input.title,
+    description: input.description,
+    requestData: input.requestData || {},
+    priority: input.priority,
+    urgencyJustification: input.urgencyJustification,
+    requestedCompletionDate: input.requestedCompletionDate
+      ? new Date(input.requestedCompletionDate)
       : undefined,
-    onBehalfOfId: req.body.onBehalfOfId,
-    resourceId: req.body.resourceId,
-    projectId: req.body.projectId,
-    allocationId: req.body.allocationId,
-    contractId: req.body.contractId,
-    externalRef: req.body.externalRef,
-    externalUrl: req.body.externalUrl,
-    dependsOnId: req.body.dependsOnId,
+    onBehalfOfId: input.onBehalfOfId,
+    resourceId: input.resourceId,
+    projectId: input.projectId,
+    allocationId: input.allocationId,
+    contractId: input.contractId,
+    externalRef: input.externalRef,
+    externalUrl: input.externalUrl,
+    dependsOnId: input.dependsOnId,
   });
 
-  res.status(201).json({
-    success: true,
-    data: request,
-    message: 'Request created successfully',
-  });
+  if (!input.submitForApproval) {
+    res.status(201).json({
+      success: true,
+      data: request,
+      message: 'Request created successfully',
+      meta: {
+        submissionAttempted: false,
+        submissionSucceeded: false,
+      },
+    });
+    return;
+  }
+
+  try {
+    const submittedRequest = await requestService.submitRequest(
+      tenantId,
+      String(request.id),
+      userId
+    );
+
+    res.status(201).json({
+      success: true,
+      data: submittedRequest,
+      message: 'Request submitted successfully',
+      meta: {
+        submissionAttempted: true,
+        submissionSucceeded: true,
+      },
+    });
+    return;
+  } catch (error) {
+    const submissionError = error instanceof ApiError
+      ? {
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+      }
+      : {
+        message: 'Draft saved, but submission failed. Please open the draft and try again.',
+        code: 'SUBMIT_AFTER_CREATE_FAILED',
+        statusCode: 500,
+      };
+
+    res.status(201).json({
+      success: true,
+      data: request,
+      message: 'Draft saved, but submission failed',
+      meta: {
+        submissionAttempted: true,
+        submissionSucceeded: false,
+        submissionError,
+      },
+    });
+    return;
+  }
 }
 
 /**
@@ -54,7 +128,7 @@ export async function createRequest(req: Request, res: Response): Promise<void> 
 export async function getRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
 
   const request = await requestService.getRequest(tenantId, requestId, userId);
 
@@ -91,6 +165,10 @@ export async function listRequests(req: Request, res: Response): Promise<void> {
     filters.priority = (Array.isArray(req.query.priority)
       ? req.query.priority
       : [req.query.priority]) as Priority[];
+  }
+
+  if (req.query.invoiceReference) {
+    filters.invoiceReference = req.query.invoiceReference as string;
   }
 
   if (req.query.requesterId) {
@@ -145,19 +223,20 @@ export async function listRequests(req: Request, res: Response): Promise<void> {
 export async function updateRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
+  const input = updateRequestSchema.parse(req.body);
 
   const request = await requestService.updateRequest(tenantId, requestId, userId, {
-    title: req.body.title,
-    description: req.body.description,
-    requestData: req.body.requestData,
-    priority: req.body.priority,
-    urgencyJustification: req.body.urgencyJustification,
-    requestedCompletionDate: req.body.requestedCompletionDate
-      ? new Date(req.body.requestedCompletionDate)
+    title: input.title,
+    description: input.description,
+    requestData: input.requestData,
+    priority: input.priority,
+    urgencyJustification: input.urgencyJustification,
+    requestedCompletionDate: input.requestedCompletionDate
+      ? new Date(input.requestedCompletionDate)
       : undefined,
-    externalRef: req.body.externalRef,
-    externalUrl: req.body.externalUrl,
+    externalRef: input.externalRef,
+    externalUrl: input.externalUrl,
   });
 
   res.json({
@@ -174,7 +253,7 @@ export async function updateRequest(req: Request, res: Response): Promise<void> 
 export async function deleteRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
 
   await requestService.deleteRequest(tenantId, requestId, userId);
 
@@ -195,7 +274,7 @@ export async function deleteRequest(req: Request, res: Response): Promise<void> 
 export async function submitRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
 
   const request = await requestService.submitRequest(tenantId, requestId, userId);
 
@@ -213,10 +292,10 @@ export async function submitRequest(req: Request, res: Response): Promise<void> 
 export async function approveRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
 
   const request = await requestService.approveRequest(tenantId, requestId, userId, {
-    comments: req.body.comments,
+    comments: approveRejectSchema.parse(req.body).comments,
   });
 
   res.json({
@@ -233,10 +312,10 @@ export async function approveRequest(req: Request, res: Response): Promise<void>
 export async function rejectRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
 
   const request = await requestService.rejectRequest(tenantId, requestId, userId, {
-    comments: req.body.comments,
+    comments: approveRejectSchema.parse(req.body).comments,
   });
 
   res.json({
@@ -253,10 +332,11 @@ export async function rejectRequest(req: Request, res: Response): Promise<void> 
 export async function returnRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
+  const input = approveRejectSchema.parse(req.body);
 
   const request = await requestService.returnRequest(tenantId, requestId, userId, {
-    comments: req.body.comments,
+    comments: input.comments,
   });
 
   res.json({
@@ -273,18 +353,53 @@ export async function returnRequest(req: Request, res: Response): Promise<void> 
 export async function cancelRequest(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
+  const input = cancelRequestSchema.parse(req.body);
 
-  if (!req.body.reason) {
-    throw new ApiError('Cancellation reason is required', 400, 'REASON_REQUIRED');
-  }
-
-  const request = await requestService.cancelRequest(tenantId, requestId, userId, req.body.reason);
+  const request = await requestService.cancelRequest(tenantId, requestId, userId, input.reason);
 
   res.json({
     success: true,
     data: request,
     message: 'Request cancelled',
+  });
+}
+
+/**
+ * Link request to invoice reference
+ * POST /api/v1/requests/:id/invoice-link
+ */
+export async function linkRequestInvoice(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const userId = req.user!.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
+
+  const input = invoiceLinkSchema.parse(req.body);
+  const request = await requestService.linkRequestToInvoice(tenantId, requestId, userId, input);
+
+  res.json({
+    success: true,
+    data: request,
+    message: 'Request linked to invoice successfully',
+  });
+}
+
+/**
+ * Unlink request from invoice reference
+ * DELETE /api/v1/requests/:id/invoice-link
+ */
+export async function unlinkRequestInvoice(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const userId = req.user!.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
+
+  const input = invoiceUnlinkSchema.parse(req.body ?? {});
+  const request = await requestService.unlinkRequestFromInvoice(tenantId, requestId, userId, input);
+
+  res.json({
+    success: true,
+    data: request,
+    message: 'Request invoice linkage removed successfully',
   });
 }
 
@@ -299,19 +414,16 @@ export async function cancelRequest(req: Request, res: Response): Promise<void> 
 export async function addComment(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
-
-  if (!req.body.content) {
-    throw new ApiError('Comment content is required', 400, 'CONTENT_REQUIRED');
-  }
+  const requestId = requestIdParamSchema.parse(req.params).id;
+  const input = addCommentSchema.parse(req.body);
 
   const comment = await requestService.addComment(
     tenantId,
     requestId,
     userId,
-    req.body.content,
-    req.body.isInternal || false,
-    req.body.parentId
+    input.content,
+    input.isInternal || false,
+    input.parentId
   );
 
   res.status(201).json({
@@ -328,10 +440,10 @@ export async function addComment(req: Request, res: Response): Promise<void> {
 export async function getComments(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
 
   // TODO: Check if user is approver to show internal comments
-  const includeInternal = req.query.includeInternal === 'true';
+  const includeInternal = includeInternalCommentsSchema.parse(req.query).includeInternal === 'true';
 
   const comments = await requestService.getComments(tenantId, requestId, userId, includeInternal);
 
@@ -339,6 +451,50 @@ export async function getComments(req: Request, res: Response): Promise<void> {
     success: true,
     data: comments,
   });
+}
+
+/**
+ * Upload an attachment to a request
+ * POST /api/v1/requests/:id/attachments
+ */
+export async function uploadAttachment(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const userId = req.user!.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
+
+  if (!req.file) {
+    throw new ApiError('No file uploaded', 400, 'FILE_REQUIRED');
+  }
+
+  const attachment = await requestService.addAttachment(tenantId, requestId, userId, {
+    buffer: req.file.buffer,
+    mimetype: req.file.mimetype,
+    originalname: req.file.originalname,
+    size: req.file.size,
+  });
+
+  res.status(201).json({
+    success: true,
+    data: attachment,
+    message: 'Attachment uploaded successfully',
+  });
+}
+
+/**
+ * Download a request attachment
+ * GET /api/v1/requests/:id/attachments/:attachmentId/download
+ */
+export async function downloadAttachment(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const userId = req.user!.id;
+  const { id: requestId, attachmentId } = requestAttachmentParamSchema.parse(req.params);
+
+  const file = await requestService.downloadAttachment(tenantId, requestId, attachmentId, userId);
+  const safeFileName = file.filename.replace(/"/g, '');
+
+  res.setHeader('Content-Type', file.mimeType);
+  res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+  res.send(file.buffer);
 }
 
 // ============================================================================
@@ -465,7 +621,8 @@ export async function getRequestType(req: Request, res: Response): Promise<void>
 export async function getHistory(req: Request, res: Response): Promise<void> {
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
-  const requestId = req.params.id;
+  const requestId = requestIdParamSchema.parse(req.params).id;
+  const mode = (req.query.mode as string | undefined) === 'current-state' ? 'current-state' : 'as-was';
 
   // Use getRequest to check access and include history
   const request = await requestService.getRequest(tenantId, requestId, userId) as { history: unknown[] };
@@ -473,5 +630,9 @@ export async function getHistory(req: Request, res: Response): Promise<void> {
   res.json({
     success: true,
     data: request.history || [],
+    meta: {
+      mode,
+      defaultMode: 'as-was',
+    },
   });
 }

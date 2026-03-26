@@ -313,16 +313,14 @@ export async function setupAuth(
   credentials: LoginCredentials = testConfig.testUser,
 ): Promise<void> {
   const authManager = new AuthManager();
-  const session = await authManager.loginApi(request, credentials);
+  await authManager.loginApi(request, credentials);
   
-  const storageState = createStorageState(session, testConfig.baseURL);
-  
-  // Write storage state to file
+  // Persist the actual cookie state returned by the API instead of synthesizing it.
   const fs = await import('fs/promises');
   const path = await import('path');
   
   await fs.mkdir(path.dirname(storageStatePath), { recursive: true });
-  await fs.writeFile(storageStatePath, JSON.stringify(storageState, null, 2));
+  await request.storageState({ path: storageStatePath });
 }
 
 // ============================================================================

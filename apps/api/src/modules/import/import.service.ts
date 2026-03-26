@@ -211,7 +211,6 @@ export async function importResources(
         capacity: parseNumber(row.capacity) ?? 100,
         billRatePerHour: parseNumber(row.billRatePerHour),
         costPerHour: parseNumber(row.costPerHour),
-        benchSince: new Date(),
       };
 
       if (existing) {
@@ -223,6 +222,7 @@ export async function importResources(
         await prisma.resource.create({
           data: {
             ...resourceData,
+            benchSince: null,
             tenantId,
           } as unknown as Prisma.ResourceUncheckedCreateInput,
         });

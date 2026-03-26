@@ -103,7 +103,7 @@ export const createCurrency = async (req: Request, res: Response, next: NextFunc
     }
 
     const data = createCurrencySchema.parse(req.body);
-    const currency = await currencyService.createCurrency(tenantId, data);
+    const currency = await currencyService.createCurrency(tenantId, data, req.user?.id);
     res.status(201).json(currency);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -123,7 +123,7 @@ export const updateCurrency = async (req: Request, res: Response, next: NextFunc
     }
 
     const data = updateCurrencySchema.parse(req.body);
-    const currency = await currencyService.updateCurrency(tenantId, req.params.id, data);
+    const currency = await currencyService.updateCurrency(tenantId, req.params.id, data, req.user?.id);
     res.json(currency);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -142,11 +142,11 @@ export const deleteCurrency = async (req: Request, res: Response, next: NextFunc
       return;
     }
 
-    await currencyService.deleteCurrency(tenantId, req.params.id);
+    await currencyService.deleteCurrency(tenantId, req.params.id, req.user?.id);
     res.status(204).send();
   } catch (error) {
     if (error instanceof Error && error.message === 'Cannot delete base currency') {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ code: 'BASE_CURRENCY_ERROR', error: error.message });
       return;
     }
     next(error);
@@ -253,7 +253,7 @@ export const updateExchangeRate = async (req: Request, res: Response, next: Next
     }
 
     const data = updateExchangeRateSchema.parse(req.body);
-    const rate = await exchangeRateService.updateExchangeRate(tenantId, req.params.id, data);
+    const rate = await exchangeRateService.updateExchangeRate(tenantId, req.params.id, data, req.user?.id);
     res.json(rate);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -266,7 +266,13 @@ export const updateExchangeRate = async (req: Request, res: Response, next: Next
 
 export const deleteExchangeRate = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await exchangeRateService.deleteExchangeRate(req.params.id);
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    await exchangeRateService.deleteExchangeRate(tenantId, req.params.id, req.user?.id);
     res.status(204).send();
   } catch (error) {
     next(error);

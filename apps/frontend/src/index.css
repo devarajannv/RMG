@@ -170,4 +170,25 @@
     background-size: 200% 200%;
     animation: gradient-shift 5s ease infinite;
   }
+
+  /* Dialog shake animation for preventDismiss backdrop clicks */
+  @keyframes dialog-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(2px); }
+  }
+
+  .animate-dialog-shake {
+    animation: dialog-shake 0.3s ease-in-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-dialog-shake {
+      animation: none;
+      outline: 2px solid hsl(var(--secondary));
+      outline-offset: 2px;
+    }
+  }
 }

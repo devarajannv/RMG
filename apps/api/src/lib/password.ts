@@ -1,4 +1,6 @@
 import argon2 from 'argon2';
+import { prisma } from './prisma';
+import { logger } from './logger';
 
 /**
  * Argon2 configuration following OWASP recommendations
@@ -11,6 +13,9 @@ const ARGON2_OPTIONS: argon2.Options = {
   parallelism: 4, // Degree of parallelism
   hashLength: 32, // Output hash length
 };
+
+/** C-12: Number of previous passwords to check against */
+const PASSWORD_HISTORY_COUNT = 5;
 
 /**
  * Hash a password using Argon2id
@@ -28,9 +33,55 @@ export async function verifyPassword(
 ): Promise<boolean> {
   try {
     return await argon2.verify(hash, password);
-  } catch {
-    // Invalid hash format or verification error
+  } catch (error) {
+    // M-21: Log verification errors instead of silently swallowing
+    logger.error('Password verification error — possible corrupted hash', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      hashLength: hash?.length,
+    });
     return false;
+  }
+}
+
+/**
+ * C-12: Check if a password has been used before by the user
+ * Checks against the last N password hashes
+ */
+export async function isPasswordReused(userId: string, newPassword: string): Promise<boolean> {
+  const history = await prisma.passwordHistory.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: PASSWORD_HISTORY_COUNT,
+    select: { passwordHash: true },
+  });
+
+  for (const entry of history) {
+    const match = await verifyPassword(entry.passwordHash, newPassword);
+    if (match) return true;
+  }
+  return false;
+}
+
+/**
+ * C-12: Record a password hash in the user's password history
+ */
+export async function recordPasswordHistory(userId: string, passwordHash: string): Promise<void> {
+  await prisma.passwordHistory.create({
+    data: { userId, passwordHash },
+  });
+
+  // Prune old entries beyond the history count
+  const entries = await prisma.passwordHistory.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  });
+
+  if (entries.length > PASSWORD_HISTORY_COUNT) {
+    const idsToDelete = entries.slice(PASSWORD_HISTORY_COUNT).map((e) => e.id);
+    await prisma.passwordHistory.deleteMany({
+      where: { id: { in: idsToDelete } },
+    });
   }
 }
 
@@ -94,11 +145,11 @@ export function validatePasswordStrength(password: string): string[] {
 export function generateSecureToken(length = 32): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const crypto = require('crypto');
-  const randomBytes = crypto.randomBytes(length);
   let result = '';
   
+  // L-13: Use crypto.randomInt to avoid modulo bias
   for (let i = 0; i < length; i++) {
-    result += chars[randomBytes[i] % chars.length];
+    result += chars[crypto.randomInt(chars.length)];
   }
   
   return result;

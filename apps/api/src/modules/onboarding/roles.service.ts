@@ -208,9 +208,18 @@ export async function assignRoleToResource(
   resourceId: string,
   businessRoleId: string,
   assignedBy: string,
-  isPrimary: boolean = false
+  isPrimary: boolean = false,
+  tenantId?: string
 ) {
   logger.info('Assigning role to resource', { resourceId, businessRoleId });
+
+  // Verify resource belongs to tenant
+  if (tenantId) {
+    const resource = await prisma.resource.findFirst({ where: { id: resourceId, tenantId } });
+    if (!resource) {
+      throw new Error('Resource not found in tenant');
+    }
+  }
   
   const effectiveFrom = new Date();
   
@@ -242,8 +251,16 @@ export async function assignRoleToResource(
 /**
  * Remove role from resource
  */
-export async function removeRoleFromResource(resourceId: string, businessRoleId: string) {
+export async function removeRoleFromResource(resourceId: string, businessRoleId: string, tenantId?: string) {
   logger.info('Removing role from resource', { resourceId, businessRoleId });
+
+  // Verify resource belongs to tenant
+  if (tenantId) {
+    const resource = await prisma.resource.findFirst({ where: { id: resourceId, tenantId } });
+    if (!resource) {
+      throw new Error('Resource not found in tenant');
+    }
+  }
   
   await prisma.resourceBusinessRole.deleteMany({
     where: {

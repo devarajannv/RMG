@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-rmgaas_staging}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-staging_password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Staging database password required}
       POSTGRES_DB: ${DB_NAME:-rmgaas_staging}
     ports:
       - '5433:5432'  # Different port for staging
@@ -40,13 +40,13 @@ services:
     image: redis:7-alpine
     container_name: rmgaas-redis-staging
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?Staging Redis password required}
     ports:
       - '6380:6379'  # Different port for staging
     volumes:
       - redis_staging_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -72,11 +72,11 @@ services:
     environment:
       NODE_ENV: staging
       PORT: 4000
-      DATABASE_URL: postgresql://${DB_USER:-rmgaas_staging}:${DB_PASSWORD:-staging_password}@postgres:5432/${DB_NAME:-rmgaas_staging}?schema=public
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-staging-jwt-secret-change-in-production-32chars}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-staging-jwt-refresh-secret-32chars}
-      COOKIE_SECRET: ${COOKIE_SECRET:-staging-cookie-secret-change-prod-32char}
+      DATABASE_URL: postgresql://${DB_USER:-rmgaas_staging}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-rmgaas_staging}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?Staging JWT secret required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Staging JWT refresh secret required}
+      COOKIE_SECRET: ${COOKIE_SECRET:?Staging cookie secret required}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,https://staging.rmgaas.newvision.in}
       LOG_LEVEL: debug
       # Enable debug features

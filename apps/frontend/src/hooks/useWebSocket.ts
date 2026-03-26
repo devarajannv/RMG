@@ -103,13 +103,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   
   const { accessToken, isAuthenticated } = useAuthStore();
 
-  // Get WebSocket URL
+  // Get WebSocket URL — C-08: No token in URL query string
   const getWsUrl = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const host = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    return `${protocol}//${host}/ws?token=${accessToken}`;
-  }, [accessToken]);
+    return `${protocol}//${host}/ws`;
+  }, []);
 
   // Connect to WebSocket
   const connect = useCallback(() => {
@@ -128,7 +128,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('[WebSocket] Connected');
+        console.log('[WebSocket] Connected, sending auth...');
+        // C-08: Send auth token via message instead of URL query
+        ws.send(JSON.stringify({ type: 'auth', payload: { token: accessToken } }));
         setConnectionState('connected');
         reconnectCountRef.current = 0;
         onConnected?.();

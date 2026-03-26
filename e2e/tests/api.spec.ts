@@ -52,15 +52,15 @@ test.describe('API Endpoints', () => {
       expect([400, 401]).toContain(response.status());
     });
 
-    test('API-004: should refresh token', async ({ apiHelper }) => {
-      const response = await apiHelper.request.post('/api/auth/refresh');
+    test('API-004: should refresh token', async ({ api }) => {
+      const response = await api.request.post('/api/auth/refresh');
       
       // May require refresh token in body
       expect([200, 400, 401]).toContain(response.status());
     });
 
-    test('API-005: should get current user', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/users/me');
+    test('API-005: should get current user', async ({ api }) => {
+      const response = await api.request.get('/api/users/me');
       
       expect(response.status()).toBe(200);
       
@@ -75,8 +75,8 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Resources API', () => {
-    test('API-006: should list resources', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/resources');
+    test('API-006: should list resources', async ({ api }) => {
+      const response = await api.request.get('/api/resources');
       
       expect(response.status()).toBe(200);
       
@@ -84,8 +84,8 @@ test.describe('API Endpoints', () => {
       expect(Array.isArray(body.data || body)).toBe(true);
     });
 
-    test('API-007: should filter resources', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/resources', {
+    test('API-007: should filter resources', async ({ api }) => {
+      const response = await api.request.get('/api/resources', {
         params: {
           status: 'ACTIVE',
           limit: 10,
@@ -95,8 +95,8 @@ test.describe('API Endpoints', () => {
       expect(response.status()).toBe(200);
     });
 
-    test('API-008: should paginate resources', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/resources', {
+    test('API-008: should paginate resources', async ({ api }) => {
+      const response = await api.request.get('/api/resources', {
         params: {
           page: 1,
           limit: 5,
@@ -110,15 +110,15 @@ test.describe('API Endpoints', () => {
       expect(body).toHaveProperty('data');
     });
 
-    test('API-009: should get single resource', async ({ apiHelper }) => {
+    test('API-009: should get single resource', async ({ api }) => {
       // First get a resource ID
-      const listResponse = await apiHelper.request.get('/api/resources?limit=1');
+      const listResponse = await api.request.get('/api/resources?limit=1');
       const resources = await listResponse.json();
       
       if (resources.data?.length > 0 || resources.length > 0) {
         const resourceId = resources.data?.[0]?.id || resources[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/resources/${resourceId}`);
+        const response = await api.request.get(`/api/resources/${resourceId}`);
         expect(response.status()).toBe(200);
         
         const resource = await response.json();
@@ -126,10 +126,10 @@ test.describe('API Endpoints', () => {
       }
     });
 
-    test('API-010: should create resource', async ({ apiHelper, testData }) => {
+    test('API-010: should create resource', async ({ api, testData }) => {
       const resource = testData.resource();
       
-      const response = await apiHelper.request.post('/api/resources', {
+      const response = await api.request.post('/api/resources', {
         data: resource,
       });
       
@@ -140,14 +140,14 @@ test.describe('API Endpoints', () => {
       expect(created).toHaveProperty('id');
     });
 
-    test('API-011: should update resource', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/resources?limit=1');
+    test('API-011: should update resource', async ({ api }) => {
+      const listResponse = await api.request.get('/api/resources?limit=1');
       const resources = await listResponse.json();
       
       if (resources.data?.length > 0 || resources.length > 0) {
         const resourceId = resources.data?.[0]?.id || resources[0]?.id;
         
-        const response = await apiHelper.request.patch(`/api/resources/${resourceId}`, {
+        const response = await api.request.patch(`/api/resources/${resourceId}`, {
           data: {
             status: 'ACTIVE',
           },
@@ -157,8 +157,8 @@ test.describe('API Endpoints', () => {
       }
     });
 
-    test('API-012: should validate resource creation', async ({ apiHelper }) => {
-      const response = await apiHelper.request.post('/api/resources', {
+    test('API-012: should validate resource creation', async ({ api }) => {
+      const response = await api.request.post('/api/resources', {
         data: {
           // Missing required fields
         },
@@ -167,8 +167,8 @@ test.describe('API Endpoints', () => {
       expect([400, 422]).toContain(response.status());
     });
 
-    test('API-013: should search resources', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/resources/search', {
+    test('API-013: should search resources', async ({ api }) => {
+      const response = await api.request.get('/api/resources/search', {
         params: {
           query: 'test',
         },
@@ -184,8 +184,8 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Projects API', () => {
-    test('API-014: should list projects', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/projects');
+    test('API-014: should list projects', async ({ api }) => {
+      const response = await api.request.get('/api/projects');
       
       expect(response.status()).toBe(200);
       
@@ -193,36 +193,36 @@ test.describe('API Endpoints', () => {
       expect(Array.isArray(body.data || body)).toBe(true);
     });
 
-    test('API-015: should get single project', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/projects?limit=1');
+    test('API-015: should get single project', async ({ api }) => {
+      const listResponse = await api.request.get('/api/projects?limit=1');
       const projects = await listResponse.json();
       
       if (projects.data?.length > 0 || projects.length > 0) {
         const projectId = projects.data?.[0]?.id || projects[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/projects/${projectId}`);
+        const response = await api.request.get(`/api/projects/${projectId}`);
         expect(response.status()).toBe(200);
       }
     });
 
-    test('API-016: should create project', async ({ apiHelper, testData }) => {
+    test('API-016: should create project', async ({ api, testData }) => {
       const project = testData.project();
       
-      const response = await apiHelper.request.post('/api/projects', {
+      const response = await api.request.post('/api/projects', {
         data: project,
       });
       
       expect([200, 201]).toContain(response.status());
     });
 
-    test('API-017: should update project', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/projects?limit=1');
+    test('API-017: should update project', async ({ api }) => {
+      const listResponse = await api.request.get('/api/projects?limit=1');
       const projects = await listResponse.json();
       
       if (projects.data?.length > 0 || projects.length > 0) {
         const projectId = projects.data?.[0]?.id || projects[0]?.id;
         
-        const response = await apiHelper.request.patch(`/api/projects/${projectId}`, {
+        const response = await api.request.patch(`/api/projects/${projectId}`, {
           data: {
             status: 'ACTIVE',
           },
@@ -232,14 +232,14 @@ test.describe('API Endpoints', () => {
       }
     });
 
-    test('API-018: should get project team', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/projects?limit=1');
+    test('API-018: should get project team', async ({ api }) => {
+      const listResponse = await api.request.get('/api/projects?limit=1');
       const projects = await listResponse.json();
       
       if (projects.data?.length > 0 || projects.length > 0) {
         const projectId = projects.data?.[0]?.id || projects[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/projects/${projectId}/team`);
+        const response = await api.request.get(`/api/projects/${projectId}/team`);
         
         // Team endpoint may or may not exist
         expect([200, 404]).toContain(response.status());
@@ -252,8 +252,8 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Requests API', () => {
-    test('API-019: should list requests', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/requests');
+    test('API-019: should list requests', async ({ api }) => {
+      const response = await api.request.get('/api/requests');
       
       expect(response.status()).toBe(200);
       
@@ -261,50 +261,50 @@ test.describe('API Endpoints', () => {
       expect(Array.isArray(body.data || body)).toBe(true);
     });
 
-    test('API-020: should create request', async ({ apiHelper, testData }) => {
+    test('API-020: should create request', async ({ api, testData }) => {
       const request = testData.request();
       
-      const response = await apiHelper.request.post('/api/requests', {
+      const response = await api.request.post('/api/requests', {
         data: request,
       });
       
       expect([200, 201]).toContain(response.status());
     });
 
-    test('API-021: should get request by ID', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/requests?limit=1');
+    test('API-021: should get request by ID', async ({ api }) => {
+      const listResponse = await api.request.get('/api/requests?limit=1');
       const requests = await listResponse.json();
       
       if (requests.data?.length > 0 || requests.length > 0) {
         const requestId = requests.data?.[0]?.id || requests[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/requests/${requestId}`);
+        const response = await api.request.get(`/api/requests/${requestId}`);
         expect(response.status()).toBe(200);
       }
     });
 
-    test('API-022: should submit request', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/requests?status=DRAFT&limit=1');
+    test('API-022: should submit request', async ({ api }) => {
+      const listResponse = await api.request.get('/api/requests?status=DRAFT&limit=1');
       const requests = await listResponse.json();
       
       if (requests.data?.length > 0 || requests.length > 0) {
         const requestId = requests.data?.[0]?.id || requests[0]?.id;
         
-        const response = await apiHelper.request.post(`/api/requests/${requestId}/submit`);
+        const response = await api.request.post(`/api/requests/${requestId}/submit`);
         
         // Submit endpoint may or may not exist
         expect([200, 201, 404]).toContain(response.status());
       }
     });
 
-    test('API-023: should approve request', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/requests?status=PENDING&limit=1');
+    test('API-023: should approve request', async ({ api }) => {
+      const listResponse = await api.request.get('/api/requests?status=PENDING&limit=1');
       const requests = await listResponse.json();
       
       if (requests.data?.length > 0 || requests.length > 0) {
         const requestId = requests.data?.[0]?.id || requests[0]?.id;
         
-        const response = await apiHelper.request.post(`/api/requests/${requestId}/approve`, {
+        const response = await api.request.post(`/api/requests/${requestId}/approve`, {
           data: {
             comment: 'E2E Test Approval',
           },
@@ -315,14 +315,14 @@ test.describe('API Endpoints', () => {
       }
     });
 
-    test('API-024: should reject request', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/requests?status=PENDING&limit=1');
+    test('API-024: should reject request', async ({ api }) => {
+      const listResponse = await api.request.get('/api/requests?status=PENDING&limit=1');
       const requests = await listResponse.json();
       
       if (requests.data?.length > 0 || requests.length > 0) {
         const requestId = requests.data?.[0]?.id || requests[0]?.id;
         
-        const response = await apiHelper.request.post(`/api/requests/${requestId}/reject`, {
+        const response = await api.request.post(`/api/requests/${requestId}/reject`, {
           data: {
             reason: 'E2E Test Rejection',
           },
@@ -333,8 +333,8 @@ test.describe('API Endpoints', () => {
       }
     });
 
-    test('API-025: should get pending approvals', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/requests/pending');
+    test('API-025: should get pending approvals', async ({ api }) => {
+      const response = await api.request.get('/api/requests/pending');
       
       // Pending endpoint may or may not exist
       expect([200, 404]).toContain(response.status());
@@ -346,56 +346,56 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Contracts API', () => {
-    test('API-026: should list contracts', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/contracts');
+    test('API-026: should list contracts', async ({ api }) => {
+      const response = await api.request.get('/api/contracts');
       
       expect(response.status()).toBe(200);
     });
 
-    test('API-027: should create contract', async ({ apiHelper, testData }) => {
+    test('API-027: should create contract', async ({ api, testData }) => {
       const contract = testData.contract();
       
-      const response = await apiHelper.request.post('/api/contracts', {
+      const response = await api.request.post('/api/contracts', {
         data: contract,
       });
       
       expect([200, 201]).toContain(response.status());
     });
 
-    test('API-028: should get contract by ID', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/contracts?limit=1');
+    test('API-028: should get contract by ID', async ({ api }) => {
+      const listResponse = await api.request.get('/api/contracts?limit=1');
       const contracts = await listResponse.json();
       
       if (contracts.data?.length > 0 || contracts.length > 0) {
         const contractId = contracts.data?.[0]?.id || contracts[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/contracts/${contractId}`);
+        const response = await api.request.get(`/api/contracts/${contractId}`);
         expect(response.status()).toBe(200);
       }
     });
 
-    test('API-029: should get contract milestones', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/contracts?limit=1');
+    test('API-029: should get contract milestones', async ({ api }) => {
+      const listResponse = await api.request.get('/api/contracts?limit=1');
       const contracts = await listResponse.json();
       
       if (contracts.data?.length > 0 || contracts.length > 0) {
         const contractId = contracts.data?.[0]?.id || contracts[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/contracts/${contractId}/milestones`);
+        const response = await api.request.get(`/api/contracts/${contractId}/milestones`);
         
         // Milestones endpoint may or may not exist
         expect([200, 404]).toContain(response.status());
       }
     });
 
-    test('API-030: should get contract documents', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/contracts?limit=1');
+    test('API-030: should get contract documents', async ({ api }) => {
+      const listResponse = await api.request.get('/api/contracts?limit=1');
       const contracts = await listResponse.json();
       
       if (contracts.data?.length > 0 || contracts.length > 0) {
         const contractId = contracts.data?.[0]?.id || contracts[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/contracts/${contractId}/documents`);
+        const response = await api.request.get(`/api/contracts/${contractId}/documents`);
         
         // Documents endpoint may or may not exist
         expect([200, 404]).toContain(response.status());
@@ -408,16 +408,16 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Allocations API', () => {
-    test('API-031: should list allocations', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/allocations');
+    test('API-031: should list allocations', async ({ api }) => {
+      const response = await api.request.get('/api/allocations');
       
       expect(response.status()).toBe(200);
     });
 
-    test('API-032: should create allocation', async ({ apiHelper }) => {
+    test('API-032: should create allocation', async ({ api }) => {
       // First get a resource and project
-      const resourcesResponse = await apiHelper.request.get('/api/resources?limit=1');
-      const projectsResponse = await apiHelper.request.get('/api/projects?limit=1');
+      const resourcesResponse = await api.request.get('/api/resources?limit=1');
+      const projectsResponse = await api.request.get('/api/projects?limit=1');
       
       const resources = await resourcesResponse.json();
       const projects = await projectsResponse.json();
@@ -426,7 +426,7 @@ test.describe('API Endpoints', () => {
         const resourceId = resources.data?.[0]?.id || resources[0]?.id;
         const projectId = projects.data?.[0]?.id || projects[0]?.id;
         
-        const response = await apiHelper.request.post('/api/allocations', {
+        const response = await api.request.post('/api/allocations', {
           data: {
             resourceId,
             projectId,
@@ -440,14 +440,14 @@ test.describe('API Endpoints', () => {
       }
     });
 
-    test('API-033: should get resource allocations', async ({ apiHelper }) => {
-      const resourcesResponse = await apiHelper.request.get('/api/resources?limit=1');
+    test('API-033: should get resource allocations', async ({ api }) => {
+      const resourcesResponse = await api.request.get('/api/resources?limit=1');
       const resources = await resourcesResponse.json();
       
       if (resources.data?.length || resources.length) {
         const resourceId = resources.data?.[0]?.id || resources[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/resources/${resourceId}/allocations`);
+        const response = await api.request.get(`/api/resources/${resourceId}/allocations`);
         
         expect([200, 404]).toContain(response.status());
       }
@@ -459,22 +459,22 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Dashboard API', () => {
-    test('API-034: should get dashboard stats', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/dashboard/stats');
+    test('API-034: should get dashboard stats', async ({ api }) => {
+      const response = await api.request.get('/api/dashboard/stats');
       
       // Dashboard endpoint may or may not exist
       expect([200, 404]).toContain(response.status());
     });
 
-    test('API-035: should get pending tasks', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/dashboard/pending');
+    test('API-035: should get pending tasks', async ({ api }) => {
+      const response = await api.request.get('/api/dashboard/pending');
       
       // Pending tasks endpoint may or may not exist
       expect([200, 404]).toContain(response.status());
     });
 
-    test('API-036: should get recent activity', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/dashboard/activity');
+    test('API-036: should get recent activity', async ({ api }) => {
+      const response = await api.request.get('/api/dashboard/activity');
       
       // Activity endpoint may or may not exist
       expect([200, 404]).toContain(response.status());
@@ -486,14 +486,14 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Clients API', () => {
-    test('API-037: should list clients', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/clients');
+    test('API-037: should list clients', async ({ api }) => {
+      const response = await api.request.get('/api/clients');
       
       expect(response.status()).toBe(200);
     });
 
-    test('API-038: should create client', async ({ apiHelper }) => {
-      const response = await apiHelper.request.post('/api/clients', {
+    test('API-038: should create client', async ({ api }) => {
+      const response = await api.request.post('/api/clients', {
         data: {
           name: `E2E Test Client ${Date.now()}`,
           code: `E2E${Date.now()}`,
@@ -503,14 +503,14 @@ test.describe('API Endpoints', () => {
       expect([200, 201]).toContain(response.status());
     });
 
-    test('API-039: should get client by ID', async ({ apiHelper }) => {
-      const listResponse = await apiHelper.request.get('/api/clients?limit=1');
+    test('API-039: should get client by ID', async ({ api }) => {
+      const listResponse = await api.request.get('/api/clients?limit=1');
       const clients = await listResponse.json();
       
       if (clients.data?.length || clients.length) {
         const clientId = clients.data?.[0]?.id || clients[0]?.id;
         
-        const response = await apiHelper.request.get(`/api/clients/${clientId}`);
+        const response = await api.request.get(`/api/clients/${clientId}`);
         expect(response.status()).toBe(200);
       }
     });
@@ -521,14 +521,14 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Error Handling', () => {
-    test('API-040: should return 404 for non-existent resource', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/resources/non-existent-id-12345');
+    test('API-040: should return 404 for non-existent resource', async ({ api }) => {
+      const response = await api.request.get('/api/resources/non-existent-id-12345');
       
       expect([400, 404]).toContain(response.status());
     });
 
-    test('API-041: should return proper error format', async ({ apiHelper }) => {
-      const response = await apiHelper.request.get('/api/resources/invalid');
+    test('API-041: should return proper error format', async ({ api }) => {
+      const response = await api.request.get('/api/resources/invalid');
       
       if (response.status() >= 400) {
         const body = await response.json();
@@ -538,8 +538,8 @@ test.describe('API Endpoints', () => {
       }
     });
 
-    test('API-042: should validate request body', async ({ apiHelper }) => {
-      const response = await apiHelper.request.post('/api/resources', {
+    test('API-042: should validate request body', async ({ api }) => {
+      const response = await api.request.post('/api/resources', {
         data: {
           invalidField: 'value',
         },
@@ -548,8 +548,8 @@ test.describe('API Endpoints', () => {
       expect([400, 422]).toContain(response.status());
     });
 
-    test('API-043: should handle malformed JSON', async ({ apiHelper }) => {
-      const response = await apiHelper.request.post('/api/resources', {
+    test('API-043: should handle malformed JSON', async ({ api }) => {
+      const response = await api.request.post('/api/resources', {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -565,27 +565,27 @@ test.describe('API Endpoints', () => {
   // ========================================================================
   
   test.describe('Performance', () => {
-    test('API-044: should respond within 1 second for list endpoints', async ({ apiHelper }) => {
+    test('API-044: should respond within 1 second for list endpoints', async ({ api }) => {
       const startTime = Date.now();
       
-      await apiHelper.request.get('/api/resources?limit=10');
+      await api.request.get('/api/resources?limit=10');
       
       const responseTime = Date.now() - startTime;
       expect(responseTime).toBeLessThan(1000);
     });
 
-    test('API-045: should handle pagination efficiently', async ({ apiHelper }) => {
+    test('API-045: should handle pagination efficiently', async ({ api }) => {
       const startTime = Date.now();
       
-      await apiHelper.request.get('/api/resources?page=1&limit=100');
+      await api.request.get('/api/resources?page=1&limit=100');
       
       const responseTime = Date.now() - startTime;
       expect(responseTime).toBeLessThan(2000);
     });
 
-    test('API-046: should handle concurrent requests', async ({ apiHelper }) => {
+    test('API-046: should handle concurrent requests', async ({ api }) => {
       const requests = Array(5).fill(null).map(() =>
-        apiHelper.request.get('/api/resources?limit=10')
+        api.request.get('/api/resources?limit=10')
       );
       
       const responses = await Promise.all(requests);

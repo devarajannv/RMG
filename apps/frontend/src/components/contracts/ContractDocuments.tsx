@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { safeWindowOpen } from '@/lib/url-validator';
 import { Can } from '@/components/permissions';
 
 // ============================================================================
@@ -288,7 +289,7 @@ function DocumentCard({ document, onPreview, onDownload, onDelete, readOnly }: D
               <Download className="h-4 w-4 mr-2" />
               Download
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => window.open(document.url, '_blank')}>
+            <DropdownMenuItem onClick={() => safeWindowOpen(document.url)}>
               <ExternalLink className="h-4 w-4 mr-2" />
               Open in New Tab
             </DropdownMenuItem>
@@ -354,7 +355,7 @@ function UploadDialog({ isOpen, onClose, files, onUpload, isUploading }: UploadD
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" preventDismiss>
         <DialogHeader>
           <DialogTitle>Upload Documents</DialogTitle>
         </DialogHeader>
@@ -487,7 +488,7 @@ function PreviewDialog({ isOpen, onClose, document }: PreviewDialogProps) {
               <p className="mt-4 text-gray-600">Preview not available for this file type</p>
               <Button
                 className="mt-4"
-                onClick={() => window.open(document.url, '_blank')}
+                onClick={() => safeWindowOpen(document.url)}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open in New Tab
@@ -499,7 +500,7 @@ function PreviewDialog({ isOpen, onClose, document }: PreviewDialogProps) {
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-          <Button onClick={() => window.open(document.url, '_blank')}>
+          <Button onClick={() => safeWindowOpen(document.url)}>
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>

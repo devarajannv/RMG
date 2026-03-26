@@ -651,49 +651,50 @@ export async function quickAllocateFromBench(
     throw new ApiError('Project not found or not active', 404, 'PROJECT_NOT_FOUND');
   }
 
-  // Create allocation
-  const allocation = await prisma.allocation.create({
-    data: {
-      tenantId,
-      resourceId: input.resourceId,
-      projectId: input.projectId,
-      role: input.role,
-      percentage: input.percentage,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      isBillable: input.isBillable ?? true,
-      status: 'CONFIRMED',
-      confirmedAt: new Date(),
-      notes: input.notes,
-    },
-    include: {
-      resource: { select: { id: true, firstName: true, lastName: true, employeeId: true } },
-      project: { select: { id: true, name: true, code: true } },
-    },
-  });
-
-  // Update resource bench status if fully allocated
-  const newTotalAllocation = currentAllocation + input.percentage;
-  if (newTotalAllocation >= resource.capacity) {
-    await prisma.resource.update({
-      where: { id: input.resourceId },
-      data: { benchSince: null, lastAllocatedAt: new Date() },
-    });
-  }
-
-  // Audit log
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId,
-      entityType: 'Allocation',
-      entityId: allocation.id,
-      action: 'CREATE',
-      changes: {
-        type: 'QUICK_ALLOCATION_FROM_BENCH',
-        ...input,
+  const allocation = await prisma.$transaction(async (tx) => {
+    const createdAllocation = await tx.allocation.create({
+      data: {
+        tenantId,
+        resourceId: input.resourceId,
+        projectId: input.projectId,
+        role: input.role,
+        percentage: input.percentage,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        isBillable: input.isBillable ?? true,
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+        notes: input.notes,
       },
-    },
+      include: {
+        resource: { select: { id: true, firstName: true, lastName: true, employeeId: true } },
+        project: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    const newTotalAllocation = currentAllocation + input.percentage;
+    if (newTotalAllocation >= resource.capacity) {
+      await tx.resource.update({
+        where: { id: input.resourceId },
+        data: { benchSince: null, lastAllocatedAt: new Date() },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        entityType: 'Allocation',
+        entityId: createdAllocation.id,
+        action: 'CREATE',
+        changes: {
+          type: 'QUICK_ALLOCATION_FROM_BENCH',
+          ...input,
+        },
+      },
+    });
+
+    return createdAllocation;
   });
 
   logger.info('Quick allocation created from bench', {

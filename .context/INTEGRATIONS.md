@@ -72,6 +72,7 @@ RMGaaS operates in an ecosystem of enterprise systems. This document defines:
 - Active but **partially subscribed** (cost reasons)
 - Core employee data available
 - Some modules not subscribed
+- Current implementation scope: unidirectional only for Phase 1, from PeopleStrong into RMGaaS
 
 ### Data We Need FROM PeopleStrong
 
@@ -86,6 +87,8 @@ RMGaaS operates in an ecosystem of enterprise systems. This document defines:
 
 ### Data We Provide TO PeopleStrong
 
+Status: deferred. Not part of the current implementation scope.
+
 | Data | Purpose |
 |------|---------|
 | Allocation Status | Workforce dashboard |
@@ -96,13 +99,18 @@ RMGaaS operates in an ecosystem of enterprise systems. This document defines:
 ### Integration Method
 
 ```
-PeopleStrong ←→ RMGaaS
+PeopleStrong → RMGaaS
          │
          ├── REST API (if available)
          ├── Webhook (for real-time events)
          ├── SFTP (for batch files)
          └── Manual Import (fallback)
 ```
+
+Phase 1 scope:
+
+- PeopleStrong sends employee master and lifecycle changes into RMGaaS
+- RMGaaS does not push data back to PeopleStrong yet
 
 ---
 

@@ -3,17 +3,25 @@
  * Manages request type CRUD operations including tenant-specific custom types
  */
 
-import { Prisma, RequestCategory, Priority, SlaCalculationType, RequestVisibility, RollbackPermission } from '@prisma/client';
+import {
+  Prisma,
+  RequestCategory,
+  Priority,
+  SlaCalculationType,
+  RequestVisibility,
+  RollbackPermission,
+} from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
+import { parseRequestBlueprintDefinition } from './request-blueprint.schemas';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface CreateRequestTypeInput {
-  code: string;
+  code?: string;
   name: string;
   description?: string;
   category: RequestCategory;
@@ -82,6 +90,456 @@ export interface RequestTypeListOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
+export interface RequestBlueprintListOptions {
+  onlyActivated?: boolean;
+}
+
+type PackActivationRecord = {
+  id: string;
+  tenantId: string;
+  status: string;
+  activatedAt: Date;
+  activatedByUserId: string | null;
+};
+
+type RequestTypeRecord = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  category: RequestCategory;
+  defaultPriority: Priority;
+  requiresApproval: boolean;
+  allowDraft: boolean;
+  allowAttachments: boolean;
+  visibilityScope: RequestVisibility;
+  isSystemType: boolean;
+  tenantId: string | null;
+};
+
+type RequestBlueprintWithRelations = {
+  id: string;
+  code: string;
+  schemaVersion: string;
+  name: string;
+  description: string | null;
+  domain: string;
+  category: string;
+  icon: string | null;
+  version: number;
+  isSystemBlueprint: boolean;
+  maturityLevel: string;
+  renderMode: string;
+  complexityLevel: string;
+  allowDraft: boolean;
+  allowSubmit: boolean;
+  allowEditAfterReturn: boolean;
+  allowAttachments: boolean;
+  maxAttachments: number | null;
+  maxAttachmentSizeMb: number | null;
+  commonFields: Prisma.JsonValue;
+  entityBindings: Prisma.JsonValue;
+  customFields: Prisma.JsonValue;
+  dependencyRules: Prisma.JsonValue;
+  workflowPolicy: Prisma.JsonValue;
+  overridePolicy: Prisma.JsonValue;
+  requestType: RequestTypeRecord | null;
+  packs: Array<{
+    sortOrder: number;
+    isRequired: boolean;
+    pack: {
+      code: string;
+      name: string;
+      activations: PackActivationRecord[];
+    };
+  }>;
+};
+
+type RequestPackWithRelations = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  domain: string;
+  maturityLevel: string;
+  isActive: boolean;
+  sortOrder: number;
+  iconName: string | null;
+  activationDependencies: Prisma.JsonValue;
+  recommendedOrgProfiles: string[];
+  activations: PackActivationRecord[];
+  blueprints: Array<{
+    sortOrder: number;
+    isRequired: boolean;
+    blueprint: RequestBlueprintWithRelations;
+  }>;
+};
+
+const prismaClient = prisma as typeof prisma & {
+  requestPack: {
+    findMany: (args: unknown) => Promise<RequestPackWithRelations[]>;
+    findFirst: (args: unknown) => Promise<RequestPackWithRelations | null>;
+  };
+  requestBlueprint: {
+    findMany: (args: unknown) => Promise<RequestBlueprintWithRelations[]>;
+    findFirst: (args: unknown) => Promise<RequestBlueprintWithRelations | null>;
+  };
+};
+
+function buildBlueprintDefinition(blueprint: RequestBlueprintWithRelations) {
+  const packCodes = blueprint.packs.map((membership: RequestBlueprintWithRelations['packs'][number]) => membership.pack.code);
+
+  return parseRequestBlueprintDefinition({
+    schemaVersion: blueprint.schemaVersion,
+    identity: {
+      code: blueprint.code,
+      name: blueprint.name,
+      description: blueprint.description ?? undefined,
+      domain: blueprint.domain,
+      category: blueprint.category,
+      icon: blueprint.icon ?? undefined,
+      version: blueprint.version,
+      isSystemBlueprint: blueprint.isSystemBlueprint,
+      packCode: packCodes.length === 1 ? packCodes[0] : undefined,
+      maturityLevel: blueprint.maturityLevel,
+    },
+    runtime: {
+      renderMode: blueprint.renderMode,
+      complexityLevel: blueprint.complexityLevel,
+      allowDraft: blueprint.allowDraft,
+      allowSubmit: blueprint.allowSubmit,
+      allowEditAfterReturn: blueprint.allowEditAfterReturn,
+      allowAttachments: blueprint.allowAttachments,
+      maxAttachments: blueprint.maxAttachments ?? undefined,
+      maxAttachmentSizeMb: blueprint.maxAttachmentSizeMb ?? undefined,
+    },
+    commonFields: blueprint.commonFields,
+    entityBindings: blueprint.entityBindings,
+    customFields: blueprint.customFields,
+    dependencyRules: blueprint.dependencyRules,
+    workflowPolicy: blueprint.workflowPolicy,
+    overridePolicy: blueprint.overridePolicy,
+  });
+}
+
+function mapPackActivation(activation: PackActivationRecord | undefined) {
+  if (!activation) {
+    return null;
+  }
+
+  return {
+    id: activation.id,
+    status: activation.status,
+    activatedAt: activation.activatedAt,
+    activatedByUserId: activation.activatedByUserId,
+  };
+}
+
+function mapBlueprintSummary(
+  blueprint: any,
+  tenantId: string
+) {
+  if (!blueprint) {
+    return null;
+  }
+
+  const packMemberships = blueprint.packs.map((membership: any) => {
+    const activation = membership.pack.activations.find((item: PackActivationRecord) => item.tenantId === tenantId);
+
+    return {
+      packCode: membership.pack.code,
+      packName: membership.pack.name,
+      sortOrder: membership.sortOrder,
+      isRequired: membership.isRequired,
+      activation: mapPackActivation(activation),
+    };
+  });
+
+  return {
+    id: blueprint.id,
+    code: blueprint.code,
+    schemaVersion: blueprint.schemaVersion,
+    version: blueprint.version,
+    renderMode: blueprint.renderMode,
+    complexityLevel: blueprint.complexityLevel,
+    allowDraft: blueprint.allowDraft,
+    allowSubmit: blueprint.allowSubmit,
+    allowEditAfterReturn: blueprint.allowEditAfterReturn,
+    allowAttachments: blueprint.allowAttachments,
+    isActivatedForTenant: packMemberships.some((membership: any) => membership.activation?.status === 'ACTIVE'),
+    packMemberships,
+  };
+}
+
+function mapBlueprintRecord(
+  blueprint: RequestBlueprintWithRelations,
+  tenantId: string
+) {
+  const packMemberships = blueprint.packs.map((membership) => {
+    const activation = membership.pack.activations.find((item: PackActivationRecord) => item.tenantId === tenantId);
+
+    return {
+      packCode: membership.pack.code,
+      packName: membership.pack.name,
+      sortOrder: membership.sortOrder,
+      isRequired: membership.isRequired,
+      activation: mapPackActivation(activation),
+    };
+  });
+
+  return {
+    id: blueprint.id,
+    code: blueprint.code,
+    schemaVersion: blueprint.schemaVersion,
+    definition: buildBlueprintDefinition(blueprint),
+    requestType: blueprint.requestType
+      ? {
+          id: blueprint.requestType.id,
+          code: blueprint.requestType.code,
+          name: blueprint.requestType.name,
+          description: blueprint.requestType.description,
+          category: blueprint.requestType.category,
+          defaultPriority: blueprint.requestType.defaultPriority,
+          requiresApproval: blueprint.requestType.requiresApproval,
+          allowDraft: blueprint.requestType.allowDraft,
+          allowAttachments: blueprint.requestType.allowAttachments,
+          visibilityScope: blueprint.requestType.visibilityScope,
+          isSystemType: blueprint.requestType.isSystemType,
+          tenantId: blueprint.requestType.tenantId,
+        }
+      : null,
+    isActivatedForTenant: packMemberships.some((membership) => membership.activation?.status === 'ACTIVE'),
+    packMemberships,
+  };
+}
+
+function mapPackRecord(pack: any, tenantId: string) {
+  const activation = pack.activations.find((item: PackActivationRecord) => item.tenantId === tenantId);
+
+  return {
+    id: pack.id,
+    code: pack.code,
+    name: pack.name,
+    description: pack.description,
+    domain: pack.domain,
+    maturityLevel: pack.maturityLevel,
+    isActive: pack.isActive,
+    sortOrder: pack.sortOrder,
+    iconName: pack.iconName,
+    activationDependencies: pack.activationDependencies,
+    recommendedOrgProfiles: pack.recommendedOrgProfiles,
+    blueprintCount: pack.blueprints.length,
+    activation: mapPackActivation(activation),
+    blueprints: pack.blueprints.map((membership: RequestPackWithRelations['blueprints'][number]) => ({
+      packCode: pack.code,
+      sortOrder: membership.sortOrder,
+      isRequired: membership.isRequired,
+      blueprint: {
+        id: membership.blueprint.id,
+        code: membership.blueprint.code,
+        name: membership.blueprint.name,
+        description: membership.blueprint.description,
+        category: membership.blueprint.category,
+        renderMode: membership.blueprint.renderMode,
+        complexityLevel: membership.blueprint.complexityLevel,
+        requestType: membership.blueprint.requestType
+          ? {
+              id: membership.blueprint.requestType.id,
+              code: membership.blueprint.requestType.code,
+              name: membership.blueprint.requestType.name,
+              category: membership.blueprint.requestType.category,
+            }
+          : null,
+      },
+    })),
+  };
+}
+
+function getRequestTypeListInclude(tenantId: string) {
+  return {
+    _count: {
+      select: {
+        requests: true,
+        tenantConfigs: true,
+      },
+    },
+    tenantConfigs: {
+      include: {
+        approvalChain: {
+          select: { id: true, name: true, code: true },
+        },
+      },
+    },
+    blueprint: {
+      include: {
+        packs: {
+          include: {
+            pack: {
+              include: {
+                activations: {
+                  where: {
+                    tenantId,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function getRequestTypeDetailInclude(tenantId: string) {
+  return {
+    _count: {
+      select: {
+        requests: true,
+        tenantConfigs: true,
+      },
+    },
+    tenantConfigs: {
+      include: {
+        approvalChain: {
+          select: { id: true, name: true, code: true, status: true },
+        },
+      },
+    },
+    clonedFrom: {
+      select: { id: true, code: true, name: true },
+    },
+    blueprint: {
+      include: {
+        requestType: true,
+        packs: {
+          include: {
+            pack: {
+              include: {
+                activations: {
+                  where: {
+                    tenantId,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function mapRequestTypeListRecord<T extends { tenantConfigs?: Array<{ tenantId: string }>; blueprint?: any }>(
+  requestType: T,
+  tenantId: string
+) {
+  const scoped = scopeTenantConfigs(requestType, tenantId);
+
+  return {
+    ...scoped,
+    blueprint: mapBlueprintSummary(requestType.blueprint, tenantId),
+  };
+}
+
+function mapRequestTypeDetailRecord<T extends { tenantConfigs?: Array<{ tenantId: string }>; blueprint?: any }>(
+  requestType: T,
+  tenantId: string
+) {
+  const scoped = scopeTenantConfigs(requestType, tenantId);
+
+  return {
+    ...scoped,
+    blueprint: requestType.blueprint ? mapBlueprintRecord(requestType.blueprint, tenantId) : null,
+  };
+}
+
+function scopeTenantConfigs<T extends { tenantConfigs?: Array<{ tenantId: string }> }>(
+  requestType: T,
+  tenantId: string
+): T {
+  if (!requestType.tenantConfigs) {
+    return requestType;
+  }
+
+  return {
+    ...requestType,
+    tenantConfigs: requestType.tenantConfigs.filter((config) => config.tenantId === tenantId),
+  };
+}
+
+function toRequestTypeBaseCode(name: string): string {
+  const normalized = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  const fallback = normalized || 'REQUEST_TYPE';
+  const startsWithLetter = /^[A-Z]/.test(fallback);
+  const prefixed = startsWithLetter ? fallback : `RT_${fallback}`;
+
+  return prefixed.slice(0, 50);
+}
+
+function normalizeRequestedCode(code?: string): string | undefined {
+  if (!code) return undefined;
+  const trimmed = code.trim().toUpperCase();
+  return trimmed || undefined;
+}
+
+function withSuffix(baseCode: string, suffix: number): string {
+  if (suffix <= 1) return baseCode;
+  const suffixText = `_${suffix}`;
+  const maxBaseLength = 50 - suffixText.length;
+  return `${baseCode.slice(0, maxBaseLength)}${suffixText}`;
+}
+
+async function codeExistsForTenantOrSystem(tenantId: string, code: string): Promise<boolean> {
+  const existing = await prisma.requestType.findFirst({
+    where: {
+      code,
+      OR: [
+        { tenantId },
+        { tenantId: null, isSystemType: true },
+      ],
+    },
+    select: { id: true },
+  });
+
+  return !!existing;
+}
+
+async function resolveRequestTypeCode(
+  tenantId: string,
+  name: string,
+  requestedCode?: string
+): Promise<string> {
+  const normalizedRequested = normalizeRequestedCode(requestedCode);
+  const initialCode = normalizedRequested || toRequestTypeBaseCode(name);
+
+  const codeRegex = /^[A-Z][A-Z0-9_]{2,49}$/;
+  if (!codeRegex.test(initialCode)) {
+    throw new ApiError(
+      'Code must be uppercase, start with a letter, and contain only letters, numbers, and underscores (3-50 chars)',
+      400,
+      'INVALID_CODE_FORMAT'
+    );
+  }
+
+  let attempt = 1;
+  while (attempt <= 200) {
+    const candidate = withSuffix(initialCode, attempt);
+    const exists = await codeExistsForTenantOrSystem(tenantId, candidate);
+
+    if (!exists) {
+      return candidate;
+    }
+
+    attempt += 1;
+  }
+
+  throw new ApiError('Unable to generate unique request type code', 500, 'CODE_GENERATION_FAILED');
+}
+
 // ============================================================================
 // List Request Types (System + Tenant-specific)
 // ============================================================================
@@ -128,30 +586,17 @@ export async function listRequestTypes(
       skip,
       take: limit,
       orderBy: { [options?.sortBy || 'name']: options?.sortOrder || 'asc' },
-      include: {
-        _count: {
-          select: {
-            requests: true,
-            tenantConfigs: true,
-          },
-        },
-        tenantConfigs: {
-          where: { tenantId },
-          select: {
-            id: true,
-            isEnabled: true,
-            approvalChainId: true,
-            approvalChain: {
-              select: { id: true, name: true, code: true },
-            },
-          },
-        },
-      },
+      include: getRequestTypeListInclude(tenantId),
     }),
     prisma.requestType.count({ where }),
   ]);
 
-  return { data, total, page, limit };
+  return {
+    data: data.map((requestType) => mapRequestTypeListRecord(requestType, tenantId)),
+    total,
+    page,
+    limit,
+  };
 }
 
 // ============================================================================
@@ -173,28 +618,10 @@ export async function getRequestTypeById(
         { tenantId: tenantId },
       ],
     },
-    include: {
-      _count: {
-        select: {
-          requests: true,
-          tenantConfigs: true,
-        },
-      },
-      tenantConfigs: {
-        where: { tenantId },
-        include: {
-          approvalChain: {
-            select: { id: true, name: true, code: true, status: true },
-          },
-        },
-      },
-      clonedFrom: {
-        select: { id: true, code: true, name: true },
-      },
-    },
+    include: getRequestTypeDetailInclude(tenantId),
   });
 
-  return requestType;
+  return requestType ? mapRequestTypeDetailRecord(requestType, tenantId) : null;
 }
 
 /**
@@ -210,11 +637,7 @@ export async function getRequestTypeByCode(
       code: code,
       tenantId: tenantId,
     },
-    include: {
-      tenantConfigs: {
-        where: { tenantId },
-      },
-    },
+    include: getRequestTypeDetailInclude(tenantId),
   });
 
   // If not found, check for system type
@@ -225,15 +648,242 @@ export async function getRequestTypeByCode(
         tenantId: null,
         isSystemType: true,
       },
-      include: {
-        tenantConfigs: {
-          where: { tenantId },
-        },
-      },
+      include: getRequestTypeDetailInclude(tenantId),
     });
   }
 
-  return requestType;
+  return requestType ? mapRequestTypeDetailRecord(requestType, tenantId) : null;
+}
+
+// ============================================================================
+// Request Packs & Blueprints
+// ============================================================================
+
+/**
+ * List active request packs with tenant activation state
+ */
+export async function listRequestPacks(tenantId: string): Promise<unknown[]> {
+  const packs = await prismaClient.requestPack.findMany({
+    where: {
+      isActive: true,
+    },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    include: {
+      activations: {
+        where: {
+          tenantId,
+        },
+      },
+      blueprints: {
+        orderBy: [{ sortOrder: 'asc' }, { blueprint: { name: 'asc' } }],
+        include: {
+          blueprint: {
+            include: {
+              requestType: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return packs.map((pack) => mapPackRecord(pack, tenantId));
+}
+
+/**
+ * Get a single request pack by code
+ */
+export async function getRequestPackByCode(
+  tenantId: string,
+  code: string
+): Promise<unknown | null> {
+  const pack = await prismaClient.requestPack.findFirst({
+    where: {
+      code,
+      isActive: true,
+    },
+    include: {
+      activations: {
+        where: {
+          tenantId,
+        },
+      },
+      blueprints: {
+        orderBy: [{ sortOrder: 'asc' }, { blueprint: { name: 'asc' } }],
+        include: {
+          blueprint: {
+            include: {
+              requestType: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return pack ? mapPackRecord(pack, tenantId) : null;
+}
+
+/**
+ * Activate a request pack for a tenant
+ */
+export async function activateRequestPack(
+  tenantId: string,
+  code: string,
+  userId: string
+): Promise<unknown> {
+  const pack = await prisma.requestPack.findFirst({
+    where: {
+      code,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      activationDependencies: true,
+    },
+  });
+
+  if (!pack) {
+    throw new ApiError('Request pack not found', 404, 'NOT_FOUND');
+  }
+
+  await prisma.tenantRequestPackActivation.upsert({
+    where: {
+      tenantId_packId: {
+        tenantId,
+        packId: pack.id,
+      },
+    },
+    create: {
+      tenantId,
+      packId: pack.id,
+      status: 'ACTIVE',
+      activatedByUserId: userId,
+      activationSummary: {
+        activatedPackCode: pack.code,
+        activatedPackName: pack.name,
+      },
+      readinessSnapshot: pack.activationDependencies as Prisma.InputJsonValue | undefined,
+    },
+    update: {
+      status: 'ACTIVE',
+      activatedByUserId: userId,
+      activationSummary: {
+        activatedPackCode: pack.code,
+        activatedPackName: pack.name,
+      },
+      readinessSnapshot: pack.activationDependencies as Prisma.InputJsonValue | undefined,
+    },
+  });
+
+  logger.info('Request pack activated', {
+    tenantId,
+    userId,
+    packCode: pack.code,
+  });
+
+  return getRequestPackByCode(tenantId, code);
+}
+
+/**
+ * List blueprint-backed request types visible to a tenant
+ */
+export async function listRequestBlueprints(
+  tenantId: string,
+  options?: RequestBlueprintListOptions
+): Promise<unknown[]> {
+  const blueprints = await prismaClient.requestBlueprint.findMany({
+    where: {
+      requestType: {
+        OR: [
+          { tenantId },
+          { tenantId: null, isSystemType: true },
+        ],
+      },
+      ...(options?.onlyActivated
+        ? {
+            packs: {
+              some: {
+                pack: {
+                  activations: {
+                    some: {
+                      tenantId,
+                      status: 'ACTIVE',
+                    },
+                  },
+                },
+              },
+            },
+          }
+        : {}),
+    },
+    orderBy: [{ name: 'asc' }],
+    include: {
+      requestType: true,
+      packs: {
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          pack: {
+            include: {
+              activations: {
+                where: {
+                  tenantId,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return blueprints.map((blueprint: RequestBlueprintWithRelations) => mapBlueprintRecord(blueprint, tenantId));
+}
+
+/**
+ * Get a blueprint by request type code
+ */
+export async function getRequestBlueprintByRequestTypeCode(
+  tenantId: string,
+  requestTypeCode: string
+): Promise<unknown | null> {
+  const blueprint = await prismaClient.requestBlueprint.findFirst({
+    where: {
+      requestType: {
+        code: requestTypeCode,
+        OR: [
+          { tenantId },
+          { tenantId: null, isSystemType: true },
+        ],
+      },
+    },
+    orderBy: {
+      requestType: {
+        tenantId: 'desc',
+      },
+    },
+    include: {
+      requestType: true,
+      packs: {
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          pack: {
+            include: {
+              activations: {
+                where: {
+                  tenantId,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return blueprint ? mapBlueprintRecord(blueprint, tenantId) : null;
 }
 
 // ============================================================================
@@ -248,48 +898,11 @@ export async function createRequestType(
   userId: string,
   input: CreateRequestTypeInput
 ): Promise<unknown> {
-  // Validate code format (uppercase, alphanumeric + underscore)
-  const codeRegex = /^[A-Z][A-Z0-9_]{2,49}$/;
-  if (!codeRegex.test(input.code)) {
-    throw new ApiError(
-      'Code must be uppercase, start with a letter, and contain only letters, numbers, and underscores (3-50 chars)',
-      400,
-      'INVALID_CODE_FORMAT'
-    );
-  }
-
-  // Check for duplicate code within tenant
-  const existingTenant = await prisma.requestType.findFirst({
-    where: {
-      code: input.code,
-      tenantId: tenantId,
-    },
-  });
-
-  if (existingTenant) {
-    throw new ApiError('Request type code already exists for this tenant', 409, 'DUPLICATE_CODE');
-  }
-
-  // Check if code conflicts with system type
-  const existingSystem = await prisma.requestType.findFirst({
-    where: {
-      code: input.code,
-      tenantId: null,
-      isSystemType: true,
-    },
-  });
-
-  if (existingSystem) {
-    throw new ApiError(
-      'Request type code conflicts with a system type. Use a different code or clone the system type.',
-      409,
-      'CONFLICTS_WITH_SYSTEM_TYPE'
-    );
-  }
+  const resolvedCode = await resolveRequestTypeCode(tenantId, input.name, input.code);
 
   const requestType = await prisma.requestType.create({
     data: {
-      code: input.code,
+      code: resolvedCode,
       name: input.name,
       description: input.description,
       category: input.category,
@@ -325,6 +938,7 @@ export async function createRequestType(
     code: requestType.code,
     tenantId,
     userId,
+    codeAutoGenerated: !input.code,
   });
 
   return requestType;
@@ -344,9 +958,9 @@ export async function updateRequestType(
   userId: string,
   input: UpdateRequestTypeInput
 ): Promise<unknown> {
-  // Get the request type
-  const requestType = await prisma.requestType.findUnique({
-    where: { id: requestTypeId },
+  // M-10: Use findFirst with tenantId to prevent cross-tenant data loading
+  const requestType = await prisma.requestType.findFirst({
+    where: { id: requestTypeId, OR: [{ tenantId }, { tenantId: null }] },
   });
 
   if (!requestType) {
@@ -421,8 +1035,9 @@ export async function deleteRequestType(
   userId: string
 ): Promise<void> {
   // Get the request type
-  const requestType = await prisma.requestType.findUnique({
-    where: { id: requestTypeId },
+  // M-10: Use findFirst with tenantId to prevent cross-tenant data loading
+  const requestType = await prisma.requestType.findFirst({
+    where: { id: requestTypeId, OR: [{ tenantId }, { tenantId: null }] },
     include: {
       _count: {
         select: { requests: true },
@@ -439,7 +1054,7 @@ export async function deleteRequestType(
     throw new ApiError('Cannot delete system request types', 403, 'CANNOT_DELETE_SYSTEM_TYPE');
   }
 
-  // Ensure tenant owns this type
+  // Ensure tenant owns this type (defense-in-depth after findFirst scoping)
   if (requestType.tenantId !== tenantId) {
     throw new ApiError('Request type not found', 404, 'NOT_FOUND');
   }

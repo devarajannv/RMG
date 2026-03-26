@@ -183,14 +183,14 @@ describe('ResourcesPage', () => {
       const filtersButton = screen.getByRole('button', { name: /filters/i });
       
       // Initially filters should be hidden
-      expect(screen.queryByText(/all departments/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/all practices/i)).not.toBeInTheDocument();
       
       // Click to show filters
       await user.click(filtersButton);
       
       // Now filters should be visible
       await waitFor(() => {
-        expect(screen.getByText(/all departments/i)).toBeInTheDocument();
+        expect(screen.getByText(/all practices/i)).toBeInTheDocument();
       });
     });
 

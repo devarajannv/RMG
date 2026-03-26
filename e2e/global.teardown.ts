@@ -10,6 +10,7 @@
  */
 
 import { FullConfig } from '@playwright/test';
+import { authStatePaths } from './playwright.config';
 
 async function globalTeardown(config: FullConfig) {
   console.log('\n🧹 E2E Global Teardown Starting...\n');
@@ -32,7 +33,7 @@ async function globalTeardown(config: FullConfig) {
   const fs = await import('fs/promises');
   const path = await import('path');
   
-  const authDir = path.join(process.cwd(), 'e2e', '.auth');
+  const authDir = authStatePaths.dir;
   
   try {
     const files = await fs.readdir(authDir);

@@ -1,5 +1,7 @@
 import { PrismaClient, Prisma, TimesheetStatus, PeriodStatus } from '@prisma/client';
 import { addDays, startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
+import { createAuditLog, createInvoiceLinkageAuditEvent } from '../audit/audit.service';
+import { resolveBillabilityDomain, clampBillableRatio } from '../../config/billability-domain';
 
 const prisma = new PrismaClient();
 
@@ -17,6 +19,7 @@ export interface TimesheetEntryInput {
   taskType?: string;
   description?: string;
   isBillable?: boolean;
+  billableRatio?: number;
   isOvertime?: boolean;
 }
 
@@ -24,6 +27,7 @@ export interface TimesheetFilters {
   tenantId: string;
   resourceId?: string;
   projectId?: string;
+  invoiceReference?: string;
   startDate?: Date;
   endDate?: Date;
   status?: TimesheetStatus[];
@@ -44,7 +48,7 @@ export interface WeeklyTimesheetData {
     projectCode: string;
     clientName: string;
     isBillable: boolean;
-    days: { [date: string]: { id?: string; hours: number; status: TimesheetStatus } };
+    days: { [date: string]: { id?: string; hours: number; status: TimesheetStatus; billableRatio?: number } };
   }>;
   totals: {
     daily: { [date: string]: number };
@@ -54,11 +58,107 @@ export interface WeeklyTimesheetData {
   };
 }
 
+export interface TimesheetInvoiceLinkageInput {
+  invoiceReference: string;
+  reason?: string;
+  correlationId?: string;
+}
+
+export interface TimesheetPeriodInvoiceUnlinkInput {
+  invoiceReference: string;
+  reason?: string;
+  correlationId?: string;
+}
+
+function readBillableRatioFromCustomFields(customFields: Prisma.JsonValue | null, fallbackIsBillable: boolean): number {
+  const root = (customFields as Record<string, unknown> | null) ?? null;
+  const billabilityDomain = (root?.billabilityDomain as Record<string, unknown> | undefined) ?? undefined;
+  return clampBillableRatio(billabilityDomain?.billableRatio, fallbackIsBillable ? 1 : 0);
+}
+
+function buildBillabilityCustomFields(
+  existingCustomFields: Prisma.JsonValue | null,
+  hours: number,
+  isBillable: boolean,
+  billableRatio?: number,
+  status: TimesheetStatus = 'DRAFT'
+): Prisma.InputJsonValue {
+  const root = ((existingCustomFields as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const billabilityDomain = resolveBillabilityDomain({
+    isBillable,
+    billableRatio,
+    status,
+    hours,
+  });
+
+  return {
+    ...root,
+    billabilityDomain,
+  } as unknown as Prisma.InputJsonValue;
+}
+
+function readTimesheetInvoiceReference(customFields: Prisma.JsonValue | null): string | null {
+  const root = (customFields as Record<string, unknown> | null) ?? null;
+  const invoiceReference = root?.invoiceReference;
+  return typeof invoiceReference === 'string' && invoiceReference.trim().length > 0
+    ? invoiceReference.trim()
+    : null;
+}
+
+function buildTimesheetInvoiceLinkedCustomFields(
+  existingCustomFields: Prisma.JsonValue | null,
+  invoiceReference: string,
+  userId: string,
+  reason?: string
+): Prisma.InputJsonValue {
+  const root = ((existingCustomFields as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  return {
+    ...root,
+    invoiceReference,
+    invoiceLinkage: {
+      invoiceReference,
+      linkedAt: new Date().toISOString(),
+      linkedBy: userId,
+      reason: reason ?? null,
+    },
+  } as Prisma.InputJsonValue;
+}
+
+function buildTimesheetInvoiceUnlinkedCustomFields(
+  existingCustomFields: Prisma.JsonValue | null,
+  userId: string,
+  reason?: string
+): Prisma.InputJsonValue {
+  const root = ((existingCustomFields as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const { invoiceReference: _discardedInvoiceReference, ...withoutInvoiceReference } = root;
+  const currentInvoiceLinkage = (root.invoiceLinkage as Record<string, unknown> | undefined) ?? undefined;
+
+  return {
+    ...withoutInvoiceReference,
+    invoiceLinkage: {
+      ...(currentInvoiceLinkage ?? {}),
+      invoiceReference: null,
+      unlinkedAt: new Date().toISOString(),
+      unlinkedBy: userId,
+      unlinkReason: reason ?? null,
+    },
+  } as Prisma.InputJsonValue;
+}
+
 // ============================================================================
 // Timesheet Entry CRUD
 // ============================================================================
 
 export async function createTimesheetEntry(input: TimesheetEntryInput) {
+  const isBillable = input.isBillable ?? true;
+  const customFields = buildBillabilityCustomFields(
+    null,
+    input.hours,
+    isBillable,
+    input.billableRatio,
+    'DRAFT'
+  );
+
   // Check for existing entry
   const existing = await prisma.timesheetEntry.findFirst({
     where: {
@@ -78,8 +178,9 @@ export async function createTimesheetEntry(input: TimesheetEntryInput) {
         hours: input.hours,
         taskType: input.taskType,
         description: input.description,
-        isBillable: input.isBillable ?? true,
+        isBillable,
         isOvertime: input.isOvertime ?? false,
+        customFields,
         status: 'DRAFT',
       },
       include: {
@@ -99,8 +200,9 @@ export async function createTimesheetEntry(input: TimesheetEntryInput) {
       hours: input.hours,
       taskType: input.taskType,
       description: input.description,
-      isBillable: input.isBillable ?? true,
+      isBillable,
       isOvertime: input.isOvertime ?? false,
+      customFields,
       status: 'DRAFT',
     },
     include: {
@@ -135,6 +237,13 @@ export async function updateTimesheetEntry(
       description: data.description,
       isBillable: data.isBillable,
       isOvertime: data.isOvertime,
+      customFields: buildBillabilityCustomFields(
+        entry.customFields,
+        data.hours ?? Number(entry.hours),
+        data.isBillable ?? entry.isBillable,
+        data.billableRatio,
+        'DRAFT'
+      ),
       status: 'DRAFT',
     },
     include: {
@@ -142,6 +251,369 @@ export async function updateTimesheetEntry(
       resource: { select: { id: true, firstName: true, lastName: true } },
     },
   });
+}
+
+export async function linkTimesheetEntryToInvoice(
+  tenantId: string,
+  entryId: string,
+  userId: string,
+  input: TimesheetInvoiceLinkageInput
+) {
+  const invoiceReference = input.invoiceReference.trim();
+  if (!invoiceReference) {
+    throw new Error('invoiceReference is required');
+  }
+
+  const entry = await prisma.timesheetEntry.findFirst({
+    where: { id: entryId, tenantId, deletedAt: null },
+    select: {
+      id: true,
+      status: true,
+      customFields: true,
+      date: true,
+      resourceId: true,
+      projectId: true,
+    },
+  });
+
+  if (!entry) {
+    throw new Error('Timesheet entry not found');
+  }
+
+  if (entry.status !== 'APPROVED' && entry.status !== 'INVOICED') {
+    await createInvoiceLinkageAuditEvent({
+      tenantId,
+      userId,
+      eventType: 'INVOICE_LINK_REJECTED',
+      invoiceReference,
+      linkedEntityType: 'TimesheetEntry',
+      linkedEntityId: entryId,
+      reason: 'Timesheet entry must be APPROVED before invoice linkage',
+      correlationId: input.correlationId,
+      metadata: {
+        entryStatus: entry.status,
+      },
+    });
+    throw new Error('Timesheet entry must be APPROVED before invoice linkage');
+  }
+
+  const currentInvoiceReference = readTimesheetInvoiceReference(entry.customFields);
+  if (currentInvoiceReference && currentInvoiceReference !== invoiceReference) {
+    await createInvoiceLinkageAuditEvent({
+      tenantId,
+      userId,
+      eventType: 'INVOICE_LINK_REJECTED',
+      invoiceReference,
+      linkedEntityType: 'TimesheetEntry',
+      linkedEntityId: entryId,
+      reason: 'Timesheet entry already linked to a different invoice reference',
+      correlationId: input.correlationId,
+      metadata: {
+        currentInvoiceReference,
+      },
+    });
+    throw new Error(`Timesheet entry already linked to invoice ${currentInvoiceReference}`);
+  }
+
+  const updated = await prisma.timesheetEntry.update({
+    where: { id: entryId },
+    data: {
+      status: 'INVOICED',
+      customFields: buildTimesheetInvoiceLinkedCustomFields(entry.customFields, invoiceReference, userId, input.reason),
+    },
+    include: {
+      project: { select: { id: true, code: true, name: true } },
+      resource: { select: { id: true, firstName: true, lastName: true } },
+    },
+  });
+
+  await createInvoiceLinkageAuditEvent({
+    tenantId,
+    userId,
+    eventType: 'INVOICE_LINKED',
+    invoiceReference,
+    linkedEntityType: 'TimesheetEntry',
+    linkedEntityId: entryId,
+    reason: input.reason,
+    correlationId: input.correlationId,
+    metadata: {
+      entryStatusBefore: entry.status,
+      entryDate: entry.date.toISOString(),
+      resourceId: entry.resourceId,
+      projectId: entry.projectId,
+    },
+  });
+
+  return updated;
+}
+
+export async function unlinkTimesheetEntryFromInvoice(
+  tenantId: string,
+  entryId: string,
+  userId: string,
+  input?: Omit<TimesheetInvoiceLinkageInput, 'invoiceReference'>
+) {
+  const entry = await prisma.timesheetEntry.findFirst({
+    where: { id: entryId, tenantId, deletedAt: null },
+    select: {
+      id: true,
+      status: true,
+      customFields: true,
+      date: true,
+      resourceId: true,
+      projectId: true,
+    },
+  });
+
+  if (!entry) {
+    throw new Error('Timesheet entry not found');
+  }
+
+  const currentInvoiceReference = readTimesheetInvoiceReference(entry.customFields);
+  if (!currentInvoiceReference) {
+    throw new Error('Timesheet entry is not linked to any invoice');
+  }
+
+  const updated = await prisma.timesheetEntry.update({
+    where: { id: entryId },
+    data: {
+      status: entry.status === 'INVOICED' ? 'APPROVED' : entry.status,
+      customFields: buildTimesheetInvoiceUnlinkedCustomFields(entry.customFields, userId, input?.reason),
+    },
+    include: {
+      project: { select: { id: true, code: true, name: true } },
+      resource: { select: { id: true, firstName: true, lastName: true } },
+    },
+  });
+
+  await createInvoiceLinkageAuditEvent({
+    tenantId,
+    userId,
+    eventType: 'INVOICE_UNLINKED',
+    invoiceReference: currentInvoiceReference,
+    linkedEntityType: 'TimesheetEntry',
+    linkedEntityId: entryId,
+    reason: input?.reason,
+    correlationId: input?.correlationId,
+    metadata: {
+      entryStatusBefore: entry.status,
+      entryDate: entry.date.toISOString(),
+      resourceId: entry.resourceId,
+      projectId: entry.projectId,
+    },
+  });
+
+  return updated;
+}
+
+export async function linkTimesheetPeriodToInvoice(
+  tenantId: string,
+  periodId: string,
+  userId: string,
+  input: TimesheetInvoiceLinkageInput
+) {
+  const invoiceReference = input.invoiceReference.trim();
+  if (!invoiceReference) {
+    throw new Error('invoiceReference is required');
+  }
+
+  const period = await prisma.timesheetPeriod.findFirst({
+    where: { id: periodId, tenantId },
+    select: {
+      id: true,
+      status: true,
+      resourceId: true,
+      periodStart: true,
+      periodEnd: true,
+    },
+  });
+
+  if (!period) {
+    throw new Error('Timesheet period not found');
+  }
+
+  if (period.status !== 'APPROVED') {
+    await createInvoiceLinkageAuditEvent({
+      tenantId,
+      userId,
+      eventType: 'INVOICE_LINK_REJECTED',
+      invoiceReference,
+      linkedEntityType: 'TimesheetPeriod',
+      linkedEntityId: periodId,
+      reason: 'Timesheet period must be APPROVED before invoice linkage',
+      correlationId: input.correlationId,
+      metadata: {
+        periodStatus: period.status,
+      },
+    });
+    throw new Error('Timesheet period must be APPROVED before invoice linkage');
+  }
+
+  const entries = await prisma.timesheetEntry.findMany({
+    where: {
+      tenantId,
+      resourceId: period.resourceId,
+      date: { gte: period.periodStart, lte: period.periodEnd },
+      status: { in: ['APPROVED', 'INVOICED'] },
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      status: true,
+      customFields: true,
+    },
+  });
+
+  if (entries.length === 0) {
+    throw new Error('No approved timesheet entries available for invoice linkage in this period');
+  }
+
+  const conflictingEntry = entries.find((entry) => {
+    const currentInvoiceReference = readTimesheetInvoiceReference(entry.customFields);
+    return !!currentInvoiceReference && currentInvoiceReference !== invoiceReference;
+  });
+
+  if (conflictingEntry) {
+    const currentInvoiceReference = readTimesheetInvoiceReference(conflictingEntry.customFields);
+    await createInvoiceLinkageAuditEvent({
+      tenantId,
+      userId,
+      eventType: 'INVOICE_LINK_REJECTED',
+      invoiceReference,
+      linkedEntityType: 'TimesheetPeriod',
+      linkedEntityId: periodId,
+      reason: 'One or more timesheet entries are already linked to a different invoice reference',
+      correlationId: input.correlationId,
+      metadata: {
+        conflictingEntryId: conflictingEntry.id,
+        currentInvoiceReference,
+      },
+    });
+    throw new Error(`Timesheet entry ${conflictingEntry.id} already linked to invoice ${currentInvoiceReference}`);
+  }
+
+  let linkedCount = 0;
+  for (const entry of entries) {
+    await prisma.timesheetEntry.update({
+      where: { id: entry.id },
+      data: {
+        status: entry.status === 'APPROVED' ? 'INVOICED' : entry.status,
+        customFields: buildTimesheetInvoiceLinkedCustomFields(
+          entry.customFields,
+          invoiceReference,
+          userId,
+          input.reason
+        ),
+      },
+    });
+    linkedCount += 1;
+  }
+
+  await createInvoiceLinkageAuditEvent({
+    tenantId,
+    userId,
+    eventType: 'INVOICE_LINKED',
+    invoiceReference,
+    linkedEntityType: 'TimesheetPeriod',
+    linkedEntityId: periodId,
+    reason: input.reason,
+    correlationId: input.correlationId,
+    metadata: {
+      periodStart: period.periodStart.toISOString(),
+      periodEnd: period.periodEnd.toISOString(),
+      resourceId: period.resourceId,
+      linkedEntries: linkedCount,
+    },
+  });
+
+  return {
+    periodId,
+    invoiceReference,
+    linkedEntries: linkedCount,
+  };
+}
+
+export async function unlinkTimesheetPeriodFromInvoice(
+  tenantId: string,
+  periodId: string,
+  userId: string,
+  input: TimesheetPeriodInvoiceUnlinkInput
+) {
+  const invoiceReference = input.invoiceReference.trim();
+  if (!invoiceReference) {
+    throw new Error('invoiceReference is required');
+  }
+
+  const period = await prisma.timesheetPeriod.findFirst({
+    where: { id: periodId, tenantId },
+    select: {
+      id: true,
+      resourceId: true,
+      periodStart: true,
+      periodEnd: true,
+    },
+  });
+
+  if (!period) {
+    throw new Error('Timesheet period not found');
+  }
+
+  const linkedEntries = await prisma.timesheetEntry.findMany({
+    where: {
+      tenantId,
+      resourceId: period.resourceId,
+      date: { gte: period.periodStart, lte: period.periodEnd },
+      deletedAt: null,
+      customFields: {
+        path: ['invoiceReference'],
+        equals: invoiceReference,
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      customFields: true,
+    },
+  });
+
+  if (linkedEntries.length === 0) {
+    throw new Error(`No timesheet entries in this period are linked to invoice ${invoiceReference}`);
+  }
+
+  let unlinkedCount = 0;
+  for (const entry of linkedEntries) {
+    await prisma.timesheetEntry.update({
+      where: { id: entry.id },
+      data: {
+        status: entry.status === 'INVOICED' ? 'APPROVED' : entry.status,
+        customFields: buildTimesheetInvoiceUnlinkedCustomFields(entry.customFields, userId, input.reason),
+      },
+    });
+    unlinkedCount += 1;
+  }
+
+  await createInvoiceLinkageAuditEvent({
+    tenantId,
+    userId,
+    eventType: 'INVOICE_UNLINKED',
+    invoiceReference,
+    linkedEntityType: 'TimesheetPeriod',
+    linkedEntityId: periodId,
+    reason: input.reason,
+    correlationId: input.correlationId,
+    metadata: {
+      periodStart: period.periodStart.toISOString(),
+      periodEnd: period.periodEnd.toISOString(),
+      resourceId: period.resourceId,
+      unlinkedEntries: unlinkedCount,
+    },
+  });
+
+  return {
+    periodId,
+    invoiceReference,
+    unlinkedEntries: unlinkedCount,
+  };
 }
 
 export async function deleteTimesheetEntry(id: string, tenantId: string) {
@@ -164,13 +636,29 @@ export async function deleteTimesheetEntry(id: string, tenantId: string) {
 }
 
 export async function getTimesheetEntries(filters: TimesheetFilters) {
-  const { tenantId, resourceId, projectId, startDate, endDate, status, page = 1, limit = 50 } = filters;
+  const {
+    tenantId,
+    resourceId,
+    projectId,
+    invoiceReference,
+    startDate,
+    endDate,
+    status,
+    page = 1,
+    limit = 50,
+  } = filters;
 
   const where: Prisma.TimesheetEntryWhereInput = {
     tenantId,
     deletedAt: null,
     ...(resourceId && { resourceId }),
     ...(projectId && { projectId }),
+    ...(invoiceReference && {
+      customFields: {
+        path: ['invoiceReference'],
+        equals: invoiceReference,
+      },
+    }),
     ...(startDate && endDate && {
       date: { gte: startDate, lte: endDate },
     }),
@@ -276,7 +764,7 @@ export async function getWeeklyTimesheet(
     projectCode: string;
     clientName: string;
     isBillable: boolean;
-    days: { [date: string]: { id?: string; hours: number; status: TimesheetStatus } };
+    days: { [date: string]: { id?: string; hours: number; status: TimesheetStatus; billableRatio?: number } };
   }>();
 
   // Initialize with allocated projects
@@ -309,10 +797,12 @@ export async function getWeeklyTimesheet(
     }
 
     const proj = projectMap.get(entry.projectId)!;
+    const billableRatio = readBillableRatioFromCustomFields(entry.customFields, entry.isBillable);
     proj.days[dateKey] = {
       id: entry.id,
       hours: Number(entry.hours),
       status: entry.status,
+      billableRatio,
     };
   }
 
@@ -331,11 +821,10 @@ export async function getWeeklyTimesheet(
     for (const [dateKey, entry] of Object.entries(proj.days)) {
       dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + entry.hours;
       weeklyTotal += entry.hours;
-      if (proj.isBillable) {
-        billableTotal += entry.hours;
-      } else {
-        nonBillableTotal += entry.hours;
-      }
+      const ratio = clampBillableRatio(entry.billableRatio, proj.isBillable ? 1 : 0);
+      const billableHours = entry.hours * ratio;
+      billableTotal += billableHours;
+      nonBillableTotal += (entry.hours - billableHours);
     }
   }
 
@@ -369,6 +858,7 @@ export async function saveWeeklyTimesheet(
     date: string;
     hours: number;
     isBillable?: boolean;
+    billableRatio?: number;
     description?: string;
   }>
 ) {
@@ -414,6 +904,13 @@ export async function saveWeeklyTimesheet(
           data: {
             hours: entry.hours,
             isBillable: entry.isBillable ?? existing.isBillable,
+            customFields: buildBillabilityCustomFields(
+              existing.customFields,
+              entry.hours,
+              entry.isBillable ?? existing.isBillable,
+              entry.billableRatio,
+              'DRAFT'
+            ),
             description: entry.description,
           },
         });
@@ -427,6 +924,13 @@ export async function saveWeeklyTimesheet(
             date,
             hours: entry.hours,
             isBillable: entry.isBillable ?? true,
+            customFields: buildBillabilityCustomFields(
+              null,
+              entry.hours,
+              entry.isBillable ?? true,
+              entry.billableRatio,
+              'DRAFT'
+            ),
             description: entry.description,
             status: 'DRAFT',
           },
@@ -446,12 +950,13 @@ export async function saveWeeklyTimesheet(
 export async function submitTimesheet(
   tenantId: string,
   resourceId: string,
-  weekStart: Date
+  weekStart: Date,
+  submittedByUserId: string
 ) {
   const start = startOfWeek(weekStart, { weekStartsOn: 1 });
   const end = endOfWeek(weekStart, { weekStartsOn: 1 });
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Update all draft entries to submitted
     const updateResult = await tx.timesheetEntry.updateMany({
       where: {
@@ -479,13 +984,18 @@ export async function submitTimesheet(
     });
 
     const totalHours = entries.reduce((sum, e) => sum + Number(e.hours), 0);
-    const billableHours = entries.filter(e => e.isBillable).reduce((sum, e) => sum + Number(e.hours), 0);
+    const billableHours = entries.reduce((sum, e) => {
+      const ratio = readBillableRatioFromCustomFields(e.customFields, e.isBillable);
+      return sum + (Number(e.hours) * ratio);
+    }, 0);
     const overtimeHours = entries.filter(e => e.isOvertime).reduce((sum, e) => sum + Number(e.hours), 0);
 
     // Create or update period record
     const existingPeriod = await tx.timesheetPeriod.findFirst({
       where: { tenantId, resourceId, periodStart: start, periodEnd: end },
     });
+
+    let periodId: string;
 
     if (existingPeriod) {
       await tx.timesheetPeriod.update({
@@ -498,8 +1008,9 @@ export async function submitTimesheet(
           overtimeHours,
         },
       });
+      periodId = existingPeriod.id;
     } else {
-      await tx.timesheetPeriod.create({
+      const createdPeriod = await tx.timesheetPeriod.create({
         data: {
           tenantId,
           resourceId,
@@ -513,10 +1024,38 @@ export async function submitTimesheet(
           overtimeHours,
         },
       });
+      periodId = createdPeriod.id;
     }
 
-    return { entriesSubmitted: updateResult.count, totalHours, billableHours };
+    return { entriesSubmitted: updateResult.count, totalHours, billableHours, periodId };
   });
+
+  await createAuditLog(
+    tenantId,
+    submittedByUserId,
+    'TimesheetPeriod',
+    result.periodId,
+    'SUBMIT',
+    {
+      resourceId,
+      weekStart: start.toISOString(),
+      weekEnd: end.toISOString(),
+      entriesSubmitted: result.entriesSubmitted,
+      totalHours: result.totalHours,
+      billableHours: result.billableHours,
+      billabilitySnapshot: {
+        modelVersion: 'timesheet-billability-v1',
+        billableRatioApplied: true,
+        nonBillableHours: Math.round((result.totalHours - result.billableHours) * 100) / 100,
+      },
+    }
+  );
+
+  return {
+    entriesSubmitted: result.entriesSubmitted,
+    totalHours: result.totalHours,
+    billableHours: result.billableHours,
+  };
 }
 
 // ============================================================================
@@ -535,9 +1074,9 @@ export async function approveTimesheet(
   if (!period) throw new Error('Timesheet period not found');
   if (period.status !== 'SUBMITTED') throw new Error('Only submitted timesheets can be approved');
 
-  return prisma.$transaction(async (tx) => {
+  const updatedPeriod = await prisma.$transaction(async (tx) => {
     // Update period
-    const updatedPeriod = await tx.timesheetPeriod.update({
+    const approvedPeriod = await tx.timesheetPeriod.update({
       where: { id: periodId },
       data: {
         status: 'APPROVED',
@@ -562,14 +1101,30 @@ export async function approveTimesheet(
       },
     });
 
-    return updatedPeriod;
+    return approvedPeriod;
   });
+
+  await createAuditLog(
+    tenantId,
+    approverId,
+    'TimesheetPeriod',
+    updatedPeriod.id,
+    'APPROVE',
+    {
+      periodStart: updatedPeriod.periodStart.toISOString(),
+      periodEnd: updatedPeriod.periodEnd.toISOString(),
+      resourceId: updatedPeriod.resourceId,
+      approvedAt: updatedPeriod.approvedAt?.toISOString(),
+    }
+  );
+
+  return updatedPeriod;
 }
 
 export async function rejectTimesheet(
   tenantId: string,
   periodId: string,
-  _approverId: string,
+  approverId: string,
   reason: string
 ) {
   const period = await prisma.timesheetPeriod.findFirst({
@@ -579,9 +1134,9 @@ export async function rejectTimesheet(
   if (!period) throw new Error('Timesheet period not found');
   if (period.status !== 'SUBMITTED') throw new Error('Only submitted timesheets can be rejected');
 
-  return prisma.$transaction(async (tx) => {
+  const updatedPeriod = await prisma.$transaction(async (tx) => {
     // Update period
-    const updatedPeriod = await tx.timesheetPeriod.update({
+    const rejectedPeriod = await tx.timesheetPeriod.update({
       where: { id: periodId },
       data: {
         status: 'REJECTED',
@@ -606,8 +1161,25 @@ export async function rejectTimesheet(
       },
     });
 
-    return updatedPeriod;
+    return rejectedPeriod;
   });
+
+  await createAuditLog(
+    tenantId,
+    approverId,
+    'TimesheetPeriod',
+    updatedPeriod.id,
+    'REJECT',
+    {
+      periodStart: updatedPeriod.periodStart.toISOString(),
+      periodEnd: updatedPeriod.periodEnd.toISOString(),
+      resourceId: updatedPeriod.resourceId,
+      rejectedAt: updatedPeriod.rejectedAt?.toISOString(),
+      reason,
+    }
+  );
+
+  return updatedPeriod;
 }
 
 // ============================================================================
@@ -664,11 +1236,15 @@ export async function getTimesheetStats(tenantId: string, resourceId?: string, s
       isBillable: true,
       isOvertime: true,
       status: true,
+      customFields: true,
     },
   });
 
   const totalHours = entries.reduce((sum, e) => sum + Number(e.hours), 0);
-  const billableHours = entries.filter(e => e.isBillable).reduce((sum, e) => sum + Number(e.hours), 0);
+  const billableHours = entries.reduce((sum, e) => {
+    const ratio = readBillableRatioFromCustomFields(e.customFields, e.isBillable);
+    return sum + (Number(e.hours) * ratio);
+  }, 0);
   const overtimeHours = entries.filter(e => e.isOvertime).reduce((sum, e) => sum + Number(e.hours), 0);
   const submittedHours = entries.filter(e => e.status !== 'DRAFT').reduce((sum, e) => sum + Number(e.hours), 0);
   const approvedHours = entries.filter(e => e.status === 'APPROVED' || e.status === 'INVOICED').reduce((sum, e) => sum + Number(e.hours), 0);

@@ -1,0 +1,245 @@
+Project ID,Account,Project name,RMG HC on 17-Dec-25,Category,Project Manager,Delivery Head,CSM,Revenue Type (T&M/Fixed Bid/Fixed Capacity),Project Type (SOW/Staff Augmentation),Status,Project start Date,Project SOW End Date,SOW signed?,Status2,Column20,,Project ID
+NV000101,Arena Club,Arena-Club Development and Support,0,COGS,Lakshmi Soumya Konambhotla,Ryan Cardoz - TBD,Balan Ramaswamy,T&M,SOW,,11-Sep-23,30-Sep-25,Signed,Completed,#NAME?,,NV000101
+NV000102,Austills,ACE System Upgrade,1.2,COGS,Jayashree Kudale,Vedavati Shetty,Balan Ramaswamy,T&M,SOW,,1-Feb-22,31-Dec-26,Signed,Active,#NAME?,,NV000102
+NV000103,BCT - Nama,NAMA MDM Support,2.75,COGS,Hari Parlapalli,Balan Ramaswamy,Balan Ramaswamy,FMB,SOW,,3-Jun-24,3-Jun-26,Signed,Active,#NAME?,,NV000103
+NV000104,Beyondsoft,Avante Power BI,0,COGS,Rituraj Yeotikar,Rituraj Yeotikar,Lawlesh Tiwari ,T&M,Staff-Aug,,6-May-24,17-Jun-25,Signed,Sort-Closed,#NAME?,,NV000104
+NV000105,Beyondsoft,CBM Datalake,0,COGS,KevalSing Rajput,Puneet Gulati,Lawlesh Tiwari ,FB,SOW,,5-Aug-24,31-May-25,Signed,Completed,#NAME?,,NV000105
+NV000106,Beyondsoft,ElevateBio,5.5,COGS,Kiranjit Bhowmick,Prakash Ghaitadke ,Lawlesh Tiwari ,FMB,SOW,,16-Aug-22,30-Nov-25,Signed,Completed,#NAME?,,NV000106
+NV000107,Beyondsoft,BeyondSoft account pool,0,COGS,Lawlesh Tiwari ,Lawlesh Tiwari ,Lawlesh Tiwari ,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000107
+NV000108,Beyondsoft,Offshore TA Team,2,COGS,Mayank Srivastava,Balan Ramaswamy,Lawlesh Tiwari ,FMB,SOW,,1-Jan-23,31-Dec-25,Signed,Completed,#NAME?,,NV000108
+NV000109,Beyondsoft,SKPT Client Portal,0,COGS,Lakshmi Soumya Konambhotla,Ryan Cardoz - TBD,Lawlesh Tiwari ,FB,SOW,,1-Aug-24,18-Apr-25,Signed,Completed,#NAME?,,NV000109
+NV000110,Biolabs,BioLabs,1.5,COGS,Kiranjit Bhowmick,Prakash Ghaitadke ,Balan Ramaswamy,T&M,SOW,,20-Sep-23,31-Mar-26,Signed,Active,#NAME?,,NV000110
+NV000111,BIS,Phase III IT Managed Services,0,COGS,Kiranjit Bhowmick,Ritesh Gupta,Balan Ramaswamy,FMB,SOW,,2-Jan-24,30-Sep-25,Signed,Sort-Closed,#NAME?,,NV000111
+NV000112,BIS,Phase III NewDL Application,1.35,COGS,Lakshmi Soumya Konambhotla,Vedavati Shetty,Balan Ramaswamy,FMB,SOW,,2-Jan-24,31-Mar-26,Signed,Active,#NAME?,,NV000112
+NV000113,BresaTech,BresaTech,0,COGS,Rishabh Darda,Saksham Sarode,Harshad Mandlecha,T&M,Staff-Aug,,7-Nov-22,31-Dec-24,Signed,Completed,#NAME?,,NV000113
+NV000114,Cognida,Cloud Operations,0,COGS,Ritesh Gupta,Ritesh Gupta,Balan Ramaswamy,T&M,Staff-Aug,,1-Mar-24,31-Mar-25,Signed,Sort-Closed,#NAME?,,NV000114
+NV000115,Cognida,Mill5,0,COGS,Pradeep Sen,Pradeep Sen,Chandan Singh,T&M,Staff-Aug,,26-Aug-24,22-Jan-25,Signed,Sort-Closed,#NAME?,,NV000115
+NV000116,Cognida,Oracle financial support for MTI project,0,COGS,Prasant Pisupati,Prasant Pisupati,Prasant Pisupati,T&M,Staff-Aug,,15-Jun-24,30-Nov-24,Signed,Completed,#NAME?,,NV000116
+NV000117,Cognida,Tyler - Odyssey UI Migration,3,COGS,Akhilesh Prajapati,Pradeep Sen,Balan Ramaswamy,T&M,Staff-Aug,,1-Dec-23,31-Dec-25,Signed,Completed,#NAME?,,NV000117
+NV000118,Cognida,Sevomatics rollout project,0,COGS,Prasant Pisupati,Prasant Pisupati,Prasant Pisupati,T&M,Staff-Aug,,30-Jul-24,9-May-25,Signed,Completed,#NAME?,,NV000118
+NV000119,Coinonia,Coinonia - Data Paradigm,0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000119
+NV000120,Deloitte,Advisory Generative Risk Intelligence Solution,0,COGS,Sandeep Patil,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,-,-,,Completed,#NAME?,,NV000120
+NV000121,Deloitte,Audit Online,0,COGS,Sudhanshu Nautiyal ,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,1-Jun-23,30-Nov-25,,Completed,#NAME?,,NV000121
+NV000122,Deloitte,Cortex Automation,0,COGS,Sugato Goswami,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,20-Feb-23,30-Nov-25,,Completed,#NAME?,,NV000122
+NV000123,Deloitte,Cortex SOW,0,COGS,Talha Siddiqui,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,12-Jan-23,30-Nov-24,,Completed,#NAME?,,NV000123
+NV000124,Deloitte,Data Lens H1,0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,1-Sep-23,30-Nov-24,,Completed,#NAME?,,NV000124
+NV000125,Deloitte,Datalens – Data Consumption and support ,0,COGS,Nitin Kolhe,Shailesh Erande,Harshad Mandlecha,FB,SOW,,1-May-24,31-May-25,,Completed,#NAME?,,NV000125
+NV000126,Deloitte,DataLens Automation Testing,0,COGS,Rajesh Hiremath,Shailesh Erande,Harshad Mandlecha,FB,SOW,,1-May-24,31-Dec-24,,Completed,#NAME?,,NV000126
+NV000127,Deloitte,Global Learning POD,0,COGS,Archana Khewariya,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,12-Dec-22,31-Dec-24,,Completed,#NAME?,,NV000127
+NV000128,Deloitte,Global Tie-Out Product Transformation,0,COGS,Ramkumar Jayprakash,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,1-Jun-24,30-Nov-24,,Completed,#NAME?,,NV000128
+NV000129,Deloitte,Levvia,1,COGS,Saji Puthuthara,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,1-Jun-24,31-11-2025,Signed,Completed,#NAME?,,NV000129
+NV000130,Deloitte,Levvia Automation,0,COGS,Sandeep Sudame,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,7-Jul-24,31-May-25,,Completed,#NAME?,,NV000130
+NV000131,Deloitte,Management,1,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000131
+NV000132,Deloitte,ML Team,0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,21-Sep-23,31-May-25,,Completed,#NAME?,,NV000132
+NV000133,Deloitte,PMO,2.5,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000133
+NV000134,Deloitte,QAP,0,COGS,Shama Kamat,Shailesh Erande,Harshad Mandlecha,FB,SOW,,28-Jun-24,4-Jun-24,Signed,Completed,#NAME?,,NV000134
+NV000135,Deloitte,RADC,0,COGS,Sudhanshu Nautiyal ,Shailesh Erande,Harshad Mandlecha,FB,SOW,,1-May-24,28-Feb-25,,Completed,#NAME?,,NV000135
+NV000136,Deloitte,RPA - Training,0,COGS,Prashant Shinde,Shailesh Erande,Harshad Mandlecha,Internal,NA,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000136
+NV000137,Deloitte,RPA SOW,0,COGS,Prashant Shinde,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,1-Sep-24,31-May-25,,Completed,#NAME?,,NV000137
+NV000138,Deloitte,Smart Wizard,0,COGS,Anshul Mahajan,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,-,-,,Completed,#NAME?,,NV000138
+NV000139,Deloitte,Staff-Aug,0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,12-Dec-21,31-May-25,Signed,Completed,#NAME?,,NV000139
+NV000140,Deloitte,Tax MyInsight -Decoupling,0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,12-Feb-24,31-May-25,,Completed,#NAME?,,NV000140
+NV000141,Deloitte,Tax myInsights POD Team,0,COGS,Deepak Sharma,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,12-Nov-23,30-Nov-24,,Completed,#NAME?,,NV000141
+NV000142,Deloitte,TAX Pillar 2,0,COGS,Aniket Khedekar,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,1-Feb-25,31-May-25,,Completed,#NAME?,,NV000142
+NV000143,Deloitte,Tax Tools,0,COGS,Pranay Udapure,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,1-Jun-23,30-Nov-24,,Completed,#NAME?,,NV000143
+NV000144,Deloitte,Tax Vision,0,COGS,Shanil Nayani,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,18-Mar-24,30-Nov-24,,Completed,#NAME?,,NV000144
+NV000145,Deloitte,Tax@Hand,0,COGS,Paramveer Netkar,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,-,-,,Completed,#NAME?,,NV000145
+NV000146,Deloitte,Staff-Aug (A&M),0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000146
+NV000147,Deloitte,Staff-Aug (ATS),0,COGS,Archana Khewariya,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000147
+NV000148,Deloitte,Staff-Aug (AU IT Cloud Infrastructure),0,COGS,Ritesh Gupta,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000148
+NV000149,Deloitte,Staff-Aug (Cake Solutions),0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000149
+NV000150,Deloitte,Deloitte Pool,0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,Internal,NA,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000150
+NV000151,Deloitte,Staff-Aug (Consulting),0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000151
+NV000152,Deloitte,Staff-Aug (Delmont),0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000152
+NV000153,Deloitte,Staff-Aug (Audit),0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000153
+NV000154,Deloitte,Staff-Aug (Online Sharepoint),0,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000154
+NV000155,Deloitte,Staff-Aug (DSF),0,COGS,Sandeep Patil,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000155
+NV000156,Deloitte,Staff-Aug (INK),0,COGS,Kuldeep Golani,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000156
+NV000157,Deloitte,Staff-Aug (Intella),0,COGS,Aniket Khedekar,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000157
+NV000158,Deloitte,Staff-Aug (KM),0,COGS,Anshul Mahajan,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000158
+NV000159,Deloitte,Staff-Aug (Omnia),0,COGS,Kuldeep Golani,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000159
+NV000160,Deloitte,Pursuit Manager,0,COGS,Paramveer Netkar,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,8-Sep-23,31-May-25,,Completed,#NAME?,,NV000160
+NV000161,Deloitte,Staff-Aug (DA),0,COGS,Kuldeep Golani,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000161
+NV000162,Deloitte,Staff-Aug (O2E),0,COGS,Nishant Modi,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000162
+NV000163,Deloitte,Staff-Aug (Tax),0,COGS,Pranay Udapure,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000163
+NV000164,Deloitte,Staff-Aug (Staff IT),0,COGS,Archana Khewariya,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000164
+NV000165,Doxa,Doxa - Promont - App Support,2,COGS,Vikrant Kale,Vedavati Shetty,Lawlesh Tiwari ,T&M,Staff-Aug,,14-Dec-20,31-Dec-26,Signed,Active,#NAME?,,NV000165
+NV000166,Evolver Inc. ,Dodge & Cox,0,COGS,Shailesh Erande,Shailesh Erande,Smita Bhatia,T&M,Staff-Aug,,5-Aug-24,30-Jun-25,Signed,Sort-Closed,#NAME?,,NV000166
+NV000167,Experis,Procom/Experis,1,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,17-Oct-22,30-Dec-26,Signed,Active,#NAME?,,NV000167
+NV000168,Growth IT,FlightCheck Managed Service,1,COGS,Kiranjit Bhowmick,Prakash Ghaitadke ,Lawlesh Tiwari ,FMB,SOW,,2-Jan-23,Open ended,Signed,Active,#NAME?,,NV000168
+NV000169,IIPL/TechM,Bescom Oracle ERP Implementation - EAM,0,COGS,Prasant Pisupati,Prasant Pisupati,Prasant Pisupati,FB,SOW,,17-Apr-24,31-Mar-25,Signed,Completed,#NAME?,,NV000169
+NV000170,Imperium Technologies,Imperium - SteamView SaaS ,0,COGS,Sunil Nair,Ryan Cardoz,Chandan Singh,FB,SOW,,19-Aug-24,31-Jan-25,Signed,Completed,#NAME?,,NV000170
+NV000171,Infovision,Staples AutoMatch Modernization Project,0,COGS,Prasant Pisupati,Prasant Pisupati,Prasant Pisupati,FB+T&M,SOW,,9-Sep-24,13-May-25,Signed,Sort-Closed,#NAME?,,NV000171
+NV000172,KYC360,Riskscreen,0,COGS,Lakshmi Soumya Konambhotla,Ryan Cardoz - TBD,Balan Ramaswamy,T&M,SOW,,4-Jan-23,18-Jul-25,Signed,Sort-Closed,#NAME?,,NV000172
+NV000173,McPherson,McPherson,0,COGS,Prasant Pisupati,Prasant Pisupati,Prasant Pisupati,FMB+T&M,SOW,,-,-,,Completed,#NAME?,,NV000173
+NV000174,Miyahuna,Miyahuna - C2M Implementation,24.75,COGS,Hari Parlapalli,Pradeep Sen,Balan Ramaswamy,FB,SOW,,1-Jul-23,10-Apr-26,Signed,Active,#NAME?,,NV000174
+NV000175,NewVision,Long-Leave,7,COGS,Neelanjana Chakravarty,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000175
+NV000176,NewVision,Management,2.95,COGS,Balan Ramaswamy,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000176
+NV000177,NewVision,Administration,4,G&A,Balan Ramaswamy,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000177
+NV000178,NewVision,AI 4 Life - Log Analyzer,3,COGS,Shailesh Erande,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000178
+NV000179,NewVision,AssureIT,0,COGS,Akhilesh Prajapati,Saksham Sarode,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000179
+NV000180,NewVision,Data Ingestion (Data Bricks),0,COGS,Vinod Talreja,Rituraj Yeotikar,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000180
+NV000181,NewVision,Failure Analysis,0,COGS,Shine Pushpan,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000181
+NV000182,NewVision,Finance,4,G&A,Sumesh B,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000182
+NV000183,NewVision,GenAI,0,COGS,Vinod Talreja,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000183
+NV000184,NewVision,Internal IT Support,9.5,G&A,Prakash Ghaitadke ,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000184
+NV000185,NewVision,Marketing,3,S&M,Smita Bhatia,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000185
+NV000186,NewVision,Business Excellence,7.5,G&A,Indranil Basu,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000186
+NV000187,NewVision,Presales,2,S&M,Smita Bhatia,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000187
+NV000188,NewVision,Sales and Marketing,12,S&M,Smita Bhatia,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000188
+NV000189,NewVision,Shikshadaan,0,COGS,Arti Katariya,Ryan Cardoz,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000189
+NV000190,NewVision,Talent Acquisition,9,G&A,Mayank Srivastava,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000190
+NV000191,NewVision,Talent Management & Operations,10,G&A,Neelanjana Chakravarty,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000191
+NV000192,NewVision,Practice Pool - wil be split in other practices as below,0,COGS,,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Hold,#NAME?,,NV000192
+NV000193,NewVision,Microsoft practice Pool,21.55,COGS,Shailesh Erande,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000193
+NV000194,NewVision,DA practice Pool,21,COGS,Saksham Sarode,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000194
+NV000195,NewVision,Data practice Pool,13,COGS,Shailesh Erande,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000195
+NV000196,NewVision,DE practice Pool,6.85,COGS,Devarajan P,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000196
+NV000197,NewVision,DPS practice Pool,6.5,COGS,Shine Pushpan,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000197
+NV000198,NewVision,Utilities practice Pool,0,COGS,Balan Ramaswamy,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000198
+NV000199,NewVision,ITIS practice Pool,0.45,COGS,Prakash Ghaitadke ,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000199
+NV000200,NewVision,Oracle-ERP practice Pool,0,COGS,Prasant Pisupati,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Completed,#NAME?,,NV000200
+NV000201,NewVision,Java practice Pool,1,COGS,Shailesh Erande,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000201
+NV000202,NewVision,RPA practice Pool,3,COGS,Saksham Sarode,NA,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000202
+NV000203,NewVision,Inside Sales,0.5,S&M,Smita Bhatia,NA,NA,Internal,Internal,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,NV000203
+NV000204,Oracle,KM-C2M Testing,3,COGS,Suresh Sangaraju,Shama Kamat,Balan Ramaswamy,FB,SOW,,23-Aug-20,10-Apr-26,Signed,Active,#NAME?,,NV000204
+NV000205,Oracle,KM-WPM,8,COGS,Suresh Sangaraju,Shama Kamat,Balan Ramaswamy,FB,SOW,,23-Aug-20,10-Apr-26,Signed,Active,#NAME?,,NV000205
+NV000206,Oracle,KM-Management,2,COGS,Shama Kamat,Shama Kamat,Balan Ramaswamy,FB,Internal,,-,-,Signed,Active,#NAME?,,NV000206
+NV000207,RKON,BAS+ODS,2,COGS,Lakshmi Soumya Konambhotla,Lakshmi Soumya Konambhotla,Lawlesh Tiwari ,T&M,SOW,,21-Jul-22,31-Mar-26,Signed,Active,#NAME?,,NV000207
+NV000208,RKON,Ludi offshore,8,COGS,Manish Sharma,Vedavati Shetty,Lawlesh Tiwari ,T&M,SOW,,44739,31-Dec-26,Signed,Active,#NAME?,,NV000208
+NV000209,RKON,Mapware,0,COGS,Shanil Nayani,Ryan Cardoz - TBD,Lawlesh Tiwari ,T&M,SOW,,45323,31-Jan-25,Signed,Completed,#NAME?,,NV000209
+NV000210,RKON,MSP+ACAMS,0,COGS,Inayat Kazi,Ritesh Gupta,Lawlesh Tiwari ,FMB,SOW,,44690,30-Sep-25,Signed,Completed,#NAME?,,NV000210
+NV000211,RKON,ServiceNow Reimplementation,0,COGS,Ritesh Gupta,Ritesh Gupta,Chandan Singh,FB,SOW,,45252,31-Aug-24,Signed,Completed,#NAME?,,NV000211
+NV000212,Sports Media Agency,Run For Charity,0,COGS,Swapnil Patil / Ryan Cardoz ,Ryan Cardoz,Ryan Cardoz,FB,SOW,,45367,Open Ended,,Completed,#NAME?,,NV000212
+NV000213,Sports Media Agency,Run Through UK,0,COGS,Anupriya Jaiswal,Ryan Cardoz,Ryan Cardoz,FB,SOW,,45397,45672,Signed,Completed,#NAME?,,NV000213
+NV000214,USP,USP - CC&B - ConEd,1,COGS,Balan Ramaswamy,Balan Ramaswamy,Balan Ramaswamy,T&M,Staff-Aug,,45096,46387,Signed,Active,#NAME?,,NV000214
+NV000215,Deloitte,Staff-Aug (Activity Dashsboard),0,COGS,Pranay Udapure,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000215
+NV000216,Deloitte,Staff-Aug (DayShape),0,COGS,Archana Khewariya,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000216
+NV000217,Deloitte,Staff-Aug (Diamonde),0,COGS,Sandeep Patil,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,,Completed,#NAME?,,NV000217
+NV000218,Sports Media Agency,RFC 2.0,0.05,COGS,Anupriya Jaiswal / Soumya Lakshmi,Ganesh Lande,Lawlesh Tiwari ,FMB,SOW,,45673,45936,Signed,Completed,#NAME?,,NV000218
+NV000219,Growth IT,FlightCheck AMS,1.15,COGS,Uday D’Souza,Prakash Ghaitadke ,Lawlesh Tiwari ,T&M,Staff-Aug,,44986,Open Ended,Signed,Active,#NAME?,,NV000219
+NV000220,RKON,ServiceNow MSP,2,COGS,Prakash Ghaitadke ,Prakash Ghaitadke ,Lawlesh Tiwari ,FMB+T&M,SOW,,45536,31-Dec-26,Signed,Active,#NAME?,,NV000220
+NV000221,Deloitte,CARS,0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45605,45808,Signed,Completed,#NAME?,,NV000221
+NV000222,Deloitte,Levvia Transformation additional PODs,0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45523,45626,,Completed,#NAME?,,NV000222
+NV000223,Deloitte,TBD,3.5,COGS,Shailesh Erande,Shailesh Erande,Harshad Mandlecha,Internal,NA,,44621,46112,NA,Active,#NAME?,,NV000223
+NV000224,RKON,Strada Discovery,0,COGS,Rituraj Yeotikar,Ryan Cardoz,Chandan Singh,FB,SOW,,45566,30-Nov-24,Signed,Completed,#NAME?,,NV000224
+NV000225,Deloitte,RADC Additional Team,0,COGS,Sudhanshu Nautiyal ,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45505,45626,,Completed,#NAME?,,NV000225
+NV000226,Deloitte,INK DART MVP,0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45586,45808,Signed,Completed,#NAME?,,NV000226
+NV000227,Deloitte,Digital Platforms ,0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45566,45808,Not signed,Completed,#NAME?,,
+NV000228,Alaska Highway Business Travel Guide,The Local Pages - Alcan Mobile App Development,0,COGS,Uday D’Souza,Ryan Cardoz,,FB,SOW,,45621,30-Apr-25,Signed,Completed,#NAME?,,
+NV000229,Globe Tele Services,GTS OTP Automation,0,COGS,Uday D’Souza,Sugato Goswami,Kapil Godani,FB,SOW,,45600,45777,Signed,Sort-Closed,#NAME?,,
+NV000230,RKON,Neovance - Compass Intranet (SharePoint) Site Development,0,COGS,,Ryan Cardoz,Chandan Singh,FB,SOW,,45624,7-Dec-24,Signed,Completed,#NAME?,,
+NV000231,RCG Global Services Inc,RCGGS email domain transition and migration support,0,COGS,Ritesh Gupta,Ritesh Gupta,Ritesh Gupta,FB,SOW,,45628,45681,Signed,Completed,#NAME?,,
+NV000232,Milliman Solutions LLC,RX_Portal_2.0,0,COGS,Sunil Nair,Shailesh Erande,Kapil Godani,FB,SOW,,45677,45798,Signed,Sort-Closed,#NAME?,,
+NV000233,RKON,Strada implementation,5,COGS,Rituraj Yeotikar,Rituraj Yeotikar,Lawlesh Tiwari ,FMB,SOW,,45627,18-Dec-25,Signed,Completed,#NAME?,,
+NV000234,Imperium Technologies,Imperium - SteamView AMS,0,COGS,Ritesh Gupta,Ryan Cardoz,Smita Bhatia,FMB,SOW,,45748,46053,Not signed,Hold,#NAME?,,
+NV000235,RKON,Wrench Group - Azure Function App Integration with Vnet,0,COGS,Shanil Nayani,Ryan Cardoz,Chandan Singh,FB,SOW,,45687,4-Feb-25,Signed,Completed,#NAME?,,
+NV000236,WOTTR,COSX,0,COGS,Shine Pushpan,Shine Pushpan,Kapil Godani,FB,SOW,,45691,45723,Not signed,Hold,#NAME?,,
+NV000237,RKON,GitHub Enterprise support,0,COGS,,Ryan Cardoz,Chandan Singh,FB,SOW,,45663,31-Jan-25,Signed,Completed,#NAME?,,
+NV000238,RKON,Senior Advisory Role,0.05,COGS,Sandeep Dhir,Sandeep Dhir,Kapil Godani,T&M,SOW,,45689,Open ended,Signed,Active,#NAME?,,
+NV000239,RKON,Neovance App Migration,3.65,COGS,Shailesh Erande,Ritesh Gupta,Lawlesh Tiwari ,T&M,SOW,,11-Feb-24,15-Mar-25,Signed,Completed,#NAME?,,
+NV000240,Open Road App LLC,ALCAN Maps Integration and Convoy,0.1,COGS,Uday D’Souza,Vedavati Shetty,Smita Bhatia,FB,SOW,,45726,45991,Signed,Hold,#NAME?,,
+NV000241,Cognida,MOSS/SharePoint Lead,0,COGS,Ritesh Gupta,Ritesh Gupta,Balan Ramaswamy,T&M,Staff-Aug,,45717,45838,Signed,Completed,#NAME?,,
+NV000242,NewVision,Mobility practice Pool,5,COGS,Shailesh Erande,NA,NA,Internal,NA,,44621,46112,NA,Active,#NAME?,,
+NV000243,Deloitte,GDAS CoRe services - QA automation (Learning COE),0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45740,45822,Signed,Completed,#NAME?,,
+NV000244,Global Wave Group,GWG - Credit Track,0,COGS,KevalSing Rajput,Rituraj Yeotikar,Balan Ramaswamy,FB,SOW,,21-Apr-25,1-Aug-25,Signed,Completed,#NAME?,,
+NV000245,RKON,Neovance e-CRM,0,COGS,Prakash Ghaitadke ,Prakash Ghaitadke ,Lawlesh Tiwari ,T&M,SOW,,45748,31-Aug-25,Signed,Completed,#NAME?,,
+NV000246,Deloitte,PPDS Reporting Refresh / DT Solutions - Operations,0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45778,45900,Signed,Completed,#NAME?,,
+NV000247,ING financial services LLC,ING QA Consulting,0,COGS,Sugato Goswami,Saksham Sarode,Saksham Sarode,T&M,SOW,,45782,45842,Signed,Completed,#NAME?,,
+NV000248,Votal,Functional testing of AI/ML app,0,COGS,,Saksham Sarode,Lawlesh Tiwari ,FMB,SOW,,45789,10-Aug-25,Signed,Completed,#NAME?,,
+NV000249,Sports Media Agency,Application - AWS OCR Integration,0,COGS,Anupriya Jaiswal / Soumya Lakshmi,Ganesh Lande,Lawlesh Tiwari ,T&M,SOW,,45777,16-May-25,Not signed,Completed,#NAME?,,
+NV000250,Deloitte,DWP (Distributed Work Portal),0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,-,-,Not signed,Completed,#NAME?,,
+NV000251,RKON,RKON account pool,0,COGS,Lawlesh Tiwari ,Lawlesh Tiwari ,Lawlesh Tiwari ,Internal,Internal,,44621,31-Mar-26,NA,Hold,#NAME?,,
+NV000252,SoftServe,SoftServe account pool,0,COGS,Uday D’Souza,,Harshad Mandlecha,Internal,Internal,,45748,31-Mar-26,NA,Active,#NAME?,,
+NV000253,Redaptive,Redaptive account pool,0,COGS,,,Harshad Mandlecha,Internal,Internal,,45748,31-Mar-26,NA,Sort-Closed,#NAME?,,
+NV000254,Deloitte,QAP Testing Automation Maintenance,0,COGS,Shama Kamat,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45820,30-Nov-25,Not signed,Completed,#NAME?,,
+NV000255,Deloitte,INK Testing,0,COGS,Kishor Sarode,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45641,31-Dec-25,Signed,Completed,#NAME?,,
+NV000256,RKON,Neovance MSP,0,COGS,Prakash Ghaitadke ,Ritesh Gupta,Lawlesh Tiwari ,T&M,SOW,,45809,31-Oct-25,Signed,Completed,#NAME?,,
+NV000257,Axiad,Axiad StaffAug,4,COGS,Uday D’Souza,Vedavati Shetty,Harshad Mandlecha,T&M,Staff-Aug,,45845,31-Jul-26,Signed,Active,#NAME?,,
+NV000258,Beyondsoft,CDMO Product Development / Batch processing,0,COGS,Uday D’Souza,Ganesh Lande,Lawlesh Tiwari ,Internal,Internal,,45839,31-Dec-25,Not signed,Sort-Closed,#NAME?,,
+NV000259,Beyondsoft,CBM Datalake - phase 2,7,COGS,Lakshmi Soumya Konambhotla,Vedavati Shetty,Lawlesh Tiwari ,FB,SOW,,4-Aug-25,31-Mar-26,Signed,Active,#NAME?,,
+NV000260,RKON,Neovance Axway MFT Migration,0,COGS,Prakash Ghaitadke ,Ritesh Gupta,Lawlesh Tiwari ,T&M,SOW,,45849,15-Aug-25,Not signed,Completed,#NAME?,,
+NV000261,Deloitte,GCS SR&T Contractor SOW for NV,4,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,SOW,,45838,31-May-26,Signed,Active,#NAME?,,
+NV000262,NewVision,Playwright Automation,0,COGS,,Saksham Sarode,NA,Internal,NA,,1-Mar-22,31-Mar-26,NA,Active,#NAME?,,
+NV000263,Deloitte,DataLens Audit Reporting,0,COGS,Rajesh Hiremath,Shailesh Erande,Harshad Mandlecha,FB,SOW,,45778,45991,Signed,Completed,#NAME?,,
+NV000264,Deloitte,Omnia Data - NV,80,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,45838,46171,Not signed,Active,#NAME?,,
+NV000265,Deloitte,DataLens - NV,15,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Signed,Active,#NAME?,,
+NV000266,NewVision,Microsoft-GenAI initiative (TestLens),0,COGS,Shailesh Erande,Shailesh Erande,NA,Internal,Internal,,1-Jul-25,31-Mar-26,NA,Completed,#NAME?,,
+NV000267,NewVision,Investment - iQureComp,0,COGS,Lakshmi Soumya Konambhotla,,NA,Internal,Internal,,1-Jul-25,31-Mar-26,NA,Completed,#NAME?,,
+NV000268,Growth IT,FlightCheck Azure Migration,0,COGS,Kiranjit Bhowmick / Ritesh Gupta,Ritesh Gupta,Lawlesh Tiwari ,FB,SOW,,11-Aug-25,12-Sep-25,Signed,Completed,#NAME?,,
+NV000269,RKON,Neovance DevOps Data Enablement Solutions,0,COGS,Sumedh Budukh,Ganesh Lande,Lawlesh Tiwari ,T&M,SOW,,8-Aug-25,5-Sep-25,Signed,Completed,#NAME?,,
+NV000270,Global Wave Group,Credit Track – Auto Spread Automation,0,COGS,KevalSing Rajput,Ganesh Lande,Lawlesh Tiwari ,FB,SOW,,18-Aug-25,21-Nov-25,Signed,Completed,#NAME?,,
+NV000271,Globe Tele Services,GTS - Impulse messaging platform project,14.25,COGS,Anup Sikka,Vedavati Shetty,Kapil Godani,FB,Staff-Aug,,18-Aug-25,31-Mar-26,Signed,Active,#NAME?,,
+NV000272,Beyondsoft,Client Portal Rel 1.1 ,2.1,COGS,Lakshmi Soumya Konambhotla,Vedavati Shetty,Lawlesh Tiwari ,FB,SOW,,18-Aug-25,12-Dec-25,Signed,Completed,#NAME?,,
+NV000273,Sports Media Agency,RFC 2.0 SEO,0,COGS,Anupriya Jaiswal,Ganesh Lande,Lawlesh Tiwari ,FB,SOW,,15-Sep-25,30-Oct-25,Signed,Completed,#NAME?,,
+NV000274,Cognida,DevOps,0,COGS,Ritesh Gupta,Ritesh Gupta,Balan Ramaswamy,T&M,Staff-Aug,,1-Sep-25,31-Dec-25,Not signed,Hold,#NAME?,,
+NV000275,Arena Club,Social Messaging,0,COGS,Shweta,Ganesh Lande,Lawlesh Tiwari ,FB,SOW,,3-Sep-25,14-Nov-25,Signed,Completed,#NAME?,,
+NV000276,Globe Tele Services,Finbraine - staff-aug,10.7,COGS,Anup Sikka,Vedavati Shetty,Kapil Godani,T&M,Staff-Aug,,8-Sep-25,TBD,Not signed,Active,#NAME?,,
+NV000277,SRI Tech Solutions,SRI-Wipro Staff-Aug,1,COGS,,Vedavati Shetty,Kapil Godani,T&M,Staff-Aug,,8-Sep-25,TBD,Not signed,Sort-Closed,#NAME?,,
+NV000278,RSM,RSM StaffAug,1,COGS,,,Harshad Mandlecha,T&M,Staff-Aug,,22-Sep-25,31-May-26,Signed,Active,#NAME?,,
+NV000279,Deloitte,Global Success Factor - NV,0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,-,-,Not signed,Hold,#NAME?,,
+NV000280,Votal,Votal Product development and enhancement,4.1,COGS,Aditi Joshi,Vedavati Shetty,Kapil Godani,T&M,SOW,,16-Sep-25,30-Sep-26,Signed,Active,#NAME?,,
+NV000281,Deloitte,Levvia Transformation - NV,101,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Signed,Active,#NAME?,,
+NV000282,Deloitte,Levvia Production Support - NV,21,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Not signed,Active,#NAME?,,
+NV000283,Globe Tele Services,GTS-StaffAug,0.3,COGS,Prakash Ghaitadke ,Vedavati Shetty,Kapil Godani,T&M,Staff-Aug,,17-Sep-25,31-Mar-26,Signed,Active,#NAME?,,
+NV000284,Deloitte,INK Transformation - NV,13,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Not signed,Active,#NAME?,,
+NV000285,Deloitte,Tax myInsights POD Team - NV,3,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Signed,Active,#NAME?,,
+NV000286,Deloitte,New Vision Consulting Services - RPA RUN SOW,10,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Not signed,Active,#NAME?,,
+NV000287,Deloitte,GES- Project Vision – AWS DevOps Team,2,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Signed,Active,#NAME?,,
+NV000288,Deloitte,Project work for Pillar 2,2,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Signed,Active,#NAME?,,
+NV000289,Deloitte,Omnia Data Tie-Out - NV,11,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,30-May-26,Signed,Active,#NAME?,,
+NV000290,Deloitte,DWP (Distributed Work Portal) Transformation Project - NV,19,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Not signed,Active,#NAME?,,
+NV000291,Deloitte,DT Solutions – POD Team to support Global Learning,4,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,30-Jan-26,Not signed,Active,#NAME?,,
+NV000292,Deloitte,DT Tax Solutions common SOW,16,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,29-May-26,Not signed,Active,#NAME?,,
+NV000293,Deloitte,GDAS CoRe services - QA automation,3,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,29-May-26,Signed,Active,#NAME?,,
+NV000294,Deloitte,QAP Testing Automation Maintenance - NV,5,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,29-May-26,Signed,Active,#NAME?,,
+NV000295,Deloitte,GCS T&T Contractor SoW for NV,4,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,31-May-26,Signed,Active,#NAME?,,
+NV000296,Deloitte,Digital Platforms NV,4,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,30-Apr-26,Signed,Active,#NAME?,,
+NV000297,Deloitte,Deloitte.com STK INV,1,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,45838,46173,Signed,Active,#NAME?,,
+NV000298,Deloitte,Dayshape O&M,2,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,45838,46171,Signed,Active,#NAME?,,
+NV000299,Deloitte,DTTL TAX INTELA- NV,3,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,45838,46173,Not signed,Active,#NAME?,,
+NV000300,Deloitte,Omnia Products - NV,5,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,45838,31-May-26,Not signed,Active,#NAME?,,
+NV000301,Deloitte,CRM R&I – NV,0,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,30-Jun-25,30-Nov-25,Signed,Completed,#NAME?,,
+NV000302,Deloitte,Omnia Data - NV - Second SoW,13,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,8-Sep-25,29-May-26,Not signed,Active,#NAME?,,
+NV000303,Sports Media Agency,RFC 2.0 Phase -2,7.75,COGS,Anupriya Jaiswal / Soumya Lakshmi,Vedavati Shetty,Lawlesh Tiwari ,FMB,SOW,,25-Sep-25,8-Feb-26,Not signed,Sort-Closed,#NAME?,,
+NV000304,Aivontis,NovaBioMedial MSP,0,COGS,Prakash Ghaitadke ,Ganesh Lande,Lawlesh Tiwari ,T&M,SOW,,-,-,Not signed,Hold,#NAME?,,
+NV000305,Deloitte,Serengeti Playwright Automation,11,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,1-Oct-25,31-Mar-26,Signed,Active,#NAME?,,
+NV000306,Deloitte,SOW for DTFM Reporting,4,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,8-Oct-25,10-Aug-26,Signed,Active,#NAME?,,
+NV000307,RKON,Wrench – Azure DevOps,0.1,COGS,Prakash Ghaitadke ,Vedavati Shetty,Lawlesh Tiwari ,T&M,SOW,,1-Oct-25,31-Jan-26,Signed,Active,#NAME?,,
+NV000308,Globe Tele Services,Laptop Reimaging,0,COGS,Prakash Ghaitadke ,Prakash Ghaitadke ,Lawlesh Tiwari ,FB,SOW,,29-Oct-25,30-Nov-25,Signed,Completed,#NAME?,,
+NV000309,Growth IT,FlightCheck Laravel Upgrade,1,COGS,Manish Sharma,,Lawlesh Tiwari ,FB,SOW,,5-Nov-25,17-Dec-25,Signed,Completed,#NAME?,,
+NV000310,RKON,"Neovance – API Integration 
+between Amazon Connect and Engagement Platform ",1.15,COGS,Prakash Ghaitadke ,Vedavati Shetty,Lawlesh Tiwari ,T&M,SOW,,7-Oct-25,20-Feb-26,Signed,Completed,#NAME?,,
+NV000311,Aivontis,CommScope ITSM Automations,3.05,COGS,Prakash Ghaitadke ,Vedavati Shetty,Lawlesh Tiwari ,FMB,SOW,,4-Nov-25,31-Jan-26,Signed,Active,#NAME?,,
+NV000312,Aivontis,CommScope 365 Tenant to Tenant Migration,5.1,COGS,Prakash Ghaitadke ,Vedavati Shetty,Lawlesh Tiwari ,FB,SOW,,5-Nov-25,30-Apr-26,Signed,Active,#NAME?,,
+NV000313,RKON,Neovance Cloud Operations and Engineering,3.5,COGS,Prakash Ghaitadke ,Vedavati Shetty,Lawlesh Tiwari ,FMB,SOW,,1-Nov-25,31-Oct-26,Signed,Active,#NAME?,,
+NV000314,Deloitte,OnPremAnalytics (AERS) Data PG SOW,,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,2-Dec-25,31-Mar-26,Signed,Active,#NAME?,,
+NV000315,Aivontis,ElevateBio,5.5,COGS,Kiranjit Bhowmick,Prakash Ghaitadke ,Lawlesh Tiwari ,FMB,SOW,,1-Dec-25,31-Dec-26,Signed,Active,#NAME?,,
+NV000316,Milliman Solutions LLC,RX Portal - Managing Donated Medicines - Phase 2,,COGS,-,-,Lawlesh Tiwari ,FMB,SOW,,17-Nov-25,30-Jun-26,Signed,Hold,#NAME?,,
+NV000317,Sports Media Agency,RTHub & RTUK Website Maintenance,,COGS,Lakshmi Soumya Konambhotla,Vedavati Shetty,Lawlesh Tiwari ,T&M,SOW,,2-Jan-26,31-Dec-26,Signed,Active,#NAME?,,
+NV000318,Axiad,Axiad - MESH Platform Enhancement,,COGS,Uday D’Souza,Vedavati Shetty,Harshad Mandlecha,T&M,SOW,31-Jan-26,16-Dec-25,31-Jul-26,Signed,Active,#NAME?,,
+NV000319,RKON,RPA-Assessment,,COGS,Saksham Sarode,Vedavati Shetty,Smita Bhatia,FB,SOW,,46042,11-Feb-26,Signed,Completed,#NAME?,,
+NV000320,Softserve,CISCO,,COGS,,,Harshad Mandlecha,T&M,SOW,,,,,,#NAME?,,
+NV000321,Deloitte,Automate Pro engagement ( ServiceNow COE),,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,46062,46171,Signed,Active,#NAME?,,
+NV000322,Seasalt,Managed Data Operations,,COGS,Uday D’Souza,Devarajan P,Kapil Godani,FMB,SOW,,46069,46799,Signed,Active,#NAME?,,
+NV000323,Deloitte,Tax Business Thor,,COGS,,Shailesh Erande,Harshad Mandlecha,T&M,Staff-Aug,,46044,46171,Signed,Active,#NAME?,,
+NV000324,Sports Media Agency,RFC2.0 Maintenance,,COGS,Lakshmi Soumya Konambhotla,Vedavati Shetty,Lawlesh Tiwari ,T&M,SOW,,46062,46418,Signed,Active,#NAME?,,
+NV000325,Sports Media Agency,SFC Refinement Phase ,,COGS,Lakshmi Soumya Konambhotla,Vedavati Shetty,Lawlesh Tiwari ,T&M,SOW,,46062,46094,Signed,Active,#NAME?,,
+NV000326,Beyondsoft,Client Portal and Data Lake Managed Platform Services,,COGS,Lakshmi Soumya Konambhotla,Vedavati Shetty,Lawlesh Tiwari ,FB,SOW,,46034,46387,Not signed,Active,#NAME?,,
+NV000327,RKON,Power Automate Support,,COGS,Shital Ghule,Vedavati Shetty,Smita Bhatia,T&M,SOW,,46058,Open ended,Signed,Active,#NAME?,,
+NV000328,SoftServe,NasDaQ Staff-Aug,,COGS,-,-,Harshad Mandlecha,T&M,SOW,,46078,46203,Signed,Active,#NAME?,,
+NV000329,ING financial services LLC,Testing Framework Phase-1,,COGS,Sugato Goswami,Saksham Sarode,Saksham Sarode,FMB,SOW,,46090,46188,Not signed,Active,#NAME?,,
+NV000330,,,,,,,,,,,,,,,#NAME?,,
+NV000331,,,,,,,,,,,,,,,#NAME?,,
+NV000332,,,,,,,,,,,,,,,#NAME?,,
+NV000333,,,,,,,,,,,,,,,#NAME?,,
+NV000334,,,,,,,,,,,,,,,#NAME?,,
+NV000335,,,,,,,,,,,,,,,#NAME?,,
+NV000336,,,,,,,,,,,,,,,#NAME?,,
+NV000337,,,,,,,,,,,,,,,#NAME?,,
+NV000338,,,,,,,,,,,,,,,#NAME?,,
+NV000339,,,,,,,,,,,,,,,#NAME?,,
+NV000340,,,,,,,,,,,,,,,#NAME?,,
+NV000341,,,,,,,,,,,,,,,#NAME?,,
+NV000342,,,,,,,,,,,,,,,#NAME?,,
+NV000343,,,,,,,,,,,,,,,#NAME?,,

@@ -46,7 +46,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 
 // ============================================================================
 // Types
@@ -264,7 +263,7 @@ function ContractFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" preventDismiss>
         <DialogHeader>
           <DialogTitle>{contract ? 'Edit Contract' : 'Create New Contract'}</DialogTitle>
         </DialogHeader>
@@ -573,7 +572,7 @@ export default function ContractsPage() {
       setShowAddModal(false);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to create contract');
+      console.error('API Error:', error); alert('Failed to create contract. Please try again.');
     },
   });
 
@@ -590,7 +589,7 @@ export default function ContractsPage() {
       setSelectedContract(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to update contract');
+      console.error('API Error:', error); alert('Failed to update contract. Please try again.');
     },
   });
 
@@ -606,7 +605,7 @@ export default function ContractsPage() {
       setSelectedContract(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to delete contract');
+      console.error('API Error:', error); alert('Failed to delete contract. Please try again.');
     },
   });
 
@@ -621,7 +620,7 @@ export default function ContractsPage() {
       queryClient.invalidateQueries({ queryKey: ['contracts-stats'] });
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || error.message || 'Failed to activate contract');
+      console.error('API Error:', error); alert('Failed to activate contract. Please try again.');
     },
   });
 
@@ -728,7 +727,6 @@ export default function ContractsPage() {
   };
 
   return (
-    <MainLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -1129,6 +1127,5 @@ export default function ContractsPage() {
           loading={deleteMutation.isPending}
         />
       </div>
-    </MainLayout>
   );
 }

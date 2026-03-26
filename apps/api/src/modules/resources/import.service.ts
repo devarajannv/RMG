@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import prisma from '../../lib/prisma';
 import { ApiError } from '../../middleware/errorHandler';
 import { logger } from '../../lib/logger';
+import { sanitizeImportValue } from '../../lib/csv-sanitizer';
 
 // ============================================================================
 // Types
@@ -60,7 +61,14 @@ function parseExcelBuffer(buffer: Buffer): ResourceRow[] {
     throw new ApiError('No data rows found in Excel file', 400, 'NO_DATA');
   }
 
-  return rows;
+  // H-11: Sanitize all imported cell values to prevent formula injection
+  return rows.map((row) => {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      sanitized[key] = typeof value === 'string' ? sanitizeImportValue(value) : value;
+    }
+    return sanitized as unknown as ResourceRow;
+  });
 }
 
 /**

@@ -4,6 +4,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import * as microsoftService from './microsoft.service';
 import { config } from '../../config/env';
@@ -47,7 +48,7 @@ function setAuthCookies(res: Response, tokens: any): void {
   res.cookie('accessToken', tokens.accessToken, {
     httpOnly: true,
     secure: config.isProd,
-    sameSite: 'lax', // 'lax' for OAuth redirects
+    sameSite: 'strict', // L-14: Use strict for auth cookies
     signed: true,
     maxAge: tokens.accessExpiresIn * 1000,
     path: '/',
@@ -57,11 +58,67 @@ function setAuthCookies(res: Response, tokens: any): void {
   res.cookie('refreshToken', tokens.refreshToken, {
     httpOnly: true,
     secure: config.isProd,
-    sameSite: 'lax',
+    sameSite: 'strict', // L-14: Use strict for auth cookies
     signed: true,
     maxAge: tokens.refreshExpiresIn * 1000,
     path: '/api/v1/auth/refresh',
   });
+}
+
+/**
+ * Create HMAC-signed state for OAuth flow
+ * Prevents CSRF and state tampering
+ */
+function createSignedState(data: Record<string, unknown>): string {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const payload = JSON.stringify({ ...data, nonce, timestamp: Date.now() });
+  const hmac = crypto.createHmac('sha256', config.cookieSecret).update(payload).digest('hex');
+  return Buffer.from(JSON.stringify({ payload, hmac })).toString('base64url');
+}
+
+/**
+ * Verify and decode HMAC-signed state
+ * Returns null if signature is invalid or state expired (5 min)
+ */
+function verifySignedState(state: string): Record<string, unknown> | null {
+  try {
+    const { payload, hmac } = JSON.parse(Buffer.from(state, 'base64url').toString());
+    const expectedHmac = crypto.createHmac('sha256', config.cookieSecret).update(payload).digest('hex');
+    
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) {
+      logger.warn('OAuth state HMAC verification failed');
+      return null;
+    }
+    
+    const data = JSON.parse(payload);
+    
+    // Expire state after 5 minutes
+    if (Date.now() - data.timestamp > 5 * 60 * 1000) {
+      logger.warn('OAuth state expired');
+      return null;
+    }
+    
+    return data;
+  } catch {
+    logger.warn('Failed to decode OAuth state');
+    return null;
+  }
+}
+
+/**
+ * Validate redirect URL is same-origin or from allowed origins
+ */
+function isAllowedRedirectUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const allowedOrigins = [
+      new URL(config.frontendUrl).origin,
+      ...config.corsOrigins.map(o => { try { return new URL(o).origin; } catch { return ''; } }),
+    ];
+    return allowedOrigins.includes(parsed.origin);
+  } catch {
+    return false;
+  }
 }
 
 // =============================================================================
@@ -102,13 +159,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const query = initiateSchema.parse(req.query);
     const redirectUri = getRedirectUri(req);
     
-    // Store state with tenant info and redirect URL
-    const stateData = {
-      tenantId: query.tenantId || config.defaultTenantId,
-      redirectUrl: query.redirectUrl || config.frontendUrl,
-      timestamp: Date.now(),
-    };
-    const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
+    // Validate redirect URL if provided
+    const redirectUrl = query.redirectUrl || config.frontendUrl;
+    if (query.redirectUrl && !isAllowedRedirectUrl(query.redirectUrl)) {
+      res.status(400).json({ error: 'Invalid redirect URL', code: 'INVALID_REDIRECT' });
+      return;
+    }
+    
+    // Create HMAC-signed state to prevent CSRF and tampering
+    const state = createSignedState({
+      tenantId: config.defaultTenantId, // Always use server-side tenant ID
+      redirectUrl,
+    });
 
     // Get Microsoft authorization URL
     const authUrl = await microsoftService.getAuthorizationUrl(redirectUri, state);
@@ -142,18 +204,23 @@ router.get('/callback', async (req: Request, res: Response, _next: NextFunction)
       return res.redirect(errorUrl);
     }
 
-    // Decode state
+    // Decode and verify signed state
     let stateData = {
       tenantId: config.defaultTenantId,
       redirectUrl: config.frontendUrl || 'http://localhost:3000',
     };
     
     if (params.state) {
-      try {
-        stateData = JSON.parse(Buffer.from(params.state, 'base64').toString());
-      } catch {
-        logger.warn('Failed to decode OAuth state');
+      const verified = verifySignedState(params.state);
+      if (!verified) {
+        const frontendUrl = config.frontendUrl || 'http://localhost:3000';
+        const errorUrl = `${frontendUrl}/login?error=invalid_state&message=${encodeURIComponent('OAuth state verification failed. Please try again.')}`;
+        return res.redirect(errorUrl);
       }
+      stateData = {
+        tenantId: (verified.tenantId as string) || config.defaultTenantId,
+        redirectUrl: (verified.redirectUrl as string) || config.frontendUrl || 'http://localhost:3000',
+      };
     }
 
     const redirectUri = getRedirectUri(req);
@@ -199,6 +266,15 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       res.status(400).json({
         error: 'Authorization code is required',
         code: 'MISSING_CODE',
+      });
+      return;
+    }
+
+    // M-05: Validate redirectUri against allowlist
+    if (redirectUri && !isAllowedRedirectUrl(redirectUri)) {
+      res.status(400).json({
+        error: 'Invalid redirect URI',
+        code: 'INVALID_REDIRECT_URI',
       });
       return;
     }

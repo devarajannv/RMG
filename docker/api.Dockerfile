@@ -68,7 +68,7 @@ ENV NODE_ENV=development \
 EXPOSE 4000
 
 # Use dumb-init to handle signals properly
-CMD ["dumb-init", "npm", "run", "dev", "--workspace=@rmgaas/api"]
+CMD ["dumb-init", "sh", "-c", "npx prisma generate --schema apps/api/prisma/schema.prisma && npm run dev --workspace=@rmgaas/api"]
 
 # =============================================================================
 # Builder Stage - Build the application

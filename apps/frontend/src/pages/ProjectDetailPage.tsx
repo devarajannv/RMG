@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
 import { ArrowLeft, Users, Building2, User, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 
 // ============================================================================
@@ -96,27 +95,22 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <MainLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      </MainLayout>
     );
   }
 
   if (error || !project) {
     return (
-      <MainLayout>
         <div className="flex flex-col items-center justify-center h-64">
           <p className="text-red-600 mb-4">{error || 'Project not found'}</p>
           <Button onClick={() => navigate('/projects')}>Back to Projects</Button>
         </div>
-      </MainLayout>
     );
   }
 
   return (
-    <MainLayout>
       <div className="space-y-6">
         {/* Breadcrumb & Header */}
         <div className="flex items-center justify-between">
@@ -325,7 +319,6 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 }
 

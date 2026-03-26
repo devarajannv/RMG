@@ -34,7 +34,15 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   // Run the rest of the request in the context
   requestContext.run(ctx, () => {
     // Log request (exclude sensitive paths)
-    const sensitiveEndpoints = ['/api/v1/auth/login', '/api/v1/auth/register', '/api/v1/auth/refresh'];
+    // LOG-04: Expanded sensitive endpoints to cover all PII-handling paths
+    const sensitiveEndpoints = [
+      '/api/v1/auth/login', '/api/v1/auth/register', '/api/v1/auth/refresh',
+      '/api/v1/auth/reset-password', '/api/v1/auth/forgot-password',
+      '/api/v1/auth/change-password', '/api/v1/auth/mfa',
+      '/api/v1/users', '/api/v1/resources',
+      '/api/v1/onboarding/resources', '/api/v1/onboarding/invitations',
+      '/api/v1/gdpr',
+    ];
     const isSensitive = sensitiveEndpoints.some((endpoint) =>
       req.path.startsWith(endpoint)
     );

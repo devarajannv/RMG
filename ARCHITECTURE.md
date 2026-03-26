@@ -77,6 +77,31 @@
 - Platform Admin is fundamentally different (cross-tenant, billing, support)
 - Security boundary: Platform has god-mode, must be isolated
 
+### Tenant App Information Architecture (DECISION: March 10, 2026)
+
+Tenant-app navigation and settings must be separated by **scope**:
+
+- `My Settings` = personal, user-scoped controls only
+- `Organization Admin` = tenant-wide controls for that customer organization only
+- Platform-global controls remain in the Platform Portal
+
+Approved tenant-app sidebar target:
+
+- Dashboard
+- Daily Work
+- Resource Management
+- Business
+- Intelligence
+- My Settings
+- Organization Admin
+
+Implications:
+
+- Personal settings include: Profile, Notifications, Display, Security
+- Tenant-admin controls move under `Organization Admin`
+- Workflow governance must not be split between a tenant-wide Settings page and a separate Workflows destination
+- `Request Types` and `Workflows` are adjacent tenant-admin capabilities and should live together under the workflow governance domain
+
 ---
 
 ## 🎯 Product Vision

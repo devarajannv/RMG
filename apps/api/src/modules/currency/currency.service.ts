@@ -1,4 +1,5 @@
 import { PrismaClient, Currency, ExchangeRate } from '@prisma/client';
+import { createAuditLog } from '../audit/audit.service';
 
 const prisma = new PrismaClient();
 
@@ -33,7 +34,7 @@ export const currencyService = {
     symbol: string;
     isBase?: boolean;
     decimalPlaces?: number;
-  }): Promise<Currency> {
+  }, actorUserId?: string): Promise<Currency> {
     // If this is being set as base, unset other base currencies
     if (data.isBase) {
       await prisma.currency.updateMany({
@@ -42,7 +43,7 @@ export const currencyService = {
       });
     }
 
-    return prisma.currency.create({
+    const created = await prisma.currency.create({
       data: {
         tenantId,
         code: data.code.toUpperCase(),
@@ -52,6 +53,23 @@ export const currencyService = {
         decimalPlaces: data.decimalPlaces || 2,
       },
     });
+
+    await createAuditLog(
+      tenantId,
+      actorUserId ?? null,
+      'Currency',
+      created.id,
+      'CREATE',
+      {
+        code: created.code,
+        name: created.name,
+        symbol: created.symbol,
+        isBase: created.isBase,
+        decimalPlaces: created.decimalPlaces,
+      }
+    );
+
+    return created;
   },
 
   // Update a currency
@@ -61,7 +79,15 @@ export const currencyService = {
     isBase?: boolean;
     isActive?: boolean;
     decimalPlaces?: number;
-  }): Promise<Currency> {
+  }, actorUserId?: string): Promise<Currency> {
+    const existing = await prisma.currency.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new Error('Currency not found');
+    }
+
     // If this is being set as base, unset other base currencies
     if (data.isBase) {
       await prisma.currency.updateMany({
@@ -70,26 +96,65 @@ export const currencyService = {
       });
     }
 
-    return prisma.currency.update({
+    const updated = await prisma.currency.update({
       where: { id },
       data,
     });
+
+    await createAuditLog(
+      tenantId,
+      actorUserId ?? null,
+      'Currency',
+      updated.id,
+      'UPDATE',
+      {
+        before: {
+          name: existing.name,
+          symbol: existing.symbol,
+          isBase: existing.isBase,
+          isActive: existing.isActive,
+          decimalPlaces: existing.decimalPlaces,
+        },
+        after: data,
+      }
+    );
+
+    return updated;
   },
 
   // Delete a currency (soft delete by deactivating)
-  async deleteCurrency(tenantId: string, id: string): Promise<Currency> {
+  async deleteCurrency(tenantId: string, id: string, actorUserId?: string): Promise<Currency> {
     const currency = await prisma.currency.findFirst({
       where: { id, tenantId },
     });
+
+    if (!currency) {
+      throw new Error('Currency not found');
+    }
 
     if (currency?.isBase) {
       throw new Error('Cannot delete base currency');
     }
 
-    return prisma.currency.update({
+    const updated = await prisma.currency.update({
       where: { id },
       data: { isActive: false },
     });
+
+    await createAuditLog(
+      tenantId,
+      actorUserId ?? null,
+      'Currency',
+      updated.id,
+      'DELETE',
+      {
+        code: currency.code,
+        name: currency.name,
+        reason: 'SOFT_DELETE',
+      }
+    );
+
+    return updated;
   },
 
   // Seed default currencies
@@ -260,7 +325,7 @@ export const exchangeRateService = {
       },
     });
 
-    return prisma.exchangeRate.create({
+    const created = await prisma.exchangeRate.create({
       data: {
         tenantId,
         fromCurrencyId: data.fromCurrencyId,
@@ -276,18 +341,45 @@ export const exchangeRateService = {
         toCurrency: true,
       },
     });
+
+    await createAuditLog(
+      tenantId,
+      data.createdById ?? null,
+      'ExchangeRate',
+      created.id,
+      'CREATE',
+      {
+        fromCurrencyId: created.fromCurrencyId,
+        toCurrencyId: created.toCurrencyId,
+        rate: Number(created.rate),
+        effectiveFrom: created.effectiveFrom.toISOString(),
+        effectiveTo: created.effectiveTo?.toISOString(),
+        source: created.source,
+      }
+    );
+
+    return created;
   },
 
   // Update an exchange rate
   async updateExchangeRate(
-    _tenantId: string,
+    tenantId: string,
     id: string,
     data: {
       rate?: number;
       effectiveTo?: Date;
-    }
+    },
+    actorUserId?: string,
   ): Promise<ExchangeRate> {
-    return prisma.exchangeRate.update({
+    const existing = await prisma.exchangeRate.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new Error('Exchange rate not found');
+    }
+
+    const updated = await prisma.exchangeRate.update({
       where: { id },
       data,
       include: {
@@ -295,11 +387,53 @@ export const exchangeRateService = {
         toCurrency: true,
       },
     });
+
+    await createAuditLog(
+      tenantId,
+      actorUserId ?? null,
+      'ExchangeRate',
+      updated.id,
+      'UPDATE',
+      {
+        before: {
+          rate: Number(existing.rate),
+          effectiveTo: existing.effectiveTo?.toISOString(),
+        },
+        after: {
+          rate: data.rate,
+          effectiveTo: data.effectiveTo?.toISOString(),
+        },
+      }
+    );
+
+    return updated;
   },
 
   // Delete an exchange rate
-  async deleteExchangeRate(id: string): Promise<void> {
+  async deleteExchangeRate(tenantId: string, id: string, actorUserId?: string): Promise<void> {
+    const existing = await prisma.exchangeRate.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new Error('Exchange rate not found');
+    }
+
     await prisma.exchangeRate.delete({ where: { id } });
+
+    await createAuditLog(
+      tenantId,
+      actorUserId ?? null,
+      'ExchangeRate',
+      id,
+      'DELETE',
+      {
+        fromCurrencyId: existing.fromCurrencyId,
+        toCurrencyId: existing.toCurrencyId,
+        rate: Number(existing.rate),
+        effectiveFrom: existing.effectiveFrom.toISOString(),
+      }
+    );
   },
 
   // Convert amount between currencies

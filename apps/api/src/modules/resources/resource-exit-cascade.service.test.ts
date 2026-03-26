@@ -15,7 +15,7 @@ import {
 vi.mock('../../lib/prisma', () => ({
   default: {
     resource: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
     allocation: {
       findMany: vi.fn(),
@@ -43,7 +43,7 @@ describe('Resource Exit Cascade Service', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(prisma.resource.findUnique).mockResolvedValue(mockResource as never);
+    vi.mocked(prisma.resource.findFirst).mockResolvedValue(mockResource as never);
     vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 'audit-1' } as never);
   });
 
@@ -308,7 +308,7 @@ describe('Resource Exit Cascade Service', () => {
     });
 
     it('should handle resource not found error', async () => {
-      vi.mocked(prisma.resource.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.resource.findFirst).mockResolvedValue(null);
 
       const result = await executeResourceExitCascade(
         tenantId,
@@ -433,7 +433,7 @@ describe('Resource Exit Cascade Service', () => {
       vi.mocked(prisma.allocation.findMany).mockResolvedValue([]);
       
       // Make second resource fail
-      vi.mocked(prisma.resource.findUnique)
+      vi.mocked(prisma.resource.findFirst)
         .mockResolvedValueOnce(mockResource as never)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(mockResource as never);

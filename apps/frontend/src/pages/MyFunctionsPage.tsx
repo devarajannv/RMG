@@ -11,7 +11,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import MainLayout from '@/components/layout/MainLayout';
 import { Briefcase, Calendar, UserCheck, ArrowRight, Clock, AlertTriangle } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import { useMyAssignments, useDelegateFunction } from '@/hooks/useFunctions';
@@ -153,7 +152,6 @@ export default function MyFunctionsPage() {
   };
 
   return (
-    <MainLayout>
       <div className="p-6 max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -274,6 +272,5 @@ export default function MyFunctionsPage() {
           />
         )}
       </div>
-    </MainLayout>
   );
 }

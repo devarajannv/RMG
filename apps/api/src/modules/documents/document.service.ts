@@ -2,6 +2,7 @@ import { PrismaClient, Document, DocumentVersion, DocumentAccess, DocumentClassi
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { getTenantDocumentTaxonomyPolicy, resolveDocumentCategory } from '../../config/document-taxonomy';
 
 const prisma = new PrismaClient();
 
@@ -69,9 +70,9 @@ export const documentService = {
   },
 
   // Check if user has access to document
-  async checkAccess(documentId: string, userId: string, action: 'view' | 'download' | 'edit' | 'delete' | 'share'): Promise<boolean> {
-    const document = await prisma.document.findUnique({
-      where: { id: documentId },
+  async checkAccess(documentId: string, userId: string, action: 'view' | 'download' | 'edit' | 'delete' | 'share', tenantId: string): Promise<boolean> {
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, tenantId },
       include: { accessRules: true },
     });
 
@@ -119,6 +120,9 @@ export const documentService = {
       throw new Error(`File size exceeds maximum of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
     }
 
+    const documentTaxonomy = await getTenantDocumentTaxonomyPolicy(tenantId);
+    const category = resolveDocumentCategory(documentTaxonomy, data.category);
+
     // Generate unique filename
     const ext = path.extname(data.file.originalname);
     const filename = `${crypto.randomUUID()}${ext}`;
@@ -145,7 +149,7 @@ export const documentService = {
         mimeType: data.file.mimetype,
         fileSize: data.file.size,
         classification: data.classification || 'INTERNAL',
-        category: data.category,
+        category,
         tags: data.tags || [],
         storageProvider: 'LOCAL',
         storagePath,
@@ -200,7 +204,7 @@ export const documentService = {
     }
 
     // Check access
-    const hasAccess = await this.checkAccess(documentId, userId, 'edit');
+    const hasAccess = await this.checkAccess(documentId, userId, 'edit', tenantId);
     if (!hasAccess) {
       throw new Error('Access denied');
     }
@@ -265,7 +269,7 @@ export const documentService = {
     }
 
     // Check access
-    const hasAccess = await this.checkAccess(documentId, userId, 'download');
+    const hasAccess = await this.checkAccess(documentId, userId, 'download', tenantId);
     if (!hasAccess) {
       throw new Error('Access denied');
     }
@@ -314,14 +318,22 @@ export const documentService = {
     }
 
     // Check access
-    const hasAccess = await this.checkAccess(documentId, userId, 'edit');
+    const hasAccess = await this.checkAccess(documentId, userId, 'edit', tenantId);
     if (!hasAccess) {
       throw new Error('Access denied');
     }
 
+    const documentTaxonomy = await getTenantDocumentTaxonomyPolicy(tenantId);
+    const nextCategory = data.category !== undefined
+      ? resolveDocumentCategory(documentTaxonomy, data.category)
+      : undefined;
+
     await prisma.document.update({
       where: { id: documentId },
-      data,
+      data: {
+        ...data,
+        ...(data.category !== undefined ? { category: nextCategory } : {}),
+      },
     });
 
     // Log access
@@ -341,7 +353,7 @@ export const documentService = {
     }
 
     // Check access
-    const hasAccess = await this.checkAccess(documentId, userId, 'delete');
+    const hasAccess = await this.checkAccess(documentId, userId, 'delete', tenantId);
     if (!hasAccess) {
       throw new Error('Access denied');
     }
@@ -366,7 +378,15 @@ export const documentService = {
     canDelete?: boolean;
     canShare?: boolean;
     expiresAt?: Date;
-  }): Promise<DocumentAccess> {
+  }, tenantId: string): Promise<DocumentAccess> {
+    // Verify document belongs to the caller's tenant
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, tenantId },
+    });
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
     return prisma.documentAccess.create({
       data: {
         documentId,
@@ -385,7 +405,16 @@ export const documentService = {
   },
 
   // Revoke access
-  async revokeAccess(accessId: string): Promise<void> {
+  async revokeAccess(accessId: string, tenantId: string): Promise<void> {
+    // Verify the access record's document belongs to the caller's tenant
+    const access = await prisma.documentAccess.findUnique({
+      where: { id: accessId },
+      include: { document: { select: { tenantId: true } } },
+    });
+    if (!access || access.document.tenantId !== tenantId) {
+      throw new Error('Access record not found');
+    }
+
     await prisma.documentAccess.update({
       where: { id: accessId },
       data: { revokedAt: new Date() },

@@ -188,7 +188,7 @@ export async function deleteNotification(req: Request, res: Response): Promise<v
 export async function getPreferences(req: Request, res: Response): Promise<void> {
   const userId = req.user!.id;
 
-  const preferences = await notificationService.getUserPreferences(userId);
+  const preferences = await notificationService.getUserPreferences(userId, req.tenantId);
 
   res.json({
     success: true,
@@ -257,7 +257,7 @@ export async function bulkUpdatePreferences(req: Request, res: Response): Promis
 export async function resetPreferences(req: Request, res: Response): Promise<void> {
   const userId = req.user!.id;
 
-  await notificationService.resetPreferences(userId);
+  await notificationService.resetPreferences(userId, req.tenantId);
 
   res.json({
     success: true,
@@ -274,11 +274,12 @@ export async function resetPreferences(req: Request, res: Response): Promise<voi
  * POST /api/v1/notifications/cleanup
  */
 export async function cleanupNotifications(req: Request, res: Response): Promise<void> {
+  const tenantId = req.tenantId!;
   const daysOld = req.body.daysOld ? parseInt(req.body.daysOld) : 90;
 
   const [deletedOld, deletedExpired] = await Promise.all([
-    notificationService.deleteOldNotifications(daysOld),
-    notificationService.deleteExpiredNotifications(),
+    notificationService.deleteOldNotifications(tenantId, daysOld),
+    notificationService.deleteExpiredNotifications(tenantId),
   ]);
 
   res.json({

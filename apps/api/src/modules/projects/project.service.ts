@@ -224,7 +224,10 @@ export async function listProjects(
   filters: ProjectFilters,
   pagination: { page: number; limit: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) {
-  const { page, limit, sortBy = 'startDate', sortOrder = 'desc' } = pagination;
+  const { page, limit, sortBy: rawSortBy = 'startDate', sortOrder = 'desc' } = pagination;
+  // M-17: sortBy allowlist
+  const ALLOWED_PROJECT_SORT = ['startDate', 'endDate', 'createdAt', 'updatedAt', 'name', 'code', 'status', 'healthStatus'];
+  const sortBy = ALLOWED_PROJECT_SORT.includes(rawSortBy) ? rawSortBy : 'startDate';
   const skip = (page - 1) * limit;
 
   const where: Prisma.ProjectWhereInput = {

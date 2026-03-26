@@ -1,5 +1,30 @@
 import prisma from '../../lib/prisma';
 
+function buildCurrentBenchWhere(tenantId: string, now: Date) {
+  return {
+    tenantId,
+    status: 'ACTIVE' as const,
+    deletedAt: null,
+    employmentType: { not: 'CONTRACTOR' as const },
+    allocations: {
+      none: {
+        status: 'ACTIVE' as const,
+        deletedAt: null,
+        startDate: { lte: now },
+        endDate: { gte: now },
+      },
+    },
+  };
+}
+
+function isSyntheticManager(customFields: unknown): boolean {
+  if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) {
+    return false;
+  }
+
+  return (customFields as Record<string, unknown>).syntheticManager === true;
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -91,12 +116,22 @@ export interface UpcomingCapacity {
 export async function getDashboardMetrics(tenantId: string): Promise<DashboardMetrics> {
   const now = new Date();
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const currentBenchWhere = buildCurrentBenchWhere(tenantId, now);
+  const currentAllocationWindow = {
+    status: 'ACTIVE' as const,
+    deletedAt: null,
+    startDate: { lte: now },
+    endDate: { gte: now },
+  };
 
   // Parallel queries for performance
   const [
     resourceStats,
     benchResources,
-    projectStats,
+    totalProjects,
+    activeProjects,
+    pipelineProjects,
+    atRiskProjects,
     activeAllocations,
     pendingAllocations,
     rolloffs,
@@ -110,30 +145,63 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     }),
 
     // Bench resources
-    prisma.resource.count({
+    prisma.resource.findMany({
       where: {
-        tenantId,
-        status: 'ACTIVE',
-        deletedAt: null,
-        benchSince: { not: null },
+        ...currentBenchWhere,
+      },
+      select: {
+        costPerHour: true,
+        billRateDefault: true,
+        capacity: true,
+        customFields: true,
       },
     }),
 
-    // Project statistics
-    prisma.project.groupBy({
-      by: ['status', 'healthStatus'],
-      where: { tenantId, deletedAt: null },
-      _count: true,
+    // Total projects
+    prisma.project.count({
+      where: {
+        tenantId,
+        deletedAt: null,
+      },
+    }),
+
+    // Current staffed projects
+    prisma.project.count({
+      where: {
+        tenantId,
+        deletedAt: null,
+        allocations: {
+          some: currentAllocationWindow,
+        },
+      },
+    }),
+
+    // Pipeline projects
+    prisma.project.count({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'PIPELINE',
+      },
+    }),
+
+    // At-risk staffed projects
+    prisma.project.count({
+      where: {
+        tenantId,
+        deletedAt: null,
+        healthStatus: 'RED',
+        allocations: {
+          some: currentAllocationWindow,
+        },
+      },
     }),
 
     // Active allocations
     prisma.allocation.count({
       where: {
         tenantId,
-        status: 'ACTIVE',
-        deletedAt: null,
-        startDate: { lte: now },
-        endDate: { gte: now },
+        ...currentAllocationWindow,
       },
     }),
 
@@ -175,30 +243,32 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     if (stat.employmentType === 'CONTRACTOR' && stat.status === 'ACTIVE') contractors += stat._count;
   }
 
-  // Process project stats
-  let totalProjects = 0;
-  let activeProjects = 0;
-  let pipelineProjects = 0;
-  let atRiskProjects = 0;
+  const realBenchResources = benchResources.filter((resource) => !isSyntheticManager(resource.customFields));
+  const benchResourceCount = realBenchResources.length;
+  const workingHoursPerDay = 8;
+  const workingDaysPerMonth = 22;
+  let benchCostMonthly = 0;
+  let potentialRevenueLoss = 0;
 
-  for (const stat of projectStats) {
-    totalProjects += stat._count;
-    if (stat.status === 'ACTIVE') activeProjects += stat._count;
-    if (stat.status === 'PIPELINE') pipelineProjects += stat._count;
-    if (stat.healthStatus === 'RED') atRiskProjects += stat._count;
+  for (const resource of realBenchResources) {
+    const allocationFactor = Math.max(resource.capacity, 0) / 100;
+    if (resource.costPerHour) {
+      benchCostMonthly += resource.costPerHour.toNumber() * workingHoursPerDay * workingDaysPerMonth * allocationFactor;
+    }
+    if (resource.billRateDefault) {
+      potentialRevenueLoss += resource.billRateDefault.toNumber() * workingHoursPerDay * workingDaysPerMonth * allocationFactor;
+    }
   }
 
-  // Calculate bench cost (assuming average cost)
-  const avgMonthlyCost = 150000; // INR - should come from config
-  const benchCostMonthly = benchResources * avgMonthlyCost;
-  const potentialRevenueLoss = benchCostMonthly * 2; // Rough estimate
+  benchCostMonthly = Math.round(benchCostMonthly * 100) / 100;
+  potentialRevenueLoss = Math.round(potentialRevenueLoss * 100) / 100;
 
   return {
     resources: {
       total: activeResources,      // Active is now the primary "total" metric
       active: activeResources,
       inactive: inactiveResources, // Former employees
-      onBench: benchResources,
+      onBench: benchResourceCount,
       inNotice,
       contractors,
     },
@@ -270,13 +340,15 @@ async function calculateCurrentUtilization(tenantId: string) {
     }
   }
 
-  const rate = totalCapacity > 0 ? (totalBillable / totalCapacity) * 100 : 0;
+  const totalUtilized = totalBillable + totalNonBillable;
+  const rate = totalCapacity > 0 ? (totalUtilized / totalCapacity) * 100 : 0;
+  const trend: 'up' | 'down' | 'stable' = rate >= 85 ? 'up' : rate < 75 ? 'down' : 'stable';
 
   return {
     rate: Math.round(rate * 10) / 10,
     billable: Math.round((totalBillable / Math.max(totalCapacity, 1)) * 100 * 10) / 10,
     nonBillable: Math.round((totalNonBillable / Math.max(totalCapacity, 1)) * 100 * 10) / 10,
-    trend: 'stable' as const, // Would compare with previous period
+    trend,
   };
 }
 
@@ -370,9 +442,7 @@ export async function getBenchAnalysis(tenantId: string): Promise<BenchResource[
 
   const benchResources = await prisma.resource.findMany({
     where: {
-      tenantId,
-      status: 'ACTIVE',
-      deletedAt: null,
+      ...buildCurrentBenchWhere(tenantId, now),
       benchSince: { not: null },
     },
     include: {
@@ -398,12 +468,12 @@ export async function getBenchAnalysis(tenantId: string): Promise<BenchResource[
     orderBy: { benchSince: 'asc' },
   });
 
-  return benchResources.map((r) => {
+  return benchResources.filter((r) => !isSyntheticManager(r.customFields)).map((r) => {
     const benchDays = r.benchSince
       ? Math.floor((now.getTime() - r.benchSince.getTime()) / (1000 * 60 * 60 * 24))
       : 0;
 
-    const dailyCost = (r.costPerHour?.toNumber() ?? 2500) * 8; // 8 hours/day
+    const dailyCost = (r.costPerHour?.toNumber() ?? 0) * 8;
     const benchCost = benchDays * dailyCost;
 
     return {

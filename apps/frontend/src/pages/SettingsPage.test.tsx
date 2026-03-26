@@ -32,7 +32,7 @@ describe('SettingsPage', () => {
     it('displays page title', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByRole('heading', { level: 1, name: /settings/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: /my settings/i })).toBeTruthy();
     });
   });
 
@@ -44,43 +44,33 @@ describe('SettingsPage', () => {
     it('displays Profile tab', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByRole('button', { name: /profile/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /profile/i })).toBeTruthy();
     });
 
     it('displays Notifications tab', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /notifications/i })).toBeTruthy();
     });
 
     it('displays Display tab', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByRole('button', { name: /display/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /display/i })).toBeTruthy();
     });
 
     it('displays Security tab', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByRole('button', { name: /security/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /security/i })).toBeTruthy();
     });
 
-    it('displays Currency tab', async () => {
+    it('does not display tenant admin tabs', async () => {
       renderWithProviders(<SettingsPage />);
-      
-      expect(screen.getByRole('button', { name: /currency/i })).toBeInTheDocument();
-    });
 
-    it('displays Roles tab', async () => {
-      renderWithProviders(<SettingsPage />);
-      
-      expect(screen.getByRole('button', { name: /roles/i })).toBeInTheDocument();
-    });
-
-    it('displays Organization tab', async () => {
-      renderWithProviders(<SettingsPage />);
-      
-      expect(screen.getByRole('button', { name: /organization/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /currency/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /roles/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /organization/i })).toBeNull();
     });
   });
 
@@ -92,25 +82,25 @@ describe('SettingsPage', () => {
     it('shows Profile Information card by default', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByText(/profile information/i)).toBeInTheDocument();
+      expect(screen.getByText(/profile information/i)).toBeTruthy();
     });
 
     it('shows First Name input', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByText(/first name/i)).toBeInTheDocument();
+      expect(screen.getByText(/first name/i)).toBeTruthy();
     });
 
     it('shows Last Name input', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByText(/last name/i)).toBeInTheDocument();
+      expect(screen.getByText(/last name/i)).toBeTruthy();
     });
 
     it('shows Save button', async () => {
       renderWithProviders(<SettingsPage />);
       
-      expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /save/i })).toBeTruthy();
     });
   });
 
@@ -126,7 +116,7 @@ describe('SettingsPage', () => {
       
       // Should show notification settings content
       await waitFor(() => {
-        expect(screen.getByText(/email notifications/i)).toBeInTheDocument();
+        expect(screen.getByText(/email notifications/i)).toBeTruthy();
       });
     });
 
@@ -137,7 +127,7 @@ describe('SettingsPage', () => {
       
       // Should show display settings content
       await waitFor(() => {
-        expect(screen.getByText(/theme/i)).toBeInTheDocument();
+        expect(screen.getByText(/theme/i)).toBeTruthy();
       });
     });
 
@@ -148,7 +138,7 @@ describe('SettingsPage', () => {
       
       // Should show security settings content
       await waitFor(() => {
-        expect(screen.getByText(/change password/i)).toBeInTheDocument();
+        expect(screen.getByText(/change password/i)).toBeTruthy();
       });
     });
   });

@@ -15,17 +15,37 @@ vi.mock('../../lib/prisma', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    role: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
     userRole: {
       findFirst: vi.fn(),
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
+    auditLog: {
+      create: vi.fn(),
+    },
   },
 }));
 
 vi.mock('../../lib/password', () => ({
   hashPassword: vi.fn().mockResolvedValue('hashed_password_123'),
+  isPasswordReused: vi.fn().mockResolvedValue(false),
+  recordPasswordHistory: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../lib/redis', () => ({
+  invalidateAllUserTokens: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../lib/logger', () => ({
+  logger: {
+    info: vi.fn(),
+  },
 }));
 
 import prisma from '../../lib/prisma';
@@ -191,13 +211,15 @@ describe('User Service - Comprehensive Tests', () => {
       firstName: 'New',
       lastName: 'User',
       password: 'SecurePass123!',
-      status: 'ACTIVE',
+      status: 'ACTIVE' as const,
       roleIds: ['role-1'],
     };
 
     it('USER-013: should create user with hashed password', async () => {
       vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.role.findMany).mockResolvedValue([{ id: 'role-1' }] as never);
       vi.mocked(prisma.user.create).mockResolvedValue({ ...mockUser, id: 'new-user' } as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.createUser(mockTenantId, createInput);
 
@@ -220,7 +242,9 @@ describe('User Service - Comprehensive Tests', () => {
 
     it('USER-015: should assign roles during creation', async () => {
       vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.role.findMany).mockResolvedValue([{ id: 'role-1' }] as never);
       vi.mocked(prisma.user.create).mockResolvedValue({ ...mockUser, id: 'new-user' } as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.createUser(mockTenantId, createInput);
 
@@ -237,7 +261,9 @@ describe('User Service - Comprehensive Tests', () => {
 
     it('USER-016: should set default status to ACTIVE', async () => {
       vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.role.findMany).mockResolvedValue([{ id: 'role-1' }] as never);
       vi.mocked(prisma.user.create).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.createUser(mockTenantId, {
         ...createInput,
@@ -252,21 +278,33 @@ describe('User Service - Comprehensive Tests', () => {
         })
       );
     });
+
+    it('USER-016A: should reject cross-tenant roleIds during creation', async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.role.findMany).mockResolvedValue([] as never);
+
+      await expect(userService.createUser(mockTenantId, createInput)).rejects.toThrow(
+        'One or more roleIds are invalid for this tenant'
+      );
+    });
   });
 
   describe('updateUser', () => {
     it('USER-017: should update user fields', async () => {
-      vi.mocked(prisma.user.findFirst).mockResolvedValue(null); // No duplicate email
-      vi.mocked(prisma.user.update).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.user.findFirst)
+        .mockResolvedValueOnce({ id: mockUserId } as never)
+        .mockResolvedValueOnce(mockUser as never);
+      vi.mocked(prisma.user.updateMany).mockResolvedValue({ count: 1 } as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.updateUser(mockUserId, mockTenantId, {
         firstName: 'Updated',
         lastName: 'Name',
       });
 
-      expect(prisma.user.update).toHaveBeenCalledWith(
+      expect(prisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mockUserId },
+          where: expect.objectContaining({ id: mockUserId, tenantId: mockTenantId }),
           data: expect.objectContaining({
             firstName: 'Updated',
             lastName: 'Name',
@@ -276,7 +314,9 @@ describe('User Service - Comprehensive Tests', () => {
     });
 
     it('USER-018: should throw error if new email already exists', async () => {
-      vi.mocked(prisma.user.findFirst).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.user.findFirst)
+        .mockResolvedValueOnce({ id: mockUserId } as never)
+        .mockResolvedValueOnce(mockUser as never);
 
       await expect(userService.updateUser(mockUserId, mockTenantId, {
         email: 'existing@test.com',
@@ -284,14 +324,17 @@ describe('User Service - Comprehensive Tests', () => {
     });
 
     it('USER-019: should allow updating status', async () => {
-      vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
-      vi.mocked(prisma.user.update).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.user.findFirst)
+        .mockResolvedValueOnce({ id: mockUserId } as never)
+        .mockResolvedValueOnce(mockUser as never);
+      vi.mocked(prisma.user.updateMany).mockResolvedValue({ count: 1 } as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.updateUser(mockUserId, mockTenantId, {
         status: 'INACTIVE',
       });
 
-      expect(prisma.user.update).toHaveBeenCalledWith(
+      expect(prisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             status: 'INACTIVE',
@@ -299,12 +342,23 @@ describe('User Service - Comprehensive Tests', () => {
         })
       );
     });
+
+    it('USER-019A: should throw error when user is outside tenant scope', async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+
+      await expect(
+        userService.updateUser(mockUserId, mockTenantId, {
+          firstName: 'Updated',
+        })
+      ).rejects.toThrow('User not found');
+    });
   });
 
   describe('deleteUser', () => {
     it('USER-020: should soft delete user', async () => {
       vi.mocked(prisma.user.findFirst).mockResolvedValue(mockUser as never);
       vi.mocked(prisma.user.update).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.deleteUser(mockUserId, mockTenantId);
 
@@ -331,6 +385,7 @@ describe('User Service - Comprehensive Tests', () => {
     it('USER-022: should toggle from ACTIVE to INACTIVE', async () => {
       vi.mocked(prisma.user.findFirst).mockResolvedValue(mockUser as never);
       vi.mocked(prisma.user.update).mockResolvedValue({ ...mockUser, status: 'INACTIVE' } as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       const result = await userService.toggleUserStatus(mockUserId, mockTenantId);
 
@@ -344,6 +399,7 @@ describe('User Service - Comprehensive Tests', () => {
     it('USER-023: should toggle from INACTIVE to ACTIVE', async () => {
       vi.mocked(prisma.user.findFirst).mockResolvedValue({ ...mockUser, status: 'INACTIVE' } as never);
       vi.mocked(prisma.user.update).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.toggleUserStatus(mockUserId, mockTenantId);
 
@@ -364,10 +420,13 @@ describe('User Service - Comprehensive Tests', () => {
 
   describe('assignRoleToUser', () => {
     it('USER-025: should assign role to user', async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue({ id: 'role-1' } as never);
       vi.mocked(prisma.userRole.findFirst).mockResolvedValue(null);
       vi.mocked(prisma.userRole.create).mockResolvedValue({} as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
-      await userService.assignRoleToUser(mockUserId, 'role-1', 'admin-1');
+      await userService.assignRoleToUser(mockUserId, 'role-1', 'admin-1', mockTenantId);
 
       expect(prisma.userRole.create).toHaveBeenCalledWith({
         data: {
@@ -379,18 +438,22 @@ describe('User Service - Comprehensive Tests', () => {
     });
 
     it('USER-026: should throw error if role already assigned', async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue({ id: 'role-1' } as never);
       vi.mocked(prisma.userRole.findFirst).mockResolvedValue({ id: 'existing' } as never);
 
-      await expect(userService.assignRoleToUser(mockUserId, 'role-1', 'admin-1'))
+      await expect(userService.assignRoleToUser(mockUserId, 'role-1', 'admin-1', mockTenantId))
         .rejects.toThrow('User already has this role');
     });
   });
 
   describe('removeRoleFromUser', () => {
     it('USER-027: should remove role from user', async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(mockUser as never);
       vi.mocked(prisma.userRole.deleteMany).mockResolvedValue({ count: 1 });
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
-      await userService.removeRoleFromUser(mockUserId, 'role-1');
+      await userService.removeRoleFromUser(mockUserId, 'role-1', mockTenantId);
 
       expect(prisma.userRole.deleteMany).toHaveBeenCalledWith({
         where: { userId: mockUserId, roleId: 'role-1' },
@@ -402,6 +465,7 @@ describe('User Service - Comprehensive Tests', () => {
     it('USER-028: should reset user password', async () => {
       vi.mocked(prisma.user.findFirst).mockResolvedValue(mockUser as never);
       vi.mocked(prisma.user.update).mockResolvedValue(mockUser as never);
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
 
       await userService.resetUserPassword(mockUserId, mockTenantId, 'NewPassword123!');
 

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as intelligenceService from './intelligence.service';
 import { authenticate, authorize } from '../../middleware/auth';
+import { intelligenceQueryLimiter } from '../../middleware/rateLimiter';
 import prisma from '../../lib/prisma';
 
 const router = Router();
@@ -18,6 +19,7 @@ router.use(authenticate);
  */
 router.post(
   '/match',
+  intelligenceQueryLimiter,
   authorize('resource:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -80,6 +82,7 @@ router.post(
  */
 router.get(
   '/skill-gap/:projectId',
+  intelligenceQueryLimiter,
   authorize('project:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -103,6 +106,7 @@ router.get(
  */
 router.get(
   '/utilization-insights',
+  intelligenceQueryLimiter,
   authorize('report:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -120,6 +124,7 @@ router.get(
  */
 router.get(
   '/recommendations/:projectId',
+  intelligenceQueryLimiter,
   authorize('resource:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -153,6 +158,7 @@ router.get(
  */
 router.get(
   '/skill-inventory',
+  intelligenceQueryLimiter,
   authorize('report:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -170,6 +176,7 @@ router.get(
  */
 router.post(
   '/quick-match',
+  intelligenceQueryLimiter,
   authorize('resource:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

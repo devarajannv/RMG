@@ -9,7 +9,8 @@
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { HandlerContext, HandlerResult } from './index';
-import { ResourceStatus, EmploymentType, AllocationStatus, AuditAction, RequestStatus } from '@prisma/client';
+import { ResourceStatus, EmploymentType, AllocationStatus, RequestStatus } from '@prisma/client';
+import { createAuditLog } from '../../audit/audit.service';
 
 // ============================================================================
 // RESOURCE_ONBOARDING Handler
@@ -129,26 +130,23 @@ export async function executeOnboardingHandler(ctx: HandlerContext): Promise<Han
     }
   }
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.CREATE,
-      entityType: 'Resource',
-      entityId: resource.id,
-      changes: {
-        employeeId,
-        firstName,
-        lastName,
-        email,
-        designation,
-        practiceId,
-        dateOfJoining: dateOfJoining.toISOString(),
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Resource',
+    resource.id,
+    'CREATE',
+    {
+      employeeId,
+      firstName,
+      lastName,
+      email,
+      designation,
+      practiceId,
+      dateOfJoining: dateOfJoining.toISOString(),
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   logger.info('Resource created from onboarding request', {
     resourceId: resource.id,
@@ -275,25 +273,22 @@ export async function executeOffboardingHandler(ctx: HandlerContext): Promise<Ha
     }
   }
   
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId: ctx.approvedById,
-      action: AuditAction.UPDATE,
-      entityType: 'Resource',
-      entityId: resourceId,
-      changes: {
-        lastWorkingDate: lastWorkingDate.toISOString(),
-        exitReason,
-        exitReasonDetails,
-        newStatus: ResourceStatus.INACTIVE,
-        allocationsEnded: endedAllocations,
-        requestsCancelled: pendingRequests.length,
-        requestNumber: ctx.requestNumber,
-      },
-    },
-  });
+  await createAuditLog(
+    tenantId,
+    ctx.approvedById,
+    'Resource',
+    resourceId,
+    'UPDATE',
+    {
+      lastWorkingDate: lastWorkingDate.toISOString(),
+      exitReason,
+      exitReasonDetails,
+      newStatus: ResourceStatus.INACTIVE,
+      allocationsEnded: endedAllocations,
+      requestsCancelled: pendingRequests.length,
+      requestNumber: ctx.requestNumber,
+    }
+  );
   
   logger.info('Resource offboarded', {
     resourceId,

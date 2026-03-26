@@ -8,7 +8,7 @@
  */
 
 import { test as setup, expect } from '@playwright/test';
-import { testConfig } from '../playwright.config';
+import { authStatePaths, testConfig } from '../playwright.config';
 import { setupAuth } from '../utils/auth';
 
 /**
@@ -18,7 +18,7 @@ setup('authenticate as user', async ({ request }) => {
   console.log('🔐 Setting up authentication for test user...');
   
   try {
-    await setupAuth(request, 'e2e/.auth/user.json', testConfig.testUser);
+    await setupAuth(request, authStatePaths.user, testConfig.testUser);
     console.log('✅ User authentication state saved');
   } catch (error) {
     console.error('❌ User authentication failed:', error);
@@ -33,10 +33,10 @@ setup('authenticate as user', async ({ request }) => {
       origins: [],
     };
     
-    const authDir = path.join(process.cwd(), 'e2e', '.auth');
+    const authDir = authStatePaths.dir;
     await fs.mkdir(authDir, { recursive: true });
     await fs.writeFile(
-      path.join(authDir, 'user.json'),
+      authStatePaths.user,
       JSON.stringify(emptyState, null, 2)
     );
     
@@ -51,7 +51,7 @@ setup('authenticate as admin', async ({ request }) => {
   console.log('🔐 Setting up authentication for admin user...');
   
   try {
-    await setupAuth(request, 'e2e/.auth/admin.json', testConfig.adminUser);
+    await setupAuth(request, authStatePaths.admin, testConfig.adminUser);
     console.log('✅ Admin authentication state saved');
   } catch (error) {
     console.error('❌ Admin authentication failed:', error);
@@ -64,10 +64,10 @@ setup('authenticate as admin', async ({ request }) => {
       origins: [],
     };
     
-    const authDir = path.join(process.cwd(), 'e2e', '.auth');
+    const authDir = authStatePaths.dir;
     await fs.mkdir(authDir, { recursive: true });
     await fs.writeFile(
-      path.join(authDir, 'admin.json'),
+      authStatePaths.admin,
       JSON.stringify(emptyState, null, 2)
     );
     

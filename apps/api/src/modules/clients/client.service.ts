@@ -151,7 +151,10 @@ export async function listClients(
   filters: ClientFilters,
   pagination: { page: number; limit: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) {
-  const { page, limit, sortBy = 'name', sortOrder = 'asc' } = pagination;
+  const { page, limit, sortBy: rawSortBy = 'name', sortOrder = 'asc' } = pagination;
+  // M-17: sortBy allowlist
+  const ALLOWED_CLIENT_SORT = ['name', 'code', 'createdAt', 'updatedAt', 'status', 'industry'];
+  const sortBy = ALLOWED_CLIENT_SORT.includes(rawSortBy) ? rawSortBy : 'name';
   const skip = (page - 1) * limit;
 
   const where: Prisma.ClientWhereInput = {

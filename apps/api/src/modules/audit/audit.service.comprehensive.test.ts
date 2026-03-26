@@ -9,6 +9,7 @@ import * as auditService from './audit.service';
 // Mock Prisma
 vi.mock('../../lib/prisma', () => ({
   default: {
+    $queryRaw: vi.fn(),
     auditLog: {
       findMany: vi.fn(),
       count: vi.fn(),
@@ -272,6 +273,120 @@ describe('Audit Service - Comprehensive Tests', () => {
           entityType: 'Batch',
           action: 'PROCESS',
         }),
+      });
+    });
+
+    it('AUDIT-015: should create invoice-linkage foundation audit event', async () => {
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
+
+      await auditService.createInvoiceLinkageAuditEvent({
+        tenantId: mockTenantId,
+        userId: mockUserId,
+        eventType: 'INVOICE_LINKED',
+        invoiceReference: 'INV-2026-0001',
+        linkedEntityType: 'TimesheetEntry',
+        linkedEntityId: 'entry-001',
+        correlationId: 'corr-123',
+        metadata: { source: 'ws8-foundation-test' },
+      });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tenantId: mockTenantId,
+          userId: mockUserId,
+          entityType: 'TimesheetEntry',
+          entityId: 'entry-001',
+          action: 'UPDATE',
+          changes: expect.objectContaining({
+            eventType: 'INVOICE_LINKED',
+            invoiceReference: 'INV-2026-0001',
+            linkedEntityType: 'TimesheetEntry',
+            linkedEntityId: 'entry-001',
+          }),
+          metadata: expect.objectContaining({
+            auditEventClass: 'INVOICE_LINKAGE_FOUNDATION',
+            eventType: 'INVOICE_LINKED',
+            foundationVersion: '2026-02-24.ws8.v1',
+            correlationId: 'corr-123',
+            source: 'ws8-foundation-test',
+          }),
+        }),
+      });
+    });
+
+    it('AUDIT-016: should reject invoice-linkage event without invoiceReference', async () => {
+      await expect(
+        auditService.createInvoiceLinkageAuditEvent({
+          tenantId: mockTenantId,
+          userId: mockUserId,
+          eventType: 'INVOICE_LINKED',
+          invoiceReference: '',
+          linkedEntityType: 'Request',
+          linkedEntityId: 'request-001',
+        })
+      ).rejects.toThrow('invoiceReference');
+    });
+  });
+
+  describe('getInvoiceLinkageReconciliationReport', () => {
+    it('AUDIT-017: should return aggregated counts by invoiceReference', async () => {
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([
+        {
+          invoiceReference: 'INV-2026-0001',
+          requestCount: 2,
+          timesheetEntryCount: 5,
+          timesheetPeriodCount: 1,
+          totalLinkedRecords: 8,
+        },
+        {
+          invoiceReference: 'INV-2026-0002',
+          requestCount: 1,
+          timesheetEntryCount: 0,
+          timesheetPeriodCount: 0,
+          totalLinkedRecords: 1,
+        },
+      ] as never);
+
+      const result = await auditService.getInvoiceLinkageReconciliationReport(mockTenantId);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(result.data).toEqual([
+        {
+          invoiceReference: 'INV-2026-0001',
+          requestCount: 2,
+          timesheetEntryCount: 5,
+          timesheetPeriodCount: 1,
+          totalLinkedRecords: 8,
+        },
+        {
+          invoiceReference: 'INV-2026-0002',
+          requestCount: 1,
+          timesheetEntryCount: 0,
+          timesheetPeriodCount: 0,
+          totalLinkedRecords: 1,
+        },
+      ]);
+      expect(result.summary).toEqual({
+        invoiceReferenceCount: 2,
+        requestCount: 3,
+        timesheetEntryCount: 5,
+        timesheetPeriodCount: 1,
+        totalLinkedRecords: 9,
+      });
+    });
+
+    it('AUDIT-018: should return zeroed summary for empty report', async () => {
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+
+      const result = await auditService.getInvoiceLinkageReconciliationReport(mockTenantId);
+
+      expect(result.data).toEqual([]);
+      expect(result.summary).toEqual({
+        invoiceReferenceCount: 0,
+        requestCount: 0,
+        timesheetEntryCount: 0,
+        timesheetPeriodCount: 0,
+        totalLinkedRecords: 0,
       });
     });
   });

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
+import { useAiAssistStore } from '@/stores/aiAssistStore';
 
 // ============================================================================
 // Types
@@ -72,9 +72,17 @@ interface AnalysisResult {
 
 export default function ExportImportPage() {
   const [activeTab, setActiveTab] = useState<TabType>('export');
+  const { isAiAssistEnabled } = useAiAssistStore();
+
+  // Build tabs dynamically based on AI Assist state
+  const tabs = [
+    { id: 'export', label: 'Export', icon: '📤' },
+    { id: 'import', label: 'Import', icon: '📥' },
+    ...(isAiAssistEnabled ? [{ id: 'ai-migration', label: '✨ AI Migration', icon: '🤖' }] : []),
+    { id: 'webhooks', label: 'Webhooks', icon: '🔗' },
+  ];
 
   return (
-    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -84,12 +92,7 @@ export default function ExportImportPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200 pb-2">
-        {[
-          { id: 'export', label: 'Export', icon: '📤' },
-          { id: 'import', label: 'Import', icon: '📥' },
-          { id: 'ai-migration', label: 'AI Migration', icon: '🤖' },
-          { id: 'webhooks', label: 'Webhooks', icon: '🔗' },
-        ].map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as TabType)}
@@ -107,10 +110,9 @@ export default function ExportImportPage() {
       {/* Tab Content */}
       {activeTab === 'export' && <ExportTab />}
       {activeTab === 'import' && <ImportTab />}
-      {activeTab === 'ai-migration' && <AIMigrationTab />}
+      {activeTab === 'ai-migration' && isAiAssistEnabled && <AIMigrationTab />}
       {activeTab === 'webhooks' && <WebhooksTab />}
     </div>
-    </MainLayout>
   );
 }
 
@@ -572,9 +574,7 @@ function AIMigrationTab() {
 
       const res = await fetch('/api/v1/ai-migration/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        credentials: 'include',
         body: formData,
       });
       

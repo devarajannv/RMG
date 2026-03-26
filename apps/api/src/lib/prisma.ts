@@ -59,10 +59,56 @@ function createPrismaClient(): PrismaClient {
   return client;
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+const basePrisma = globalForPrisma.prisma ?? createPrismaClient();
+
+// ============================================================================
+// Soft-Delete Middleware (via Prisma Client Extension)
+// ============================================================================
+
+/**
+ * Models that support soft deletion (have a deletedAt field).
+ * Auto-filters: findMany, findFirst, count queries exclude soft-deleted rows.
+ */
+const SOFT_DELETE_MODELS = new Set([
+  'Tenant', 'User', 'Resource', 'Client', 'Contract', 'Project',
+  'Allocation', 'TimesheetEntry', 'Opportunity', 'Document',
+  'ApprovalChain', 'Request', 'RequestComment', 'RequestAttachment',
+  'RequestTemplate', 'RequestTrigger', 'Department', 'Team', 'ApprovalFunction',
+]);
+
+export const prisma = basePrisma.$extends({
+  query: {
+    $allModels: {
+      async findMany({ model, args, query }) {
+        if (SOFT_DELETE_MODELS.has(model) && !('deletedAt' in (args.where || {}))) {
+          args.where = { ...args.where, deletedAt: null };
+        }
+        return query(args);
+      },
+      async findFirst({ model, args, query }) {
+        if (SOFT_DELETE_MODELS.has(model) && !('deletedAt' in (args.where || {}))) {
+          args.where = { ...args.where, deletedAt: null };
+        }
+        return query(args);
+      },
+      async findFirstOrThrow({ model, args, query }) {
+        if (SOFT_DELETE_MODELS.has(model) && !('deletedAt' in (args.where || {}))) {
+          args.where = { ...args.where, deletedAt: null };
+        }
+        return query(args);
+      },
+      async count({ model, args, query }) {
+        if (SOFT_DELETE_MODELS.has(model) && !('deletedAt' in (args.where || {}))) {
+          args.where = { ...args.where, deletedAt: null };
+        }
+        return query(args);
+      },
+    },
+  },
+});
 
 if (!config.isProd) {
-  globalForPrisma.prisma = prisma;
+  globalForPrisma.prisma = basePrisma;
 }
 
 // ============================================================================

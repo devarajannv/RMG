@@ -8,6 +8,7 @@ const createRoleSchema = z.object({
   description: z.string().max(500).optional(),
   level: z.number().min(0).max(10).optional(),
   parentRoleId: z.string().uuid().optional(),
+  permissions: z.array(z.string().min(1)).optional(),
   permissionIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -16,6 +17,7 @@ const updateRoleSchema = z.object({
   description: z.string().max(500).optional(),
   level: z.number().min(0).max(10).optional(),
   parentRoleId: z.string().uuid().nullable().optional(),
+  permissions: z.array(z.string().min(1)).optional(),
   permissionIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -28,6 +30,10 @@ const revokeRoleSchema = z.object({
   userId: z.string().uuid(),
   roleId: z.string().uuid(),
   reason: z.string().max(500).optional(),
+});
+
+const provisionSystemRoleSchema = z.object({
+  presetCode: z.string().min(1),
 });
 
 // Controllers
@@ -65,6 +71,14 @@ export const getRole = async (req: Request, res: Response, next: NextFunction): 
   }
 };
 
+export const getPermissionCatalog = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    res.json(roleService.getPermissionCatalog());
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createRole = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
@@ -80,6 +94,36 @@ export const createRole = async (req: Request, res: Response, next: NextFunction
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: 'Validation error', details: error.errors });
       return;
+    }
+    next(error);
+  }
+};
+
+export const provisionSystemRole = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const data = provisionSystemRoleSchema.parse(req.body);
+    const role = await roleService.provisionSystemRole(tenantId, data.presetCode);
+    res.status(201).json(role);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+    if (error instanceof Error) {
+      if (error.message.startsWith('Unknown role preset:')) {
+        res.status(404).json({ code: 'PRESET_NOT_FOUND', error: error.message });
+        return;
+      }
+      if (error.message.includes('already in use by a custom role')) {
+        res.status(409).json({ code: 'ROLE_NAME_CONFLICT', error: error.message });
+        return;
+      }
     }
     next(error);
   }
@@ -106,11 +150,11 @@ export const updateRole = async (req: Request, res: Response, next: NextFunction
     }
     if (error instanceof Error) {
       if (error.message === 'Role not found') {
-        res.status(404).json({ error: error.message });
+        res.status(404).json({ code: 'NOT_FOUND', error: error.message });
         return;
       }
       if (error.message === 'Cannot rename system roles') {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ code: 'SYSTEM_ROLE_ERROR', error: error.message });
         return;
       }
     }
@@ -152,7 +196,15 @@ export const assignRole = async (req: Request, res: Response, next: NextFunction
     }
 
     const data = assignRoleSchema.parse(req.body);
-    await roleService.assignRole(data.userId, data.roleId, assignedBy);
+
+    // M-23: Prevent self-role-assignment
+    if (data.userId === assignedBy) {
+      res.status(400).json({ error: 'Cannot assign roles to yourself' });
+      return;
+    }
+
+    const tenantId = req.user!.tenantId;
+    await roleService.assignRole(data.userId, data.roleId, assignedBy, tenantId);
     res.json({ message: 'Role assigned successfully' });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -172,7 +224,8 @@ export const revokeRole = async (req: Request, res: Response, next: NextFunction
     }
 
     const data = revokeRoleSchema.parse(req.body);
-    await roleService.revokeRole(data.userId, data.roleId, revokedBy, data.reason);
+    const tenantId = req.user!.tenantId;
+    await roleService.revokeRole(data.userId, data.roleId, revokedBy, tenantId, data.reason);
     res.json({ message: 'Role revoked successfully' });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -191,7 +244,7 @@ export const getUserPermissions = async (req: Request, res: Response, next: Next
       return;
     }
 
-    const permissions = await roleService.getUserPermissions(userId);
+    const permissions = await roleService.getUserPermissions(userId, req.user!.tenantId);
     res.json({ userId, permissions });
   } catch (error) {
     next(error);

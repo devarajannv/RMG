@@ -61,6 +61,8 @@ model Tenant {
   businessHoursConfig      BusinessHoursConfig?
   holidays                 Holiday[]
   webhooks                 Webhook[]
+  requestPackActivations   TenantRequestPackActivation[]
+  rolePlaceholderMappings  TenantRolePlaceholderMapping[]
 
   // Trigger Relations
   requestTriggers  RequestTrigger[]
@@ -160,6 +162,18 @@ model User {
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
+}
+
+// =============================================================================
+// PASSWORD HISTORY (C-12: Prevent password reuse)
+// =============================================================================
+model PasswordHistory {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  passwordHash String   @db.VarChar(255)
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 enum UserStatus {
@@ -943,6 +957,22 @@ enum AuditAction {
   APPROVE
   REJECT
   SUBMIT
+  PASSWORD_RESET
+  ROLE_ASSIGNED
+  ROLE_REMOVED
+  USER_STATUS_CHANGED
+  REGISTER
+  LOGOUT_ALL
+  GDPR_EXPORT
+  GDPR_ERASURE
+  MFA_ENABLED
+  MFA_DISABLED
+  REQUEST_RETURNED
+  REQUEST_CANCELLED
+  OVERRIDE_APPROVED
+  OVERRIDE_REJECTED
+  OVERRIDE_EXPIRED
+  OVERRIDE_CANCELLED
 }
 
 // =============================================================================
@@ -1461,6 +1491,7 @@ model RequestType {
   tenantConfigs     TenantRequestTypeConfig[]
   templates         RequestTemplate[]
   slaPriorityMatrix SlaPriorityMatrix[]
+  blueprint         RequestBlueprint?
 
   @@unique([code, tenantId]) // Code unique per tenant (null tenantId = system)
   @@index([category])
@@ -1540,6 +1571,120 @@ model RequestTypeTemplate {
   
   @@index([category])
   @@index([isActive])
+}
+
+model RequestPack {
+  id                     String                   @id @default(uuid()) @db.Uuid
+  code                   String                   @unique @db.VarChar(50)
+  name                   String                   @db.VarChar(100)
+  description            String?                  @db.VarChar(500)
+  domain                 RequestBlueprintDomain
+  maturityLevel          RequestPackMaturityLevel @default(STANDARD)
+  isActive               Boolean                  @default(true)
+  sortOrder              Int                      @default(0)
+  iconName               String?                  @db.VarChar(50)
+  activationDependencies Json?
+  recommendedOrgProfiles String[]
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+
+  blueprints  RequestPackBlueprint[]
+  activations TenantRequestPackActivation[]
+
+  @@index([isActive])
+  @@index([domain])
+  @@index([sortOrder])
+}
+
+model RequestBlueprint {
+  id                   String                          @id @default(uuid()) @db.Uuid
+  code                 String                          @unique @db.VarChar(50)
+  requestTypeId        String?                         @unique @db.Uuid
+  requestType          RequestType?                    @relation(fields: [requestTypeId], references: [id])
+  schemaVersion        String                          @default("1.0") @db.VarChar(10)
+  name                 String                          @db.VarChar(100)
+  description          String?                         @db.VarChar(500)
+  domain               RequestBlueprintDomain
+  category             String                          @db.VarChar(100)
+  icon                 String?                         @db.VarChar(50)
+  version              Int                             @default(1)
+  isSystemBlueprint    Boolean                         @default(true)
+  maturityLevel        RequestPackMaturityLevel       @default(STANDARD)
+  renderMode           RequestBlueprintRenderMode      @default(DRAWER)
+  complexityLevel      RequestBlueprintComplexityLevel @default(STANDARD)
+  allowDraft           Boolean                         @default(true)
+  allowSubmit          Boolean                         @default(true)
+  allowEditAfterReturn Boolean                         @default(true)
+  allowAttachments     Boolean                         @default(true)
+  maxAttachments       Int?
+  maxAttachmentSizeMb  Int?
+  commonFields         Json
+  entityBindings       Json
+  customFields         Json
+  dependencyRules      Json
+  workflowPolicy       Json
+  overridePolicy       Json
+  createdAt            DateTime                        @default(now())
+  updatedAt            DateTime                        @updatedAt
+
+  packs RequestPackBlueprint[]
+
+  @@index([domain])
+  @@index([isSystemBlueprint])
+}
+
+model RequestPackBlueprint {
+  id          String           @id @default(uuid()) @db.Uuid
+  packId      String           @db.Uuid
+  pack        RequestPack      @relation(fields: [packId], references: [id], onDelete: Cascade)
+  blueprintId String           @db.Uuid
+  blueprint   RequestBlueprint @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+  sortOrder   Int              @default(0)
+  isRequired  Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+
+  @@unique([packId, blueprintId])
+  @@index([blueprintId])
+}
+
+model TenantRequestPackActivation {
+  id                String                      @id @default(uuid()) @db.Uuid
+  tenantId          String                      @db.Uuid
+  tenant            Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  packId            String                      @db.Uuid
+  pack              RequestPack                 @relation(fields: [packId], references: [id], onDelete: Cascade)
+  status            RequestPackActivationStatus @default(ACTIVE)
+  activatedByUserId String?                     @db.Uuid
+  activatedAt       DateTime                    @default(now())
+  activationSummary Json?
+  readinessSnapshot Json?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  placeholderMappings TenantRolePlaceholderMapping[]
+
+  @@unique([tenantId, packId])
+  @@index([tenantId])
+  @@index([status])
+}
+
+model TenantRolePlaceholderMapping {
+  id               String                      @id @default(uuid()) @db.Uuid
+  tenantId         String                      @db.Uuid
+  tenant           Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  activationId     String                      @db.Uuid
+  activation       TenantRequestPackActivation @relation(fields: [activationId], references: [id], onDelete: Cascade)
+  placeholderCode  String                      @db.VarChar(50)
+  placeholderLabel String?                     @db.VarChar(100)
+  businessRoleId   String?                     @db.Uuid
+  businessRole     BusinessRole?               @relation(fields: [businessRoleId], references: [id], onDelete: SetNull)
+  isRequired       Boolean                     @default(true)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@unique([activationId, placeholderCode])
+  @@index([tenantId])
+  @@index([businessRoleId])
 }
 
 // Approval Chain Definition
@@ -2549,6 +2694,38 @@ enum RollbackPermission {
   NONE
 }
 
+enum RequestBlueprintDomain {
+  PROFESSIONAL_SERVICES
+  INTERNAL_OPERATIONS
+  PEOPLE_OPERATIONS
+  FINANCE
+  OTHER
+}
+
+enum RequestPackMaturityLevel {
+  STARTER
+  STANDARD
+  ADVANCED
+}
+
+enum RequestBlueprintRenderMode {
+  MODAL
+  DRAWER
+  PAGE
+  WIZARD
+}
+
+enum RequestBlueprintComplexityLevel {
+  SIMPLE
+  STANDARD
+  ADVANCED
+}
+
+enum RequestPackActivationStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum ApprovalChainStatus {
   DRAFT
   PUBLISHED
@@ -3053,6 +3230,7 @@ model BusinessRole {
   
   // Relations
   assignments   ResourceBusinessRole[]
+  placeholderMappings TenantRolePlaceholderMapping[]
   
   @@unique([tenantId, code])
   @@index([tenantId, category])

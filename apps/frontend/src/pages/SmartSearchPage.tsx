@@ -3,7 +3,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
 import {
   BarChart,
   Bar,
@@ -216,14 +215,13 @@ export default function SmartSearchPage() {
   }
 
   return (
-    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Smart Search & Intelligence</h1>
           <p className="text-gray-500 text-sm">
-            AI-powered resource matching and utilization insights
+            Resource matching and utilization insights
           </p>
         </div>
       </div>
@@ -287,7 +285,6 @@ export default function SmartSearchPage() {
         />
       )}
     </div>
-    </MainLayout>
   );
 }
 

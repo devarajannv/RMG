@@ -651,13 +651,15 @@ export async function deleteNotification(
 
 /**
  * Delete old notifications (cleanup job)
+ * H-07: Scoped to tenant to prevent cross-tenant data destruction
  */
-export async function deleteOldNotifications(daysOld: number = 90): Promise<number> {
+export async function deleteOldNotifications(tenantId: string, daysOld: number = 90): Promise<number> {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
   const result = await prisma.notification.deleteMany({
     where: {
+      tenantId,
       createdAt: { lt: cutoffDate },
       isRead: true,
     },
@@ -672,12 +674,14 @@ export async function deleteOldNotifications(daysOld: number = 90): Promise<numb
 
 /**
  * Delete expired notifications
+ * H-07: Scoped to tenant to prevent cross-tenant data destruction
  */
-export async function deleteExpiredNotifications(): Promise<number> {
+export async function deleteExpiredNotifications(tenantId: string): Promise<number> {
   const now = new Date();
 
   const result = await prisma.notification.deleteMany({
     where: {
+      tenantId,
       expiresAt: { lt: now },
     },
   });
@@ -695,14 +699,21 @@ export async function deleteExpiredNotifications(): Promise<number> {
 
 /**
  * Get user preference for a specific notification type and channel
+ * L-09: Accept tenantId for tenant isolation
  */
 async function getUserPreference(
   userId: string,
   eventType: NotificationType,
-  channel: NotificationChannel
+  channel: NotificationChannel,
+  tenantId?: string
 ): Promise<{ enabled: boolean } | null> {
+  // L-09: Verify user belongs to tenant if tenantId provided
+  const whereClause: Record<string, unknown> = { userId, eventType, channel };
+  if (tenantId) {
+    whereClause.user = { tenantId };
+  }
   const preference = await prisma.notificationPreference.findFirst({
-    where: { userId, eventType, channel },
+    where: whereClause as any,
   });
 
   return preference ? { enabled: preference.enabled } : null;
@@ -710,10 +721,15 @@ async function getUserPreference(
 
 /**
  * Get all notification preferences for a user
+ * L-09: Accept tenantId for tenant isolation
  */
-export async function getUserPreferences(userId: string): Promise<Record<string, unknown>[]> {
+export async function getUserPreferences(userId: string, tenantId?: string): Promise<Record<string, unknown>[]> {
+  const whereClause: Record<string, unknown> = { userId };
+  if (tenantId) {
+    whereClause.user = { tenantId };
+  }
   const preferences = await prisma.notificationPreference.findMany({
-    where: { userId },
+    where: whereClause as any,
     orderBy: [{ eventType: 'asc' }, { channel: 'asc' }],
   });
 
@@ -770,8 +786,16 @@ export async function bulkUpdatePreferences(
 
 /**
  * Reset preferences to defaults (enable all)
+ * L-04: Verify user belongs to tenant before deleting preferences
  */
-export async function resetPreferences(userId: string): Promise<void> {
+export async function resetPreferences(userId: string, tenantId?: string): Promise<void> {
+  if (tenantId) {
+    // Verify user belongs to this tenant
+    const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
+    if (!user) {
+      throw new ApiError('User not found', 404, 'USER_NOT_FOUND');
+    }
+  }
   await prisma.notificationPreference.deleteMany({
     where: { userId },
   });

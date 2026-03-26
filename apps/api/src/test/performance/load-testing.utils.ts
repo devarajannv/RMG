@@ -125,6 +125,10 @@ export class LoadTestRunner {
         ...request.headers
       };
 
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
+        headers['x-e2e-test-mode'] = '1';
+      }
+
       if (this.config.authToken) {
         headers['Authorization'] = `Bearer ${this.config.authToken}`;
       }

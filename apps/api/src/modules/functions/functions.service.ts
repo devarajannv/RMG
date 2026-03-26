@@ -233,7 +233,8 @@ export async function listApprovalFunctions(
           },
         },
       },
-      orderBy: { [options.sortBy || 'sortOrder']: options.sortOrder || 'asc' },
+      // M-17: sortBy allowlist
+      orderBy: { [['sortOrder', 'createdAt', 'updatedAt', 'name', 'code', 'status'].includes(options.sortBy || '') ? options.sortBy! : 'sortOrder']: options.sortOrder || 'asc' },
       skip,
       take: limit,
     }),
@@ -573,6 +574,11 @@ export async function delegateFunction(
         'DELEGATION_TOO_LONG'
       );
     }
+  }
+
+  // H-03: Prevent self-delegation
+  if (delegatorId === input.delegateUserId) {
+    throw new ApiError('Cannot delegate a function to yourself', 400, 'SELF_DELEGATION_NOT_ALLOWED');
   }
 
   // Verify delegate user exists

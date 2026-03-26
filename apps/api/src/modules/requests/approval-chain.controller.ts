@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import { ApiError } from '../../middleware/errorHandler';
 import * as approvalChainService from './approval-chain.service';
 import { ApprovalChainStatus, ApprovalChainScope } from '@prisma/client';
+import { createApprovalChainSchema, updateApprovalChainSchema, addApprovalStepSchema, updateApprovalStepSchema, assignRequestTypesSchema, reorderStepsSchema, createDelegationSchema, approveDelegationSchema, rejectDelegationSchema } from './approval-chain.schemas';
 
 // ============================================================================
 // Approval Chain CRUD
@@ -20,19 +21,21 @@ export async function createApprovalChain(req: Request, res: Response): Promise<
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
 
-  if (!req.body.code || !req.body.name || !req.body.steps) {
-    throw new ApiError('Code, name, and steps are required', 400, 'VALIDATION_ERROR');
+  if (!req.body.name || !req.body.steps) {
+    throw new ApiError('Name and steps are required', 400, 'VALIDATION_ERROR');
   }
 
+  const input = createApprovalChainSchema.parse(req.body);
+
   const chain = await approvalChainService.createApprovalChain(tenantId, userId, {
-    code: req.body.code,
-    name: req.body.name,
-    description: req.body.description,
-    scope: req.body.scope || 'GLOBAL',
-    practiceId: req.body.practiceId,
-    effectiveFrom: req.body.effectiveFrom ? new Date(req.body.effectiveFrom) : undefined,
-    effectiveTo: req.body.effectiveTo ? new Date(req.body.effectiveTo) : undefined,
-    steps: req.body.steps,
+    code: input.code,
+    name: input.name,
+    description: input.description,
+    scope: (input.scope || 'TENANT') as any,
+    practiceId: input.practiceId || undefined,
+    effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : undefined,
+    effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : undefined,
+    steps: input.steps as any,
   });
 
   res.status(201).json({
@@ -116,14 +119,10 @@ export async function updateApprovalChain(req: Request, res: Response): Promise<
   const chainId = req.params.id;
 
   const chain = await approvalChainService.updateApprovalChain(tenantId, chainId, userId, {
-    name: req.body.name,
-    description: req.body.description,
-    scope: req.body.scope,
-    practiceId: req.body.practiceId,
-    status: req.body.status,
+    ...updateApprovalChainSchema.parse(req.body),
     effectiveFrom: req.body.effectiveFrom ? new Date(req.body.effectiveFrom) : undefined,
     effectiveTo: req.body.effectiveTo ? new Date(req.body.effectiveTo) : undefined,
-  });
+  } as any);
 
   res.json({
     success: true,
@@ -161,39 +160,9 @@ export async function addApprovalStep(req: Request, res: Response): Promise<void
   const tenantId = req.user!.tenantId;
   const chainId = req.params.id;
 
-  if (!req.body.name || req.body.stepOrder === undefined || !req.body.approverType) {
-    throw new ApiError('Name, stepOrder, and approverType are required', 400, 'VALIDATION_ERROR');
-  }
+  const input = addApprovalStepSchema.parse(req.body);
 
-  const step = await approvalChainService.addApprovalStep(tenantId, chainId, {
-    name: req.body.name,
-    instructions: req.body.instructions,
-    stepOrder: req.body.stepOrder,
-    approverType: req.body.approverType,
-    approverRoleId: req.body.approverRoleId,
-    approverUserId: req.body.approverUserId,
-    practiceSource: req.body.practiceSource,
-    roleAssignmentMode: req.body.roleAssignmentMode,
-    fallbackType: req.body.fallbackType,
-    fallbackRoleId: req.body.fallbackRoleId,
-    fallbackUserId: req.body.fallbackUserId,
-    skipIfUnresolvable: req.body.skipIfUnresolvable,
-    approvalMode: req.body.approvalMode,
-    onConflict: req.body.onConflict,
-    isOptional: req.body.isOptional,
-    canDelegate: req.body.canDelegate,
-    skipCondition: req.body.skipCondition,
-    autoApproveAfterHours: req.body.autoApproveAfterHours,
-    autoApproveCondition: req.body.autoApproveCondition,
-    slaHours: req.body.slaHours,
-    escalateAfterHours: req.body.escalateAfterHours,
-    escalateToType: req.body.escalateToType,
-    escalateToRoleId: req.body.escalateToRoleId,
-    escalateToUserId: req.body.escalateToUserId,
-    reminderAfterHours: req.body.reminderAfterHours,
-    reminderIntervalHours: req.body.reminderIntervalHours,
-    maxReminders: req.body.maxReminders,
-  });
+  const step = await approvalChainService.addApprovalStep(tenantId, chainId, input as any);
 
   res.status(201).json({
     success: true,
@@ -210,35 +179,9 @@ export async function updateApprovalStep(req: Request, res: Response): Promise<v
   const tenantId = req.user!.tenantId;
   const stepId = req.params.stepId;
 
-  const step = await approvalChainService.updateApprovalStep(tenantId, stepId, {
-    name: req.body.name,
-    instructions: req.body.instructions,
-    stepOrder: req.body.stepOrder,
-    approverType: req.body.approverType,
-    approverRoleId: req.body.approverRoleId,
-    approverUserId: req.body.approverUserId,
-    practiceSource: req.body.practiceSource,
-    roleAssignmentMode: req.body.roleAssignmentMode,
-    fallbackType: req.body.fallbackType,
-    fallbackRoleId: req.body.fallbackRoleId,
-    fallbackUserId: req.body.fallbackUserId,
-    skipIfUnresolvable: req.body.skipIfUnresolvable,
-    approvalMode: req.body.approvalMode,
-    onConflict: req.body.onConflict,
-    isOptional: req.body.isOptional,
-    canDelegate: req.body.canDelegate,
-    skipCondition: req.body.skipCondition,
-    autoApproveAfterHours: req.body.autoApproveAfterHours,
-    autoApproveCondition: req.body.autoApproveCondition,
-    slaHours: req.body.slaHours,
-    escalateAfterHours: req.body.escalateAfterHours,
-    escalateToType: req.body.escalateToType,
-    escalateToRoleId: req.body.escalateToRoleId,
-    escalateToUserId: req.body.escalateToUserId,
-    reminderAfterHours: req.body.reminderAfterHours,
-    reminderIntervalHours: req.body.reminderIntervalHours,
-    maxReminders: req.body.maxReminders,
-  });
+  const input = updateApprovalStepSchema.parse(req.body);
+
+  const step = await approvalChainService.updateApprovalStep(tenantId, stepId, input as any);
 
   res.json({
     success: true,
@@ -271,11 +214,9 @@ export async function reorderApprovalSteps(req: Request, res: Response): Promise
   const tenantId = req.user!.tenantId;
   const chainId = req.params.id;
 
-  if (!req.body.stepOrders || !Array.isArray(req.body.stepOrders)) {
-    throw new ApiError('stepOrders array is required', 400, 'VALIDATION_ERROR');
-  }
+  const input = reorderStepsSchema.parse(req.body);
 
-  await approvalChainService.reorderApprovalSteps(tenantId, chainId, req.body.stepOrders);
+  await approvalChainService.reorderApprovalSteps(tenantId, chainId, input.steps);
 
   res.json({
     success: true,
@@ -295,11 +236,9 @@ export async function assignRequestTypes(req: Request, res: Response): Promise<v
   const tenantId = req.user!.tenantId;
   const chainId = req.params.id;
 
-  if (!req.body.requestTypeIds || !Array.isArray(req.body.requestTypeIds)) {
-    throw new ApiError('requestTypeIds array is required', 400, 'VALIDATION_ERROR');
-  }
+  const input = assignRequestTypesSchema.parse(req.body);
 
-  await approvalChainService.linkChainToRequestTypes(tenantId, chainId, req.body.requestTypeIds);
+  await approvalChainService.linkChainToRequestTypes(tenantId, chainId, input.requestTypeIds);
 
   res.json({
     success: true,
@@ -319,22 +258,70 @@ export async function createDelegation(req: Request, res: Response): Promise<voi
   const tenantId = req.user!.tenantId;
   const userId = req.user!.id;
 
-  if (!req.body.delegateId || !req.body.startDate || !req.body.endDate) {
-    throw new ApiError('delegateId, startDate, and endDate are required', 400, 'VALIDATION_ERROR');
-  }
+  const input = createDelegationSchema.parse(req.body);
 
   const delegation = await approvalChainService.createDelegation(tenantId, userId, {
-    delegateId: req.body.delegateId,
-    startDate: new Date(req.body.startDate),
-    endDate: new Date(req.body.endDate),
-    reason: req.body.reason,
-    requestTypeIds: req.body.requestTypeIds,
+    delegateId: input.delegateId,
+    startDate: new Date(input.startDate),
+    endDate: new Date(input.endDate),
+    reason: input.reason,
+    requestTypeIds: input.requestTypeIds,
   });
 
   res.status(201).json({
     success: true,
     data: delegation,
     message: 'Delegation created successfully',
+  });
+}
+
+/**
+ * Approve delegation
+ * POST /api/v1/delegations/:id/approve
+ */
+export async function approveDelegation(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const userId = req.user!.id;
+  const delegationId = req.params.id;
+
+  const input = approveDelegationSchema.parse(req.body || {});
+
+  const delegation = await approvalChainService.approveDelegation(
+    tenantId,
+    delegationId,
+    userId,
+    input.notes
+  );
+
+  res.json({
+    success: true,
+    data: delegation,
+    message: 'Delegation approved successfully',
+  });
+}
+
+/**
+ * Reject delegation
+ * POST /api/v1/delegations/:id/reject
+ */
+export async function rejectDelegation(req: Request, res: Response): Promise<void> {
+  const tenantId = req.user!.tenantId;
+  const userId = req.user!.id;
+  const delegationId = req.params.id;
+
+  const input = rejectDelegationSchema.parse(req.body);
+
+  const delegation = await approvalChainService.rejectDelegation(
+    tenantId,
+    delegationId,
+    userId,
+    input.reason
+  );
+
+  res.json({
+    success: true,
+    data: delegation,
+    message: 'Delegation rejected successfully',
   });
 }
 

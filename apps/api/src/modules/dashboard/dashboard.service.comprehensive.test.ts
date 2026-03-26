@@ -16,6 +16,7 @@ vi.mock('../../lib/prisma', () => ({
     },
     project: {
       groupBy: vi.fn(),
+      count: vi.fn(),
     },
     allocation: {
       count: vi.fn(),
@@ -31,6 +32,8 @@ import prisma from '../../lib/prisma';
 
 describe('Dashboard Service - Comprehensive Tests', () => {
   const mockTenantId = 'tenant-123';
+  const now = new Date();
+  const futureDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,22 +47,35 @@ describe('Dashboard Service - Comprehensive Tests', () => {
       { status: 'NOTICE', employmentType: 'EMPLOYEE', _count: 2 },
     ];
 
-    const mockProjectStats = [
-      { status: 'ACTIVE', healthStatus: 'GREEN', _count: 10 },
-      { status: 'ACTIVE', healthStatus: 'YELLOW', _count: 3 },
-      { status: 'ACTIVE', healthStatus: 'RED', _count: 2 },
-      { status: 'PIPELINE', healthStatus: null, _count: 5 },
-    ];
-
     beforeEach(() => {
       vi.mocked(prisma.resource.groupBy).mockResolvedValue(mockResourceStats as never);
-      vi.mocked(prisma.resource.count).mockResolvedValue(8);
-      vi.mocked(prisma.resource.findMany).mockResolvedValue([
-        { capacity: 100, allocations: [{ percentage: 80, isBillable: true }] },
+      vi.mocked(prisma.resource.findMany)
+        .mockResolvedValueOnce([
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+          { costPerHour: null, billRateDefault: null, capacity: 100 },
+        ] as never)
+        .mockResolvedValueOnce([
+        {
+          capacity: 100,
+          allocations: [
+            { percentage: 80, isBillable: true },
+            { percentage: 10, isBillable: false },
+          ],
+        },
         { capacity: 100, allocations: [{ percentage: 60, isBillable: true }] },
         { capacity: 100, allocations: [] },
       ] as never);
-      vi.mocked(prisma.project.groupBy).mockResolvedValue(mockProjectStats as never);
+      vi.mocked(prisma.project.count)
+        .mockResolvedValueOnce(20) // total
+        .mockResolvedValueOnce(15) // active staffed
+        .mockResolvedValueOnce(5) // pipeline
+        .mockResolvedValueOnce(2); // at risk staffed
       vi.mocked(prisma.allocation.count)
         .mockResolvedValueOnce(100) // active
         .mockResolvedValueOnce(15) // pending
@@ -104,9 +120,10 @@ describe('Dashboard Service - Comprehensive Tests', () => {
     it('DASH-006: should calculate project counts', async () => {
       const result = await dashboardService.getDashboardMetrics(mockTenantId);
 
-      expect(result.projects.active).toBe(15); // 10+3+2 active projects
+      expect(result.projects.total).toBe(20);
+      expect(result.projects.active).toBe(15);
       expect(result.projects.pipeline).toBe(5);
-      expect(result.projects.atRisk).toBe(2); // RED health status
+      expect(result.projects.atRisk).toBe(2);
     });
 
     it('DASH-007: should get allocation metrics', async () => {
@@ -120,8 +137,16 @@ describe('Dashboard Service - Comprehensive Tests', () => {
     it('DASH-008: should calculate financial metrics', async () => {
       const result = await dashboardService.getDashboardMetrics(mockTenantId);
 
-      expect(result.financials.benchCostMonthly).toBeGreaterThanOrEqual(0);
-      expect(result.financials.potentialRevenueLoss).toBeGreaterThanOrEqual(0);
+      expect(result.financials.benchCostMonthly).toBe(0);
+      expect(result.financials.potentialRevenueLoss).toBe(0);
+    });
+
+    it('DASH-015: should report total utilization as current headline KPI', async () => {
+      const result = await dashboardService.getDashboardMetrics(mockTenantId);
+
+      expect(result.utilization.billable).toBe(46.7);
+      expect(result.utilization.nonBillable).toBe(3.3);
+      expect(result.utilization.current).toBe(50);
     });
   });
 
@@ -143,7 +168,12 @@ describe('Dashboard Service - Comprehensive Tests', () => {
       ] as never);
       vi.mocked(prisma.resource.count).mockResolvedValue(50);
 
-      const result = await dashboardService.getUtilizationTrend(mockTenantId, 12);
+      const result = await dashboardService.getUtilizationTrend(
+        mockTenantId,
+        now,
+        futureDate,
+        'weekly'
+      );
 
       expect(result).toBeInstanceOf(Array);
     });
@@ -154,7 +184,12 @@ describe('Dashboard Service - Comprehensive Tests', () => {
       ] as never);
       vi.mocked(prisma.resource.count).mockResolvedValue(10);
 
-      const result = await dashboardService.getUtilizationTrend(mockTenantId, 6);
+      const result = await dashboardService.getUtilizationTrend(
+        mockTenantId,
+        now,
+        futureDate,
+        'weekly'
+      );
 
       for (const dataPoint of result) {
         expect(dataPoint).toHaveProperty('billable');

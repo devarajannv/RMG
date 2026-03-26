@@ -239,7 +239,18 @@ export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
                 onMarkRead={(id) => markReadMutation.mutate(id)}
                 onClick={() => {
                   if (notification.actionUrl) {
-                    window.location.href = notification.actionUrl;
+                    // Validate URL is relative or same-origin to prevent open redirect
+                    try {
+                      const url = new URL(notification.actionUrl, window.location.origin);
+                      if (url.origin === window.location.origin) {
+                        window.location.href = url.pathname + url.search + url.hash;
+                      }
+                    } catch {
+                      // If URL is relative path, use it directly
+                      if (notification.actionUrl.startsWith('/') && !notification.actionUrl.startsWith('//')) {
+                        window.location.href = notification.actionUrl;
+                      }
+                    }
                   }
                 }}
               />

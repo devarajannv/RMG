@@ -48,6 +48,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/dialog';
+import { WorkflowTemplates, type WorkflowTemplate } from '@/components/workflows/WorkflowTemplates';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -66,7 +67,6 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
 import { Can } from '@/components/permissions/Can';
 import { PERMISSIONS } from '@/hooks/usePermissions';
 
@@ -74,11 +74,21 @@ import { PERMISSIONS } from '@/hooks/usePermissions';
 // Types
 // ============================================================================
 
-type ApprovalChainStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED' | 'DEPRECATED';
-type ApprovalChainScope = 'TENANT' | 'PRACTICE' | 'GLOBAL';
-type ApproverType = 'ROLE' | 'USER' | 'DYNAMIC' | 'FUNCTION';
+type ApprovalChainStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'ACTIVE' | 'DEPRECATED';
+type ApprovalChainScope = 'TENANT' | 'PRACTICE' | 'PROJECT' | 'GLOBAL';
+type ApproverType =
+  | 'ROLE'
+  | 'USER'
+  | 'FUNCTION'
+  | 'MANAGER'
+  | 'RESOURCE_MANAGER'
+  | 'PRACTICE_HEAD'
+  | 'PROJECT_MANAGER'
+  | 'CONTRACT_OWNER'
+  | 'CUSTOM'
+  | 'DYNAMIC';
 type ApprovalMode = 'ANY' | 'ALL' | 'MAJORITY' | 'FIRST_RESPONSE';
-type ConflictResolution = 'REJECTION_WINS' | 'APPROVAL_WINS' | 'MAJORITY_WINS';
+type ConflictResolution = 'REJECTION_WINS' | 'APPROVAL_WINS' | 'MAJORITY' | 'MAJORITY_WINS';
 
 interface Role {
   id: string;
@@ -159,7 +169,7 @@ interface ApprovalChain {
 }
 
 interface CreateChainInput {
-  code: string;
+  code?: string;
   name: string;
   description?: string;
   scope: ApprovalChainScope;
@@ -175,6 +185,7 @@ interface CreateChainInput {
 
 const STATUS_CONFIG: Record<ApprovalChainStatus, { label: string; color: string; icon: React.ElementType }> = {
   DRAFT: { label: 'Draft', color: 'bg-gray-100 text-gray-700', icon: Edit },
+  PUBLISHED: { label: 'Published', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
   ACTIVE: { label: 'Active', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
   ARCHIVED: { label: 'Archived', color: 'bg-yellow-100 text-yellow-700', icon: Archive },
   DEPRECATED: { label: 'Deprecated', color: 'bg-red-100 text-red-700', icon: XCircle },
@@ -183,6 +194,7 @@ const STATUS_CONFIG: Record<ApprovalChainStatus, { label: string; color: string;
 const SCOPE_CONFIG: Record<ApprovalChainScope, { label: string; icon: React.ElementType }> = {
   TENANT: { label: 'Organization-wide', icon: Building2 },
   PRACTICE: { label: 'Practice-specific', icon: Users },
+  PROJECT: { label: 'Project-specific', icon: Briefcase },
   GLOBAL: { label: 'Global', icon: Shield },
 };
 
@@ -190,6 +202,12 @@ const APPROVER_TYPE_CONFIG: Record<ApproverType, { label: string; icon: React.El
   ROLE: { label: 'Role', icon: Shield, description: 'Anyone with this role can approve' },
   USER: { label: 'Specific User', icon: User, description: 'Only this specific user can approve' },
   FUNCTION: { label: 'Function', icon: Briefcase, description: 'User holding this approval function can approve' },
+  MANAGER: { label: 'Manager', icon: User, description: 'Requester\'s manager can approve' },
+  RESOURCE_MANAGER: { label: 'Resource Manager', icon: Users, description: 'Resource manager can approve' },
+  PRACTICE_HEAD: { label: 'Practice Head', icon: Users, description: 'Practice head can approve' },
+  PROJECT_MANAGER: { label: 'Project Manager', icon: Briefcase, description: 'Project manager can approve' },
+  CONTRACT_OWNER: { label: 'Contract Owner', icon: Briefcase, description: 'Contract owner can approve' },
+  CUSTOM: { label: 'Custom', icon: Settings2, description: 'Custom assignment logic' },
   DYNAMIC: { label: 'Dynamic', icon: Zap, description: 'Determined at runtime based on request context' },
 };
 
@@ -203,20 +221,53 @@ const APPROVAL_MODE_CONFIG: Record<ApprovalMode, { label: string; description: s
 const CONFLICT_RESOLUTION_CONFIG: Record<ConflictResolution, { label: string; description: string }> = {
   REJECTION_WINS: { label: 'Rejection Wins', description: 'Any rejection rejects the step' },
   APPROVAL_WINS: { label: 'Approval Wins', description: 'Any approval approves the step' },
+  MAJORITY: { label: 'Majority Wins', description: 'Outcome based on majority' },
   MAJORITY_WINS: { label: 'Majority Wins', description: 'Outcome based on majority' },
 };
+
+const DEFAULT_STATUS_CONFIG = STATUS_CONFIG.DRAFT;
+const DEFAULT_SCOPE_CONFIG = SCOPE_CONFIG.TENANT;
+const DEFAULT_APPROVAL_MODE_CONFIG = APPROVAL_MODE_CONFIG.ANY;
+
+function getStatusConfig(status: string) {
+  return STATUS_CONFIG[status as ApprovalChainStatus] ?? DEFAULT_STATUS_CONFIG;
+}
+
+function getScopeConfig(scope: string) {
+  return SCOPE_CONFIG[scope as ApprovalChainScope] ?? DEFAULT_SCOPE_CONFIG;
+}
+
+function getApprovalModeConfig(mode?: string) {
+  if (!mode) return DEFAULT_APPROVAL_MODE_CONFIG;
+  return APPROVAL_MODE_CONFIG[mode as ApprovalMode] ?? DEFAULT_APPROVAL_MODE_CONFIG;
+}
+
+function toWorkflowCodeFromName(name: string): string {
+  const normalized = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  const fallback = normalized || 'WORKFLOW';
+  const startsWithLetter = /^[A-Z]/.test(fallback);
+  const prefixed = startsWithLetter ? fallback : `WF_${fallback}`;
+
+  return prefixed.slice(0, 50);
+}
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 export default function WorkflowBuilderPage() {
-  const [view, setView] = useState<'list' | 'editor'>('list');
+  const [view, setView] = useState<'list' | 'editor' | 'templates'>('list');
   const [selectedChain, setSelectedChain] = useState<ApprovalChain | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ApprovalChainStatus | 'all'>('all');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [templateSearchQuery] = useState('');
+  const [templateCategory] = useState('all');
 
   const queryClient = useQueryClient();
 
@@ -234,9 +285,9 @@ export default function WorkflowBuilderPage() {
   });
 
   // Fetch roles for step configuration
-  const { data: rolesResponse } = useQuery({
+  const { data: roles = [] } = useQuery({
     queryKey: ['roles'],
-    queryFn: () => api.get<{ success: boolean; data: Role[] }>('/roles'),
+    queryFn: () => api.get<Role[] | { success?: boolean; data: Role[] }>('/roles'),
   });
 
   // Fetch users for step configuration
@@ -252,7 +303,7 @@ export default function WorkflowBuilderPage() {
   });
 
   const chains = chainsResponse?.data || [];
-  const roles = rolesResponse?.data || [];
+  const resolvedRoles = Array.isArray(roles) ? roles : roles?.data || [];
   const users = usersResponse?.data || [];
 
   // Delete mutation
@@ -288,25 +339,146 @@ export default function WorkflowBuilderPage() {
     handleBackToList();
   };
 
+  // Convert WorkflowTemplate steps to CreateChainInput steps
+  const convertTemplateToChainInput = (template: WorkflowTemplate): CreateChainInput => {
+    const mapApproverType = (type?: string): ApproverType => {
+      switch (type) {
+        case 'role': return 'ROLE';
+        case 'user': return 'USER';
+        case 'dynamic':
+        case 'manager': return 'DYNAMIC';
+        default: return 'ROLE';
+      }
+    };
+
+    const steps: CreateChainInput['steps'] = template.steps
+      .filter(s => s.type === 'approval' || s.type === 'conditional')
+      .map((step, idx) => ({
+        name: step.name,
+        instructions: step.description || '',
+        stepOrder: idx + 1,
+        approverType: mapApproverType(step.approverType),
+        approvalMode: 'ANY' as ApprovalMode,
+        onConflict: 'REJECTION_WINS' as ConflictResolution,
+        isOptional: step.type === 'conditional',
+        canDelegate: true,
+        skipIfUnresolvable: false,
+        slaHours: step.timeoutHours,
+        escalateAfterHours: step.escalationEnabled ? (step.timeoutHours || 48) : undefined,
+        reminderAfterHours: 24,
+        reminderIntervalHours: 24,
+        maxReminders: 3,
+      }));
+
+    // Ensure at least one step
+    if (steps.length === 0) {
+      steps.push({
+        name: 'Step 1',
+        stepOrder: 1,
+        approverType: 'ROLE',
+        approvalMode: 'ANY',
+        onConflict: 'REJECTION_WINS',
+        isOptional: false,
+        canDelegate: true,
+        skipIfUnresolvable: false,
+        reminderAfterHours: 24,
+        reminderIntervalHours: 24,
+        maxReminders: 3,
+      });
+    }
+
+    const code = template.name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    return {
+      code,
+      name: template.name,
+      description: template.description,
+      scope: 'TENANT',
+      steps,
+    };
+  };
+
+  const handleSelectTemplate = (template: WorkflowTemplate) => {
+    const chainInput = convertTemplateToChainInput(template);
+    // Create a partial ApprovalChain from the template to pass to the editor
+    const templateChain: ApprovalChain = {
+      id: '',
+      code: chainInput.code || toWorkflowCodeFromName(chainInput.name),
+      name: chainInput.name,
+      description: chainInput.description,
+      status: 'DRAFT',
+      scope: chainInput.scope,
+      version: 1,
+      effectiveFrom: new Date().toISOString(),
+      steps: chainInput.steps.map((s, i) => ({
+        ...s,
+        id: `template-step-${i}`,
+      })) as ApprovalStep[],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setSelectedChain(templateChain);
+    setIsCreating(true);
+    setView('editor');
+  };
+
+  const handleCustomizeTemplate = (template: WorkflowTemplate) => {
+    handleSelectTemplate(template);
+  };
+
   // Render based on view
   if (view === 'editor') {
     return (
-      <MainLayout>
         <WorkflowEditor
           chain={selectedChain}
           isNew={isCreating}
-          roles={roles}
+          roles={resolvedRoles}
           users={users}
           functions={functionsResponse?.data || []}
           onBack={handleBackToList}
           onSave={handleSaveComplete}
         />
-      </MainLayout>
+    );
+  }
+
+  if (view === 'templates') {
+    return (
+        <div className="space-y-6">
+          {/* Templates Header */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={handleBackToList}>
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Workflow Templates</h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  Choose a pre-built template to get started quickly
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" onClick={handleCreateNew}>
+              <Plus className="w-4 h-4 mr-2" />
+              Start from Scratch
+            </Button>
+          </div>
+
+          {/* Template Gallery */}
+          <WorkflowTemplates
+            onSelect={handleSelectTemplate}
+            onCustomize={handleCustomizeTemplate}
+            selectedCategory={templateCategory}
+            searchQuery={templateSearchQuery}
+          />
+        </div>
     );
   }
 
   return (
-    <MainLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -317,10 +489,16 @@ export default function WorkflowBuilderPage() {
             </p>
           </div>
           <Can permission={PERMISSIONS.SETTINGS_UPDATE}>
-            <Button onClick={handleCreateNew}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Workflow
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setView('templates')}>
+                <Copy className="w-4 h-4 mr-2" />
+                From Template
+              </Button>
+              <Button onClick={handleCreateNew}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Workflow
+              </Button>
+            </div>
           </Can>
         </div>
 
@@ -377,10 +555,16 @@ export default function WorkflowBuilderPage() {
               </p>
               {!searchQuery && statusFilter === 'all' && (
                 <Can permission={PERMISSIONS.SETTINGS_UPDATE}>
-                  <Button onClick={handleCreateNew}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Workflow
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setView('templates')}>
+                      <Copy className="w-4 h-4 mr-2" />
+                      From Template
+                    </Button>
+                    <Button onClick={handleCreateNew}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Workflow
+                    </Button>
+                  </div>
                 </Can>
               )}
             </CardContent>
@@ -414,7 +598,7 @@ export default function WorkflowBuilderPage() {
           }
         }}
       />
-    </MainLayout>
+    </>
   );
 }
 
@@ -430,9 +614,9 @@ interface WorkflowCardProps {
 
 function WorkflowCard({ chain, onEdit, onDelete }: WorkflowCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const statusConfig = STATUS_CONFIG[chain.status];
+  const statusConfig = getStatusConfig(chain.status);
   const StatusIcon = statusConfig.icon;
-  const scopeConfig = SCOPE_CONFIG[chain.scope];
+  const scopeConfig = getScopeConfig(chain.scope);
   const ScopeIcon = scopeConfig.icon;
 
   return (
@@ -518,7 +702,7 @@ function WorkflowCard({ chain, onEdit, onDelete }: WorkflowCardProps) {
                       Activate
                     </DropdownMenuItem>
                   )}
-                  {chain.status === 'ACTIVE' && (
+                  {(chain.status === 'ACTIVE' || chain.status === 'PUBLISHED') && (
                     <DropdownMenuItem>
                       <Pause className="w-4 h-4 mr-2" />
                       Deactivate
@@ -662,6 +846,10 @@ function WorkflowEditor({ chain, isNew, roles, users, functions, onBack, onSave 
 
   const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [advancedCodeMode, setAdvancedCodeMode] = useState(false);
+  const resolvedRoles = Array.isArray(roles) ? roles : [];
+
+  const generatedCode = toWorkflowCodeFromName(formData.name);
 
   // Create mutation
   const createMutation = useMutation({
@@ -736,10 +924,12 @@ function WorkflowEditor({ chain, isNew, roles, users, functions, onBack, onSave 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.code.trim()) {
-      newErrors.code = 'Code is required';
-    } else if (!/^[A-Z0-9_-]+$/i.test(formData.code)) {
-      newErrors.code = 'Code must contain only letters, numbers, hyphens, and underscores';
+    if (isNew && advancedCodeMode) {
+      if (!formData.code?.trim()) {
+        newErrors.code = 'Code is required in advanced mode';
+      } else if (!/^[A-Z][A-Z0-9_]{1,49}$/.test(formData.code)) {
+        newErrors.code = 'Code must start with a letter and contain only uppercase letters, numbers, and underscores';
+      }
     }
 
     if (!formData.name.trim()) {
@@ -772,10 +962,19 @@ function WorkflowEditor({ chain, isNew, roles, users, functions, onBack, onSave 
   const handleSave = () => {
     if (!validate()) return;
 
+    const payload: CreateChainInput = {
+      ...formData,
+      code: formData.code?.trim() ? formData.code.trim().toUpperCase() : undefined,
+    };
+
     if (isNew) {
-      createMutation.mutate(formData);
+      if (!advancedCodeMode) {
+        delete payload.code;
+      }
+      createMutation.mutate(payload);
     } else {
-      updateMutation.mutate(formData);
+      delete payload.code;
+      updateMutation.mutate(payload);
     }
   };
 
@@ -831,17 +1030,32 @@ function WorkflowEditor({ chain, isNew, roles, users, functions, onBack, onSave 
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="code">Code *</Label>
+                  <Label htmlFor="code">Workflow Code</Label>
                   <Input
                     id="code"
-                    value={formData.code}
+                    value={isNew && !advancedCodeMode ? generatedCode : (formData.code || '')}
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))
                     }
-                    placeholder="e.g., LEAVE_APPROVAL"
+                    placeholder="Auto-generated from workflow name"
                     className={cn(errors.code && 'border-red-500')}
-                    disabled={!isNew}
+                    disabled={!isNew || !advancedCodeMode}
                   />
+                  {isNew && !advancedCodeMode && (
+                    <p className="text-xs text-gray-500 mt-1">Code is auto-generated and made unique by the server.</p>
+                  )}
+                  {isNew && (
+                    <Can permission={PERMISSIONS.SETTINGS_UPDATE}>
+                      <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                        <input
+                          type="checkbox"
+                          checked={advancedCodeMode}
+                          onChange={(e) => setAdvancedCodeMode(e.target.checked)}
+                        />
+                        Advanced: set custom code manually
+                      </label>
+                    </Can>
+                  )}
                   {errors.code && <p className="text-xs text-red-500 mt-1">{errors.code}</p>}
                 </div>
 
@@ -968,7 +1182,7 @@ function WorkflowEditor({ chain, isNew, roles, users, functions, onBack, onSave 
                               {step.approverType === 'ROLE' && (
                                 <>
                                   <Shield className="w-3 h-3" />
-                                  {roles.find((r) => r.id === step.approverRoleId)?.name || 'Select role'}
+                                  {resolvedRoles.find((r) => r.id === step.approverRoleId)?.name || 'Select role'}
                                 </>
                               )}
                               {step.approverType === 'USER' && (
@@ -995,7 +1209,7 @@ function WorkflowEditor({ chain, isNew, roles, users, functions, onBack, onSave 
                                 </>
                               )}
                               <span className="text-gray-300">•</span>
-                              <span>{APPROVAL_MODE_CONFIG[step.approvalMode].label}</span>
+                              <span>{getApprovalModeConfig(step.approvalMode).label}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-1">

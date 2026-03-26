@@ -98,8 +98,9 @@ export async function executeResourceExitCascade(
 
   try {
     // Get resource info for audit
-    const resource = await prisma.resource.findUnique({
-      where: { id: resourceId },
+    // M-11: Include tenantId to prevent cross-tenant PII loading
+    const resource = await prisma.resource.findFirst({
+      where: { id: resourceId, tenantId },
       select: { 
         firstName: true, 
         lastName: true, 
@@ -497,11 +498,12 @@ export async function rollbackExitCascade(
   performedBy: string
 ): Promise<{ success: boolean; restoredAllocations: number; error?: string }> {
   try {
-    const auditLog = await prisma.auditLog.findUnique({
-      where: { id: auditLogId },
+    // L-03: Include tenantId to prevent cross-tenant data loading
+    const auditLog = await prisma.auditLog.findFirst({
+      where: { id: auditLogId, tenantId },
     });
 
-    if (!auditLog || auditLog.tenantId !== tenantId) {
+    if (!auditLog) {
       return { success: false, restoredAllocations: 0, error: 'Audit log not found' };
     }
 

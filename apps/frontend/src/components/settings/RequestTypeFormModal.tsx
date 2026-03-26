@@ -65,6 +65,19 @@ const ROLLBACK_OPTIONS: { value: RollbackPermission; label: string }[] = [
   { value: 'ADMIN_ONLY', label: 'Admin Only' },
 ];
 
+function toRequestTypeCodeFromName(name: string): string {
+  const normalized = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  const fallback = normalized || 'REQUEST_TYPE';
+  const startsWithLetter = /^[A-Z]/.test(fallback);
+  const prefixed = startsWithLetter ? fallback : `RT_${fallback}`;
+
+  return prefixed.slice(0, 50);
+}
+
 // =============================================================================
 // Form Data Type
 // =============================================================================
@@ -114,12 +127,14 @@ interface Props {
 export default function RequestTypeFormModal({ isOpen, onClose, editingType }: Props) {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [advancedCodeMode, setAdvancedCodeMode] = useState(false);
 
   const createRequestType = useCreateRequestType();
   const updateRequestType = useUpdateRequestType();
 
   const isEditing = !!editingType;
   const isSaving = createRequestType.isPending || updateRequestType.isPending;
+  const generatedCode = toRequestTypeCodeFromName(formData.name);
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -144,6 +159,7 @@ export default function RequestTypeFormModal({ isOpen, onClose, editingType }: P
         setFormData(initialFormData);
       }
       setErrors({});
+      setAdvancedCodeMode(false);
     }
   }, [isOpen, editingType]);
 
@@ -151,10 +167,12 @@ export default function RequestTypeFormModal({ isOpen, onClose, editingType }: P
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
 
-    if (!formData.code.trim()) {
-      newErrors.code = 'Code is required';
-    } else if (!/^[A-Z][A-Z0-9_]*$/.test(formData.code)) {
-      newErrors.code = 'Code must start with a letter and contain only uppercase letters, numbers, and underscores';
+    if (!isEditing && advancedCodeMode) {
+      if (!formData.code.trim()) {
+        newErrors.code = 'Code is required in advanced mode';
+      } else if (!/^[A-Z][A-Z0-9_]{1,49}$/.test(formData.code)) {
+        newErrors.code = 'Code must start with a letter and contain only uppercase letters, numbers, and underscores';
+      }
     }
 
     if (!formData.name.trim()) {
@@ -177,7 +195,9 @@ export default function RequestTypeFormModal({ isOpen, onClose, editingType }: P
 
     try {
       const input: CreateRequestTypeInput = {
-        code: formData.code,
+        code: isEditing
+          ? formData.code
+          : (advancedCodeMode && formData.code.trim() ? formData.code.trim().toUpperCase() : undefined),
         name: formData.name,
         description: formData.description || undefined,
         category: formData.category,
@@ -209,7 +229,7 @@ export default function RequestTypeFormModal({ isOpen, onClose, editingType }: P
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" preventDismiss>
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Edit Request Type' : 'Create Request Type'}
@@ -222,17 +242,36 @@ export default function RequestTypeFormModal({ isOpen, onClose, editingType }: P
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Code *
+                    Code
                   </label>
                   <Input
-                    value={formData.code}
+                    value={
+                      !isEditing && !advancedCodeMode
+                        ? generatedCode
+                        : formData.code
+                    }
                     onChange={(e) =>
                       setFormData({ ...formData, code: e.target.value.toUpperCase() })
                     }
-                    placeholder="CUSTOM_REQUEST"
-                    disabled={isEditing}
+                    placeholder="Auto-generated from name"
+                    disabled={isEditing || !advancedCodeMode}
                     className={errors.code ? 'border-red-500' : ''}
                   />
+                  {!isEditing && !advancedCodeMode && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Code is auto-generated and made unique by the server.
+                    </p>
+                  )}
+                  {!isEditing && (
+                    <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={advancedCodeMode}
+                        onChange={(e) => setAdvancedCodeMode(e.target.checked)}
+                      />
+                      Advanced: set custom code manually
+                    </label>
+                  )}
                   {errors.code && (
                     <p className="text-xs text-red-500 mt-1">{errors.code}</p>
                   )}

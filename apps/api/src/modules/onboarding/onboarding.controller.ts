@@ -12,6 +12,32 @@ import * as RolesService from './roles.service';
 import * as PeopleService from './people.service';
 import * as GovernanceService from './governance.service';
 import * as OnboardingService from './onboarding.service';
+import {
+  completeStepSchema,
+  skipStepSchema,
+  initializeDefaultsSchema,
+  upsertProfileSchema,
+  updateBrandingSchema,
+  updateRegionalSettingsSchema,
+  createDepartmentSchema,
+  updateDepartmentSchema,
+  createTeamSchema,
+  updateTeamSchema,
+  createCostCenterSchema,
+  updateCostCenterSchema,
+  createBusinessRoleSchema,
+  updateBusinessRoleSchema,
+  createGradeBandSchema,
+  updateGradeBandSchema,
+  createResourceSchema,
+  updateResourceSchema,
+  createUserForResourceSchema,
+  sendInvitationSchema,
+  acceptInvitationSchema,
+  importRowsSchema,
+  createDelegationRuleSchema,
+  updateDelegationRuleSchema,
+} from './onboarding.schemas';
 
 // =============================================================================
 // HELPERS
@@ -57,7 +83,7 @@ export async function completeStep(req: Request, res: Response, next: NextFuncti
   try {
     const tenantId = getTenantId(req);
     const userId = getUserId(req);
-    const { phase, stepCode } = req.body;
+    const { phase, stepCode } = completeStepSchema.parse(req.body);
     
     await OnboardingService.completeStep(tenantId, phase, stepCode, userId);
     res.json({ success: true, message: 'Step completed' });
@@ -70,7 +96,7 @@ export async function skipStep(req: Request, res: Response, next: NextFunction) 
   try {
     const tenantId = getTenantId(req);
     const userId = getUserId(req);
-    const { phase, stepCode } = req.body;
+    const { phase, stepCode } = skipStepSchema.parse(req.body);
     
     await OnboardingService.skipStep(tenantId, phase, stepCode, userId);
     res.json({ success: true, message: 'Step skipped' });
@@ -82,7 +108,7 @@ export async function skipStep(req: Request, res: Response, next: NextFunction) 
 export async function initializeDefaults(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const options = req.body;
+    const options = initializeDefaultsSchema.parse(req.body);
     
     const result = await OnboardingService.initializeDefaults(tenantId, options);
     res.json({ success: true, data: result });
@@ -117,7 +143,7 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
 export async function createOrUpdateProfile(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const profile = await IdentityService.upsertTenantProfile(tenantId, req.body);
+    const profile = await IdentityService.upsertTenantProfile(tenantId, upsertProfileSchema.parse(req.body) as any);
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);
@@ -127,7 +153,7 @@ export async function createOrUpdateProfile(req: Request, res: Response, next: N
 export async function updateBranding(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const profile = await IdentityService.updateBranding(tenantId, req.body);
+    const profile = await IdentityService.updateBranding(tenantId, updateBrandingSchema.parse(req.body));
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);
@@ -137,7 +163,7 @@ export async function updateBranding(req: Request, res: Response, next: NextFunc
 export async function updateRegionalSettings(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const profile = await IdentityService.updateRegionalSettings(tenantId, req.body);
+    const profile = await IdentityService.updateRegionalSettings(tenantId, updateRegionalSettingsSchema.parse(req.body));
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);
@@ -188,7 +214,7 @@ export async function getDepartmentById(req: Request, res: Response, next: NextF
 export async function createDepartment(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const department = await StructureService.createDepartment(tenantId, req.body);
+    const department = await StructureService.createDepartment(tenantId, createDepartmentSchema.parse(req.body) as any);
     res.status(201).json({ success: true, data: department });
   } catch (error) {
     next(error);
@@ -199,7 +225,7 @@ export async function updateDepartment(req: Request, res: Response, next: NextFu
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
-    const department = await StructureService.updateDepartment(tenantId, id, req.body);
+    const department = await StructureService.updateDepartment(tenantId, id, updateDepartmentSchema.parse(req.body) as any);
     res.json({ success: true, data: department });
   } catch (error) {
     next(error);
@@ -232,7 +258,7 @@ export async function getTeams(req: Request, res: Response, next: NextFunction) 
 export async function createTeam(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const team = await StructureService.createTeam(tenantId, req.body);
+    const team = await StructureService.createTeam(tenantId, createTeamSchema.parse(req.body) as any);
     res.status(201).json({ success: true, data: team });
   } catch (error) {
     next(error);
@@ -243,7 +269,7 @@ export async function updateTeam(req: Request, res: Response, next: NextFunction
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
-    const team = await StructureService.updateTeam(tenantId, id, req.body);
+    const team = await StructureService.updateTeam(tenantId, id, updateTeamSchema.parse(req.body) as any);
     res.json({ success: true, data: team });
   } catch (error) {
     next(error);
@@ -275,7 +301,7 @@ export async function getCostCenters(req: Request, res: Response, next: NextFunc
 export async function createCostCenter(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const costCenter = await StructureService.createCostCenter(tenantId, req.body);
+    const costCenter = await StructureService.createCostCenter(tenantId, createCostCenterSchema.parse(req.body) as any);
     res.status(201).json({ success: true, data: costCenter });
   } catch (error) {
     next(error);
@@ -286,7 +312,7 @@ export async function updateCostCenter(req: Request, res: Response, next: NextFu
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
-    const costCenter = await StructureService.updateCostCenter(tenantId, id, req.body);
+    const costCenter = await StructureService.updateCostCenter(tenantId, id, updateCostCenterSchema.parse(req.body) as any);
     res.json({ success: true, data: costCenter });
   } catch (error) {
     next(error);
@@ -322,7 +348,7 @@ export async function getBusinessRoles(req: Request, res: Response, next: NextFu
 export async function createBusinessRole(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const role = await RolesService.createBusinessRole(tenantId, req.body);
+    const role = await RolesService.createBusinessRole(tenantId, createBusinessRoleSchema.parse(req.body) as any);
     res.status(201).json({ success: true, data: role });
   } catch (error) {
     next(error);
@@ -333,7 +359,7 @@ export async function updateBusinessRole(req: Request, res: Response, next: Next
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
-    const role = await RolesService.updateBusinessRole(tenantId, id, req.body);
+    const role = await RolesService.updateBusinessRole(tenantId, id, updateBusinessRoleSchema.parse(req.body) as any);
     res.json({ success: true, data: role });
   } catch (error) {
     next(error);
@@ -365,7 +391,7 @@ export async function getGradeBands(req: Request, res: Response, next: NextFunct
 export async function createGradeBand(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const grade = await RolesService.createGradeBand(tenantId, req.body);
+    const grade = await RolesService.createGradeBand(tenantId, createGradeBandSchema.parse(req.body) as any);
     res.status(201).json({ success: true, data: grade });
   } catch (error) {
     next(error);
@@ -376,7 +402,7 @@ export async function updateGradeBand(req: Request, res: Response, next: NextFun
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
-    const grade = await RolesService.updateGradeBand(tenantId, id, req.body);
+    const grade = await RolesService.updateGradeBand(tenantId, id, updateGradeBandSchema.parse(req.body) as any);
     res.json({ success: true, data: grade });
   } catch (error) {
     next(error);
@@ -437,7 +463,7 @@ export async function getResourceById(req: Request, res: Response, next: NextFun
 export async function createResource(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const resource = await PeopleService.createResource(tenantId, req.body);
+    const resource = await PeopleService.createResource(tenantId, createResourceSchema.parse(req.body) as any);
     res.status(201).json({ success: true, data: resource });
   } catch (error) {
     next(error);
@@ -448,7 +474,7 @@ export async function updateResource(req: Request, res: Response, next: NextFunc
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
-    const resource = await PeopleService.updateResource(tenantId, id, req.body);
+    const resource = await PeopleService.updateResource(tenantId, id, updateResourceSchema.parse(req.body) as any);
     res.json({ success: true, data: resource });
   } catch (error) {
     next(error);
@@ -471,7 +497,7 @@ export async function createUserForResource(req: Request, res: Response, next: N
   try {
     const tenantId = getTenantId(req);
     const userId = getUserId(req);
-    const result = await PeopleService.createUserForResource(tenantId, req.body, userId);
+    const result = await PeopleService.createUserForResource(tenantId, createUserForResourceSchema.parse(req.body) as any, userId);
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -494,7 +520,7 @@ export async function sendInvitation(req: Request, res: Response, next: NextFunc
   try {
     const tenantId = getTenantId(req);
     const userId = getUserId(req);
-    const invitation = await PeopleService.sendInvitation(tenantId, req.body, userId);
+    const invitation = await PeopleService.sendInvitation(tenantId, sendInvitationSchema.parse(req.body) as any, userId);
     res.status(201).json({ success: true, data: invitation });
   } catch (error) {
     next(error);
@@ -515,7 +541,7 @@ export async function revokeInvitation(req: Request, res: Response, next: NextFu
 // Public endpoint - no auth required
 export async function acceptInvitation(req: Request, res: Response, next: NextFunction) {
   try {
-    const { token, password } = req.body;
+    const { token, password } = acceptInvitationSchema.parse(req.body);
     const result = await PeopleService.acceptInvitation(token, password);
     res.json({ success: true, data: result });
   } catch (error) {
@@ -527,7 +553,7 @@ export async function acceptInvitation(req: Request, res: Response, next: NextFu
 export async function validateImport(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const { rows } = req.body;
+    const { rows } = importRowsSchema.parse(req.body);
     const result = await PeopleService.validateImport(tenantId, rows);
     res.json({ success: true, data: result });
   } catch (error) {
@@ -538,7 +564,7 @@ export async function validateImport(req: Request, res: Response, next: NextFunc
 export async function importResources(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const { rows } = req.body;
+    const { rows } = importRowsSchema.parse(req.body);
     const result = await PeopleService.importResources(tenantId, rows);
     res.json({ success: true, data: result });
   } catch (error) {
@@ -585,7 +611,7 @@ export async function getDelegationRules(req: Request, res: Response, next: Next
 export async function createDelegationRule(req: Request, res: Response, next: NextFunction) {
   try {
     const tenantId = getTenantId(req);
-    const rule = await GovernanceService.createDelegationRule(tenantId, req.body);
+    const rule = await GovernanceService.createDelegationRule(tenantId, createDelegationRuleSchema.parse(req.body) as any);
     res.status(201).json({ success: true, data: rule });
   } catch (error) {
     next(error);
@@ -596,7 +622,7 @@ export async function updateDelegationRule(req: Request, res: Response, next: Ne
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
-    const rule = await GovernanceService.updateDelegationRule(tenantId, id, req.body);
+    const rule = await GovernanceService.updateDelegationRule(tenantId, id, updateDelegationRuleSchema.parse(req.body) as any);
     res.json({ success: true, data: rule });
   } catch (error) {
     next(error);

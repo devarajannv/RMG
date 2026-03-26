@@ -93,16 +93,34 @@ interface DialogContentProps {
   children: React.ReactNode;
   className?: string;
   onClose?: () => void;
+  /** When true, backdrop click is blocked (with shake) and Escape shows a discard confirmation */
+  preventDismiss?: boolean;
 }
 
-export function DialogContent({ children, className, onClose }: DialogContentProps) {
+export function DialogContent({ children, className, onClose, preventDismiss = false }: DialogContentProps) {
   const { open, onOpenChange } = useDialogContext();
+  const [showDiscardConfirm, setShowDiscardConfirm] = React.useState(false);
+  const [shaking, setShaking] = React.useState(false);
+
+  // Reset internal state when dialog closes
+  React.useEffect(() => {
+    if (!open) {
+      setShowDiscardConfirm(false);
+      setShaking(false);
+    }
+  }, [open]);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onOpenChange(false);
-        onClose?.();
+        if (preventDismiss) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowDiscardConfirm(true);
+        } else {
+          onOpenChange(false);
+          onClose?.();
+        }
       }
     };
 
@@ -115,33 +133,106 @@ export function DialogContent({ children, className, onClose }: DialogContentPro
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
     };
-  }, [open, onOpenChange, onClose]);
+  }, [open, onOpenChange, onClose, preventDismiss]);
 
   if (!open) return null;
 
+  const handleBackdropClick = () => {
+    if (preventDismiss) {
+      setShowDiscardConfirm(true);
+    } else {
+      onOpenChange(false);
+      onClose?.();
+    }
+  };
+
+  const handleDiscard = () => {
+    setShowDiscardConfirm(false);
+    onOpenChange(false);
+    onClose?.();
+  };
+
+  const handleCloseButton = () => {
+    if (preventDismiss) {
+      setShowDiscardConfirm(true);
+    } else {
+      onOpenChange(false);
+      onClose?.();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50">
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in-0"
-        onClick={() => {
-          onOpenChange(false);
-          onClose?.();
-        }}
-      />
+      {/* Overlay (visual only — clicks handled by content container) */}
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in-0" />
       
-      {/* Content */}
-      <div className="fixed inset-0 flex items-center justify-center p-4">
+      {/* Clickable content container — clicking here (outside the panel) = backdrop click */}
+      <div
+        className="fixed inset-0 flex items-center justify-center p-4"
+        onClick={handleBackdropClick}
+      >
         <div
           role="dialog"
           aria-modal="true"
           className={cn(
             'relative bg-white rounded-xl shadow-2xl max-h-[90vh] overflow-auto animate-in fade-in-0 zoom-in-95',
             'w-full max-w-lg',
+            shaking && 'animate-dialog-shake',
             className
           )}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Close X button */}
+          <button
+            type="button"
+            onClick={handleCloseButton}
+            className="absolute top-4 right-4 z-20 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+            aria-label="Close dialog"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          {/* Discard confirmation overlay */}
+          {showDiscardConfirm && (
+            <div
+              className="absolute inset-0 z-30 bg-white/95 backdrop-blur-sm flex items-center justify-center rounded-xl"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="discard-title"
+              aria-describedby="discard-desc"
+            >
+              <div className="text-center p-6 space-y-4 max-w-sm">
+                <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                </div>
+                <h3 id="discard-title" className="text-lg font-semibold text-gray-900">
+                  Discard unsaved changes?
+                </h3>
+                <p id="discard-desc" className="text-sm text-gray-500">
+                  Any information you&apos;ve entered will be lost.
+                </p>
+                <div className="flex gap-3 justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscardConfirm(false)}
+                    className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    autoFocus
+                  >
+                    Keep Editing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscard}
+                    className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {children}
         </div>
       </div>

@@ -106,7 +106,7 @@ function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent preventDismiss>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {variant === 'danger' ? (

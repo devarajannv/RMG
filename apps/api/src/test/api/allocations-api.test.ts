@@ -263,17 +263,32 @@ describe('Allocations API Tests', () => {
 
     it('should filter by date range (active allocations)', () => {
       const today = new Date();
+      const pastStart = new Date(today);
+      pastStart.setFullYear(today.getFullYear() - 2);
+      const pastEnd = new Date(today);
+      pastEnd.setFullYear(today.getFullYear() - 1);
+
+      const currentStart = new Date(today);
+      currentStart.setMonth(today.getMonth() - 1);
+      const currentEnd = new Date(today);
+      currentEnd.setMonth(today.getMonth() + 1);
+
+      const futureStart = new Date(today);
+      futureStart.setFullYear(today.getFullYear() + 1);
+      const futureEnd = new Date(today);
+      futureEnd.setFullYear(today.getFullYear() + 2);
+
       const allocations = [
-        { id: '1', startDate: new Date('2024-01-01'), endDate: new Date('2024-12-31') }, // Past
-        { id: '2', startDate: new Date('2025-01-01'), endDate: new Date('2025-12-31') }, // Current
-        { id: '3', startDate: new Date('2026-01-01'), endDate: new Date('2026-12-31') }, // Future
+        { id: '1', startDate: pastStart, endDate: pastEnd },
+        { id: '2', startDate: currentStart, endDate: currentEnd },
+        { id: '3', startDate: futureStart, endDate: futureEnd },
       ];
 
       const active = allocations.filter(a => 
         a.startDate <= today && a.endDate >= today
       );
       
-      // Only 2025 allocation is active
+      // Only the current-window allocation is active
       expect(active.length).toBe(1);
       expect(active[0].id).toBe('2');
     });

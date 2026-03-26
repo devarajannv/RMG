@@ -133,7 +133,7 @@ export default function FunctionFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent preventDismiss>
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Edit Function' : 'Create Approval Function'}

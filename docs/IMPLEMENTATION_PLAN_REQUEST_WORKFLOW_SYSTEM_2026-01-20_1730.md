@@ -1,7 +1,7 @@
 # Request Types & Workflow System Implementation Plan
 
 **Document Created:** January 20, 2026 at 17:30 IST  
-**Last Updated:** January 20, 2026 at 22:30 IST  
+**Last Updated:** March 10, 2026 at 06:15 UTC  
 **Author:** AI Assistant (GitHub Copilot)  
 **Status:** ✅ PHASE 1 & 2 COMPLETE  
 **Priority:** HIGH  
@@ -15,13 +15,15 @@ This document outlines the implementation plan for the **Request Types & Workflo
 1. Making Request Types tenant-configurable (custom types)
 2. Making Workflows reusable across multiple request types
 3. Adding Request Type Templates for accelerated setup
-4. Integrating Request Type management into Settings
+4. Integrating Request Type management into tenant administration
 
 **Key Decisions Made:**
-- Request Types page will live under **Settings > Requests** (Option A)
+- **Superseded on March 10, 2026:** Request Types should live under **Organization Admin > Request Types**, not a tenant-wide Settings catch-all
 - Workflows will be **reusable** across multiple request types
 - Tenants will have **total freedom** to create custom request types
 - Templates are **optional accelerators**, not constraints
+
+> **Navigation Addendum (March 10, 2026):** Any references in this document to `Settings > Requests` or `Settings > Requests > Templates` are superseded by the approved tenant-app IA decision. The correct target destination is `Organization Admin`, with `Request Types` and `Workflows` kept as adjacent tenant-admin capabilities.
 
 ---
 
@@ -355,14 +357,14 @@ model RequestTypeTemplate {
 | Day 1 | Create `RequestTypesPage.tsx` - list view | Page shell with data fetching |
 | Day 2 | Create `RequestTypeFormModal.tsx` | Create/edit modal |
 | Day 3 | Add clone functionality, workflow selector | Clone from system types |
-| Day 4 | Integrate into Settings page tabs | Settings > Requests > Request Types |
+| Day 4 | Integrate into Organization Admin surface | Organization Admin > Request Types |
 | Day 5 | Permission gating, error handling | Access control working |
 
 **Deliverables:**
 - [ ] Page: `RequestTypesPage.tsx`
 - [ ] Component: `RequestTypeFormModal.tsx`
 - [ ] Component: `WorkflowSelector.tsx`
-- [ ] Integration: Settings page tab
+- [ ] Integration: Organization Admin surface
 - [ ] Tests: Page tests
 
 ### Phase 3: Frontend - Workflow Builder Integration (Week 3)
@@ -474,7 +476,7 @@ npm run test -- --grep "RequestType"
 
 | Test Case | Steps | Expected Result | Pass/Fail |
 |-----------|-------|-----------------|-----------|
-| View request types | Go to Settings > Requests > Request Types | See list of system + custom types | |
+| View request types | Go to Organization Admin > Request Types | See list of system + custom types | |
 | Create custom type | Click "Create", fill form, save | New type appears in list | |
 | Clone system type | Click "Clone" on system type | New custom type created with copy of fields | |
 | Edit custom type | Click "Edit" on custom type | Form opens, changes saved | |
@@ -496,7 +498,7 @@ npm run test -- --grep "RequestType"
 
 | Test Case | Steps | Expected Result | Pass/Fail |
 |-----------|-------|-----------------|-----------|
-| View templates | Go to Settings > Requests > Templates | See template gallery | |
+| View templates | Go to Organization Admin > Workflows > Templates | See template gallery | |
 | Preview template | Click "Preview" on template | See included types and workflows | |
 | Import template | Click "Import", confirm | Types and workflows created | |
 | Customize after import | Edit imported type | Changes saved | |
@@ -644,25 +646,27 @@ if (isEnabled) {
 ## Appendix B: Navigation Structure After Implementation
 
 ```
-Settings (sidebar)
-├── Profile & Preferences
-├── Notifications
-├── Display
-├── Security
-├── ─────────────────────────
-├── ORGANIZATION (admin section)
-│   ├── Organization Info
-│   ├── Departments & Teams
-│   ├── Roles
-│   └── Functions
-├── REQUESTS (admin section) ← NEW
-│   ├── Request Types ← NEW
-│   ├── Workflows (links to /workflows page)
-│   └── Templates ← NEW
-├── USERS (admin section)
-│   ├── User Management
-│   └── Audit Logs
-└── Currency
+Sidebar
+├── My Settings
+│   ├── Profile
+│   ├── Notifications
+│   ├── Display
+│   └── Security
+└── Organization Admin
+  ├── Organization
+  ├── Users
+  ├── Roles
+  ├── Functions
+  ├── Request Types
+  ├── Workflows
+  │   ├── Workflow Builder
+  │   ├── Templates
+  │   ├── SLA Rules
+  │   └── Escalation Rules
+  ├── Currency
+  ├── Integrations
+  ├── Audit Logs
+  └── Data Management
 ```
 
 ---

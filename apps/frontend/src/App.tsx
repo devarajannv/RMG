@@ -4,6 +4,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { Toaster } from '@/components/ui/toaster';
 import { AgentWidget, CommandPalette } from '@/components/agent';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
+import { useIdleTimeout } from '@/hooks/useIdleTimeout';
+import MainLayout from '@/components/layout/MainLayout';
 
 // Loading spinner component
 function LoadingSpinner() {
@@ -38,10 +40,19 @@ const RequestDetailPage = lazy(() => import('@/pages/RequestDetailPage'));
 const WorkflowBuilderPage = lazy(() => import('@/pages/WorkflowBuilderPage'));
 const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'));
 const MyFunctionsPage = lazy(() => import('@/pages/MyFunctionsPage'));
+const OrganizationAdminLayout = lazy(() => import('@/pages/OrganizationAdminLayout'));
+const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
+const AdminRolesPage = lazy(() => import('@/pages/admin/AdminRolesPage'));
+const AdminFunctionsPage = lazy(() => import('@/pages/admin/AdminFunctionsPage'));
+const AdminRequestTypesPage = lazy(() => import('@/pages/admin/AdminRequestTypesPage'));
+const AdminCurrencyPage = lazy(() => import('@/pages/admin/AdminCurrencyPage'));
+const AdminIntegrationsPage = lazy(() => import('@/pages/admin/AdminIntegrationsPage'));
+const AdminOrganizationPage = lazy(() => import('@/pages/admin/AdminOrganizationPage'));
+const AdminAuditLogsPage = lazy(() => import('@/pages/admin/AdminAuditLogsPage'));
 
-// Auth guard component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasHydrated } = useAuthStore();
+// Auth guard component with optional role-based access control
+function ProtectedRoute({ children, requiredRoles }: { children: React.ReactNode; requiredRoles?: string[] }) {
+  const { isAuthenticated, hasHydrated, user } = useAuthStore();
 
   if (!hasHydrated) {
     return <LoadingSpinner />;
@@ -51,9 +62,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
+  // M-09: Role-based route protection
+  if (requiredRoles && requiredRoles.length > 0) {
+    const userRoles = user?.roles ?? [];
+    const hasRequiredRole = requiredRoles.some((role) => userRoles.includes(role));
+    if (!hasRequiredRole) {
+      return <Navigate to="/" replace />;
+    }
+  }
+
   return (
     <CurrencyProvider>
-      <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
+      {children}
     </CurrencyProvider>
   );
 }
@@ -74,6 +94,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  // M-14: Auto-logout on idle
+  useIdleTimeout();
+
   return (
     <>
       <Routes>
@@ -87,185 +110,45 @@ function App() {
           }
         />
 
-        {/* Protected routes */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Placeholder routes - to be implemented */}
-        <Route
-          path="/resources"
-          element={
-            <ProtectedRoute>
-              <ResourcesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/resources/:id"
-          element={
-            <ProtectedRoute>
-              <ResourceDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects"
-          element={
-            <ProtectedRoute>
-              <ProjectsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects/:id"
-          element={
-            <ProtectedRoute>
-              <ProjectDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/allocations"
-          element={
-            <ProtectedRoute>
-              <AllocationsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/clients"
-          element={
-            <ProtectedRoute>
-              <ClientsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/clients/:id"
-          element={
-            <ProtectedRoute>
-              <ClientDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/bench"
-          element={
-            <ProtectedRoute>
-              <BenchAnalysisPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <ReportsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/contracts"
-          element={
-            <ProtectedRoute>
-              <ContractsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/contracts/:id"
-          element={
-            <ProtectedRoute>
-              <ContractDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/timesheets"
-          element={
-            <ProtectedRoute>
-              <TimesheetsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/smart-search"
-          element={
-            <ProtectedRoute>
-              <SmartSearchPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
-              <AnalyticsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/data-management"
-          element={
-            <ProtectedRoute>
-              <ExportImportPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/requests"
-          element={
-            <ProtectedRoute>
-              <RequestsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/requests/:id"
-          element={
-            <ProtectedRoute>
-              <RequestDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/workflows"
-          element={
-            <ProtectedRoute>
-              <WorkflowBuilderPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/onboarding"
-          element={
-            <ProtectedRoute>
-              <OnboardingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <SettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/my-functions"
-          element={
-            <ProtectedRoute>
-              <MyFunctionsPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Protected routes - shared MainLayout */}
+        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/resources" element={<ResourcesPage />} />
+          <Route path="/resources/:id" element={<ResourceDetailPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/allocations" element={<AllocationsPage />} />
+          <Route path="/clients" element={<ClientsPage />} />
+          <Route path="/clients/:id" element={<ClientDetailPage />} />
+          <Route path="/bench" element={<BenchAnalysisPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/contracts" element={<ContractsPage />} />
+          <Route path="/contracts/:id" element={<ContractDetailPage />} />
+          <Route path="/timesheets" element={<TimesheetsPage />} />
+          <Route path="/smart-search" element={<SmartSearchPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/data-management" element={<Navigate to="/admin/data-management" replace />} />
+          <Route path="/requests" element={<RequestsPage />} />
+          <Route path="/requests/:id" element={<RequestDetailPage />} />
+          <Route path="/workflows" element={<Navigate to="/admin/workflows" replace />} />
+          <Route path="/onboarding" element={<Navigate to="/admin/onboarding" replace />} />
+          <Route path="/admin" element={<OrganizationAdminLayout />}>
+            <Route index element={<Navigate to="/admin/onboarding" replace />} />
+            <Route path="onboarding" element={<OnboardingPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="roles" element={<AdminRolesPage />} />
+            <Route path="functions" element={<AdminFunctionsPage />} />
+            <Route path="request-types" element={<AdminRequestTypesPage />} />
+            <Route path="workflows" element={<WorkflowBuilderPage />} />
+            <Route path="currency" element={<AdminCurrencyPage />} />
+            <Route path="integrations" element={<AdminIntegrationsPage />} />
+            <Route path="organization" element={<AdminOrganizationPage />} />
+            <Route path="audit" element={<AdminAuditLogsPage />} />
+            <Route path="data-management" element={<ExportImportPage />} />
+          </Route>
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/my-functions" element={<MyFunctionsPage />} />
+        </Route>
 
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />

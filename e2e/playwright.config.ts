@@ -12,6 +12,7 @@
  * @module e2e/playwright.config
  */
 
+import path from 'path';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
@@ -20,6 +21,13 @@ import { defineConfig, devices } from '@playwright/test';
 const isCI = !!process.env.CI;
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:5173';
 const apiURL = process.env.E2E_API_URL || 'http://localhost:4000/api/v1';
+const authStateDir = path.resolve(__dirname, '.auth');
+
+export const authStatePaths = {
+  dir: authStateDir,
+  user: path.join(authStateDir, 'user.json'),
+  admin: path.join(authStateDir, 'admin.json'),
+};
 
 export default defineConfig({
   // ==========================================================================
@@ -116,17 +124,11 @@ export default defineConfig({
   // ==========================================================================
   projects: [
     // --------------------------------------------------------------------
-    // Setup Project - Run First
+    // Authentication Setup Project - Run First For Authenticated Suites
     // --------------------------------------------------------------------
     {
-      name: 'setup',
-      testMatch: /global\.setup\.ts/,
-      teardown: 'teardown',
-    },
-    
-    {
-      name: 'teardown',
-      testMatch: /global\.teardown\.ts/,
+      name: 'auth-setup',
+      testMatch: /auth\.setup\.ts/,
     },
 
     // --------------------------------------------------------------------
@@ -136,27 +138,27 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: authStatePaths.user,
       },
-      dependencies: ['setup'],
+      dependencies: ['auth-setup'],
     },
 
     {
       name: 'firefox',
       use: { 
         ...devices['Desktop Firefox'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: authStatePaths.user,
       },
-      dependencies: ['setup'],
+      dependencies: ['auth-setup'],
     },
 
     {
       name: 'webkit',
       use: { 
         ...devices['Desktop Safari'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: authStatePaths.user,
       },
-      dependencies: ['setup'],
+      dependencies: ['auth-setup'],
     },
 
     // --------------------------------------------------------------------
@@ -166,18 +168,18 @@ export default defineConfig({
       name: 'mobile-chrome',
       use: { 
         ...devices['Pixel 5'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: authStatePaths.user,
       },
-      dependencies: ['setup'],
+      dependencies: ['auth-setup'],
     },
 
     {
       name: 'mobile-safari',
       use: { 
         ...devices['iPhone 13'],
-        storageState: 'e2e/.auth/user.json',
+        storageState: authStatePaths.user,
       },
-      dependencies: ['setup'],
+      dependencies: ['auth-setup'],
     },
 
     // --------------------------------------------------------------------
@@ -189,7 +191,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: { cookies: [], origins: [] },
       },
-      testMatch: /auth\.spec\.ts/,
+      testMatch: /(auth|login-screen|dashboard-screen|requests-screen|request-detail-screen)\.spec\.ts/,
     },
   ],
 

@@ -4,8 +4,10 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import * as triggerService from './trigger.service';
 import { TriggerSourceType, InboundWebhookSource, TriggerExecutionStatus, TriggerEventStatus } from '@prisma/client';
+import { logger } from '../../lib/logger';
 
 // ============================================================================
 // Inbound Webhook Endpoints
@@ -289,6 +291,31 @@ export async function receiveInboundWebhook(req: Request, res: Response, _next: 
       ? req.headers[webhook.signatureHeader.toLowerCase()] as string
       : undefined;
 
+    // Verify webhook signature using HMAC-SHA256
+    if (webhook.secretKey) {
+      if (!signature) {
+        logger.warn('Webhook missing signature header', { webhookId: webhook.id });
+        return res.status(401).json({ error: 'Missing webhook signature' });
+      }
+
+      const rawBody = JSON.stringify(req.body);
+      const algo = webhook.signatureAlgo || 'sha256';
+      const expectedSignature = crypto
+        .createHmac(algo, webhook.secretKey)
+        .update(rawBody)
+        .digest('hex');
+
+      // Use timing-safe comparison to prevent timing attacks
+      const sigBuffer = Buffer.from(signature.replace(/^sha256=/, ''), 'utf8');
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+
+      if (sigBuffer.length !== expectedBuffer.length ||
+          !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+        logger.warn('Webhook invalid signature', { webhookId: webhook.id });
+        return res.status(401).json({ error: 'Invalid webhook signature' });
+      }
+    }
+
     // Extract event type from payload or headers
     const eventType = extractEventType(req.body, req.headers as Record<string, string>, webhook.source);
 
@@ -315,7 +342,7 @@ export async function receiveInboundWebhook(req: Request, res: Response, _next: 
   } catch (error) {
     // Always return 200/202 to webhook providers to prevent retries
     // Log the error but don't expose it
-    console.error('Webhook processing error:', error);
+    logger.error('Webhook processing error', { error: error instanceof Error ? error.message : 'Unknown' });
     return res.status(202).json({ received: true, error: 'Processing failed' });
   }
 }

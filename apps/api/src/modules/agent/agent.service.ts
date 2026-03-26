@@ -1,6 +1,6 @@
-import { PrismaClient, AgentConversation, AgentMessage } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { AgentConversation, AgentMessage } from '@prisma/client';
+import { logger } from '../../lib/logger';
+import prisma from '../../lib/prisma';
 
 // Query router configuration
 const ROUTING_CONFIG = {
@@ -143,8 +143,8 @@ export const agentService = {
     // Get or create conversation
     let conversation: AgentConversation;
     if (conversationId) {
-      const existing = await prisma.agentConversation.findUnique({
-        where: { id: conversationId },
+      const existing = await prisma.agentConversation.findFirst({
+        where: { id: conversationId, tenantId, userId, status: 'ACTIVE' },
       });
       if (existing) {
         conversation = existing;
@@ -156,10 +156,10 @@ export const agentService = {
     }
 
     // Get conversation history for context (used for future multi-turn conversations)
-    await this.getConversationHistory(conversation.id, 5);
+    await this.getConversationHistory(conversation.id, tenantId, userId, 5);
 
     // Save user message
-    await this.saveMessage(conversation.id, 'user', query);
+    await this.saveMessage(conversation.id, 'user', query, undefined, tenantId, userId);
 
     // Execute the query based on intent
     const response = await this.executeQuery(tenantId, classification, query, []);
@@ -171,7 +171,7 @@ export const agentService = {
       confidence: response.confidence,
       responseType: response.responseType,
       responseData: response.responseData,
-    });
+    }, tenantId, userId);
 
     return response;
   },
@@ -340,7 +340,7 @@ Please try one of these or ask something similar.`;
           confidence = 0.5;
       }
     } catch (error) {
-      console.error('Agent query error:', error);
+      logger.error('Agent query error', { error: error instanceof Error ? error.message : 'Unknown' });
       content = 'I encountered an error processing your request. Please try again.';
       confidence = 0.3;
     }
@@ -367,7 +367,16 @@ Please try one of these or ask something similar.`;
   },
 
   // Get conversation history
-  async getConversationHistory(conversationId: string, limit: number = 10): Promise<AgentMessage[]> {
+  async getConversationHistory(conversationId: string, tenantId: string, userId: string, limit: number = 10): Promise<AgentMessage[]> {
+    const conversation = await prisma.agentConversation.findFirst({
+      where: { id: conversationId, tenantId, userId },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      return [];
+    }
+
     return prisma.agentMessage.findMany({
       where: { conversationId },
       orderBy: { timestamp: 'desc' },
@@ -386,8 +395,21 @@ Please try one of these or ask something similar.`;
       confidence?: number;
       responseType?: string;
       responseData?: any;
-    }
+    },
+    tenantId?: string,
+    userId?: string
   ): Promise<AgentMessage> {
+    if (tenantId && userId) {
+      const conversation = await prisma.agentConversation.findFirst({
+        where: { id: conversationId, tenantId, userId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+
+      if (!conversation) {
+        throw new Error('Conversation not found');
+      }
+    }
+
     return prisma.agentMessage.create({
       data: {
         conversationId,
@@ -412,9 +434,9 @@ Please try one of these or ask something similar.`;
   },
 
   // Get a specific conversation with messages
-  async getConversation(conversationId: string): Promise<AgentConversation | null> {
-    return prisma.agentConversation.findUnique({
-      where: { id: conversationId },
+  async getConversation(conversationId: string, tenantId: string, userId: string): Promise<AgentConversation | null> {
+    return prisma.agentConversation.findFirst({
+      where: { id: conversationId, tenantId, userId },
       include: {
         messages: {
           orderBy: { timestamp: 'asc' },
@@ -424,7 +446,15 @@ Please try one of these or ask something similar.`;
   },
 
   // Delete/archive a conversation
-  async deleteConversation(conversationId: string): Promise<void> {
+  async deleteConversation(conversationId: string, tenantId: string, userId: string): Promise<void> {
+    // Verify conversation belongs to the caller
+    const conversation = await prisma.agentConversation.findFirst({
+      where: { id: conversationId, tenantId, userId },
+    });
+    if (!conversation) {
+      throw new Error('Conversation not found');
+    }
+
     await prisma.agentConversation.update({
       where: { id: conversationId },
       data: { status: 'ARCHIVED' },
@@ -432,7 +462,16 @@ Please try one of these or ask something similar.`;
   },
 
   // Provide feedback on a message
-  async provideFeedback(messageId: string, feedback: 'positive' | 'negative', note?: string): Promise<void> {
+  async provideFeedback(messageId: string, feedback: 'positive' | 'negative', tenantId: string, userId: string, note?: string): Promise<void> {
+    // Verify the message's conversation belongs to the caller
+    const message = await prisma.agentMessage.findUnique({
+      where: { id: messageId },
+      include: { conversation: { select: { tenantId: true, userId: true } } },
+    });
+    if (!message || message.conversation.tenantId !== tenantId || message.conversation.userId !== userId) {
+      throw new Error('Message not found');
+    }
+
     await prisma.agentMessage.update({
       where: { id: messageId },
       data: { feedback, feedbackNote: note },

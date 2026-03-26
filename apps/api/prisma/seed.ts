@@ -1,6 +1,9 @@
 import { PrismaClient, TenantTier, TenantStatus, UserStatus, EmploymentType, ResourceStatus, Proficiency, ClientStatus, ClientTier, ProjectType, ProjectStatus, BillingType, AllocationStatus, PracticeStatus, LocationType, LocationStatus, FunctionCategory, FunctionScopeType } from '@prisma/client';
 import argon2 from 'argon2';
 
+import { seedRequestBlueprints } from './seed-request-blueprints';
+import { roleService } from '../src/modules/roles/role.service';
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -8,6 +11,8 @@ async function main() {
 
   // Clean existing data (in reverse order of dependencies)
   console.log('🧹 Cleaning existing data...');
+  await prisma.tenantRolePlaceholderMapping.deleteMany();
+  await prisma.tenantRequestPackActivation.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.timesheetEntry.deleteMany();
   await prisma.timesheetPeriod.deleteMany();
@@ -347,7 +352,12 @@ async function main() {
 
   // Create users
   console.log('👤 Creating users...');
-  const passwordHash = await argon2.hash('Password123!@#');
+  // M-11: Use environment variable for seed password, fallback only in development
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD || 'Password123!@#';
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.warn('⚠️  WARNING: Using default seed password. Set SEED_ADMIN_PASSWORD env var for production seeding.');
+  }
+  const passwordHash = await argon2.hash(seedPassword);
 
   const userAdmin = await prisma.user.create({
     data: {
@@ -682,11 +692,22 @@ async function main() {
     console.log(`   Assigned Leave Approver to ${userRM.email} for ${practiceTech.name}`);
   }
 
+  console.log('🧩 Seeding request packs and blueprints...');
+  const requestBlueprintSeedResult = await seedRequestBlueprints(prisma);
+  console.log(
+    `   Seeded ${requestBlueprintSeedResult.packCode} with ${requestBlueprintSeedResult.requestTypeCount} request types and ${requestBlueprintSeedResult.blueprintCount} blueprints`
+  );
+
+  const pmoRole = await roleService.ensureNewVisionPmoBaseline(tenant.id);
+  if (pmoRole) {
+    console.log('   Ensured PMO system role for NewVision');
+  }
+
   console.log('✅ Seeding complete!');
   console.log('');
   console.log('📝 Sample login credentials:');
   console.log('   Email: admin@newvision.in');
-  console.log('   Password: Password123!@#');
+  console.log(`   Password: ${process.env.SEED_ADMIN_PASSWORD ? '(set via SEED_ADMIN_PASSWORD env var)' : 'Password123!@#'}`);
   console.log('');
 }
 

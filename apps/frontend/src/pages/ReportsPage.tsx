@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import MainLayout from '@/components/layout/MainLayout';
 
 // ============================================================================
 // Types
@@ -238,7 +237,6 @@ export default function ReportsPage() {
   }
 
   return (
-    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -369,7 +367,6 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
     </div>
-    </MainLayout>
   );
 }
 

@@ -14,11 +14,11 @@
  * - CREATE_TASK: Create follow-up task
  */
 
-import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 import * as crypto from 'crypto';
 import { executeEntityHandler, hasHandler, HandlerContext } from './entity-handlers';
+import { createAuditLog } from '../audit/audit.service';
 
 
 // ============================================================================
@@ -80,8 +80,9 @@ export async function executePostApprovalActions(
   const results: ActionResult[] = [];
   
   // Get tenant request type config
-  const request = await prisma.request.findUnique({
-    where: { id: context.requestId },
+  // M-12: Include tenantId to prevent cross-tenant request loading
+  const request = await prisma.request.findFirst({
+    where: { id: context.requestId, tenantId: context.tenantId },
     include: {
       type: true,
     },
@@ -514,23 +515,20 @@ async function executeLogAuditAction(
   // Use appropriate AuditAction enum value based on decision
   const auditAction = context.decision === 'APPROVED' ? 'APPROVE' : 'REJECT';
 
-  // Create audit log entry
-  await prisma.auditLog.create({
-    data: {
-      tenantId: context.tenantId,
-      userId: context.decision === 'APPROVED' ? context.approvedById! : context.rejectedById!,
-      action: auditAction,
-      entityType: 'Request',
-      entityId: context.requestId,
-      changes: {
-        requestNumber: context.requestNumber,
-        requestType: context.requestType,
-        decision: context.decision,
-        comments: context.comments,
-        ...details,
-      } as Prisma.InputJsonValue,
-    },
-  });
+  await createAuditLog(
+    context.tenantId,
+    context.decision === 'APPROVED' ? context.approvedById! : context.rejectedById!,
+    'Request',
+    context.requestId,
+    auditAction,
+    {
+      requestNumber: context.requestNumber,
+      requestType: context.requestType,
+      decision: context.decision,
+      comments: context.comments,
+      ...details,
+    }
+  );
 
   return {
     logged: true,
@@ -570,8 +568,9 @@ export async function buildActionContext(
   decidedById: string,
   comments?: string
 ): Promise<ActionExecutionContext> {
-  const request = await prisma.request.findUnique({
-    where: { id: requestId },
+  // M-12: Include tenantId to prevent cross-tenant request loading
+  const request = await prisma.request.findFirst({
+    where: { id: requestId, tenantId },
     include: {
       type: true,
       requester: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -582,8 +581,9 @@ export async function buildActionContext(
     throw new Error('Request not found');
   }
 
-  const decider = await prisma.user.findUnique({
-    where: { id: decidedById },
+  // M-12: Include tenantId to prevent cross-tenant user loading
+  const decider = await prisma.user.findFirst({
+    where: { id: decidedById, tenantId },
     select: { firstName: true, lastName: true },
   });
 

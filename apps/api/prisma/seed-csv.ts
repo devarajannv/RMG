@@ -2,6 +2,7 @@ import { PrismaClient, EmploymentType, ResourceStatus, ClientStatus, ClientTier,
 import * as fs from 'fs';
 import * as path from 'path';
 import argon2 from 'argon2';
+import { roleService } from '../src/modules/roles/role.service';
 
 const prisma = new PrismaClient();
 
@@ -171,6 +172,25 @@ function mapBillingType(csvType: string): BillingType {
   }
 }
 
+async function resetDatabase() {
+  const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
+    SELECT tablename
+    FROM pg_tables
+    WHERE schemaname = 'public'
+      AND tablename <> '_prisma_migrations'
+  `;
+
+  if (tables.length === 0) {
+    return;
+  }
+
+  const tableNames = tables
+    .map(({ tablename }) => `"public"."${tablename}"`)
+    .join(', ');
+
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tableNames} RESTART IDENTITY CASCADE`);
+}
+
 // ============================================================================
 // Main Seed Function
 // ============================================================================
@@ -195,28 +215,7 @@ async function main() {
   // Clean existing data
   // -------------------------------------------------------------------------
   console.log('🧹 Cleaning existing data...');
-  await prisma.auditLog.deleteMany();
-  await prisma.timesheetEntry.deleteMany();
-  await prisma.timesheetPeriod.deleteMany();
-  await prisma.allocation.deleteMany();
-  await prisma.resourceSkill.deleteMany();
-  await prisma.project.deleteMany();
-  await prisma.contract.deleteMany();
-  await prisma.opportunity.deleteMany();
-  await prisma.client.deleteMany();
-  await prisma.skill.deleteMany();
-  await prisma.skillCategory.deleteMany();
-  await prisma.rolePermission.deleteMany();
-  await prisma.userRole.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.resource.deleteMany();
-  await prisma.role.deleteMany();
-  await prisma.practice.deleteMany();
-  await prisma.location.deleteMany();
-  await prisma.exchangeRate.deleteMany();
-  await prisma.currency.deleteMany();
-  await prisma.document.deleteMany();
-  await prisma.tenant.deleteMany();
+  await resetDatabase();
   
   console.log('   ✓ Cleaned all tables\n');
   
@@ -734,7 +733,12 @@ async function main() {
   // Create Admin Users
   // -------------------------------------------------------------------------
   console.log('👤 Creating system users...');
-  const hashedPassword = await argon2.hash('Password123!@#');
+  // M-11: Use environment variable for seed password
+  const csvSeedPassword = process.env.SEED_ADMIN_PASSWORD || 'Password123!@#';
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.warn('⚠️  WARNING: Using default seed password. Set SEED_ADMIN_PASSWORD env var for production seeding.');
+  }
+  const hashedPassword = await argon2.hash(csvSeedPassword);
   
   const adminUser = await prisma.user.create({
     data: {
@@ -744,6 +748,7 @@ async function main() {
       firstName: 'Admin',
       lastName: 'User',
       status: 'ACTIVE',
+      emailVerified: true,
     },
   });
   
@@ -763,6 +768,7 @@ async function main() {
       firstName: 'Resource',
       lastName: 'Manager',
       status: 'ACTIVE',
+      emailVerified: true,
     },
   });
   
@@ -782,6 +788,7 @@ async function main() {
       firstName: 'Project',
       lastName: 'Manager',
       status: 'ACTIVE',
+      emailVerified: true,
     },
   });
   
@@ -819,6 +826,11 @@ async function main() {
     });
   }
   console.log('   ✓ Created 5 currencies\n');
+
+  const pmoRole = await roleService.ensureNewVisionPmoBaseline(tenant.id);
+  if (pmoRole) {
+    console.log('   ✓ Ensured PMO system role for NewVision\n');
+  }
   
   // -------------------------------------------------------------------------
   // Summary

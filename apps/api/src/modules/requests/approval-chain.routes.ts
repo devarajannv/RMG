@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { asyncHandler } from '../../middleware/errorHandler';
 import * as controller from './approval-chain.controller';
 
@@ -22,35 +22,35 @@ router.use(authenticate);
  * @desc Create approval chain
  * @access Private (Admin)
  */
-router.post('/', asyncHandler(controller.createApprovalChain));
+router.post('/', authorize('workflow:manage'), asyncHandler(controller.createApprovalChain));
 
 /**
  * @route GET /api/v1/approval-chains
  * @desc List approval chains
  * @access Private
  */
-router.get('/', asyncHandler(controller.listApprovalChains));
+router.get('/', authorize('workflow:read'), asyncHandler(controller.listApprovalChains));
 
 /**
  * @route GET /api/v1/approval-chains/:id
  * @desc Get approval chain
  * @access Private
  */
-router.get('/:id', asyncHandler(controller.getApprovalChain));
+router.get('/:id', authorize('workflow:read'), asyncHandler(controller.getApprovalChain));
 
 /**
  * @route PUT /api/v1/approval-chains/:id
  * @desc Update approval chain
  * @access Private (Admin)
  */
-router.put('/:id', asyncHandler(controller.updateApprovalChain));
+router.put('/:id', authorize('workflow:manage'), asyncHandler(controller.updateApprovalChain));
 
 /**
  * @route DELETE /api/v1/approval-chains/:id
  * @desc Delete approval chain
  * @access Private (Admin)
  */
-router.delete('/:id', asyncHandler(controller.deleteApprovalChain));
+router.delete('/:id', authorize('workflow:manage'), asyncHandler(controller.deleteApprovalChain));
 
 // ============================================================================
 // Approval Steps
@@ -61,28 +61,28 @@ router.delete('/:id', asyncHandler(controller.deleteApprovalChain));
  * @desc Add step to chain
  * @access Private (Admin)
  */
-router.post('/:id/steps', asyncHandler(controller.addApprovalStep));
+router.post('/:id/steps', authorize('workflow:manage'), asyncHandler(controller.addApprovalStep));
 
 /**
  * @route PUT /api/v1/approval-chains/:id/steps/reorder
  * @desc Reorder steps
  * @access Private (Admin)
  */
-router.put('/:id/steps/reorder', asyncHandler(controller.reorderApprovalSteps));
+router.put('/:id/steps/reorder', authorize('workflow:manage'), asyncHandler(controller.reorderApprovalSteps));
 
 /**
  * @route PUT /api/v1/approval-chains/:chainId/steps/:stepId
  * @desc Update step
  * @access Private (Admin)
  */
-router.put('/:chainId/steps/:stepId', asyncHandler(controller.updateApprovalStep));
+router.put('/:chainId/steps/:stepId', authorize('workflow:manage'), asyncHandler(controller.updateApprovalStep));
 
 /**
  * @route DELETE /api/v1/approval-chains/:chainId/steps/:stepId
  * @desc Delete step
  * @access Private (Admin)
  */
-router.delete('/:chainId/steps/:stepId', asyncHandler(controller.deleteApprovalStep));
+router.delete('/:chainId/steps/:stepId', authorize('workflow:manage'), asyncHandler(controller.deleteApprovalStep));
 
 // ============================================================================
 // Request Type Assignment
@@ -93,6 +93,6 @@ router.delete('/:chainId/steps/:stepId', asyncHandler(controller.deleteApprovalS
  * @desc Assign request types
  * @access Private (Admin)
  */
-router.put('/:id/request-types', asyncHandler(controller.assignRequestTypes));
+router.put('/:id/request-types', authorize('workflow:manage'), asyncHandler(controller.assignRequestTypes));
 
 export default router;

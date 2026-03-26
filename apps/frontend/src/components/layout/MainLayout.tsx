@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useCallback, useMemo, useEffect, Suspense } from 'react';
+import { useNavigate, useLocation, Link, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -9,22 +9,25 @@ import {
   FileText,
   Clock,
   Settings,
+  ShieldCheck,
   LogOut,
   Search,
   BarChart3,
   Building2,
   Armchair,
+  Coins,
   ChevronRight,
   ChevronDown,
   Brain,
   PieChart,
-  Database,
   X,
   ClipboardList,
   CheckSquare,
+  Database,
+  Briefcase,
   GitBranch,
   Rocket,
-  Briefcase,
+  Workflow,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -40,7 +43,7 @@ import { NotificationBell, NotificationPanel } from '@/components/notifications'
 // Group 1: Daily Activities (things users do every day)
 // Group 2: Core Business (main business entities)
 // Group 3: Intelligence (AI & analytics)
-// Group 4: Administration (settings, data management)
+// Group 4: Personal + tenant administration
 
 interface NavSection {
   title?: string;
@@ -185,32 +188,82 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Administration',
+    items: [
+      {
+        icon: Settings,
+        label: 'My Settings',
+        href: '/settings',
+      },
+    ],
+  },
+  {
+    title: 'Organization Admin',
     permissions: [PERMISSIONS.SETTINGS_READ, PERMISSIONS.ROLES_READ],
     items: [
-      { 
-        icon: Rocket, 
-        label: 'Onboarding', 
-        href: '/onboarding',
-        permissions: PERMISSIONS.SETTINGS_UPDATE,
-        adminOnly: true,
+      {
+        icon: Rocket,
+        label: 'Onboarding',
+        href: '/admin/onboarding',
+        permissions: PERMISSIONS.SETTINGS_READ,
       },
-      { 
-        icon: Database, 
-        label: 'Data Management', 
-        href: '/data-management',
-        permissions: PERMISSIONS.SETTINGS_UPDATE,
+      {
+        icon: Users,
+        label: 'Users',
+        href: '/admin/users',
+        permissions: PERMISSIONS.SETTINGS_READ,
       },
-      { 
-        icon: GitBranch, 
-        label: 'Workflows', 
-        href: '/workflows',
-        permissions: [PERMISSIONS.SETTINGS_UPDATE, PERMISSIONS.ROLES_READ],
+      {
+        icon: ShieldCheck,
+        label: 'Roles',
+        href: '/admin/roles',
+        permissions: PERMISSIONS.ROLES_READ,
       },
-      { 
-        icon: Settings, 
-        label: 'Settings', 
-        href: '/settings',
+      {
+        icon: Settings,
+        label: 'Functions',
+        href: '/admin/functions',
+        permissions: PERMISSIONS.SETTINGS_READ,
+      },
+      {
+        icon: FileText,
+        label: 'Request Types',
+        href: '/admin/request-types',
+        permissions: PERMISSIONS.SETTINGS_READ,
+      },
+      {
+        icon: Workflow,
+        label: 'Workflows',
+        href: '/admin/workflows',
+        permissions: [PERMISSIONS.SETTINGS_READ, PERMISSIONS.ROLES_READ],
+      },
+      {
+        icon: Coins,
+        label: 'Currency',
+        href: '/admin/currency',
+        permissions: PERMISSIONS.SETTINGS_READ,
+      },
+      {
+        icon: GitBranch,
+        label: 'Integrations',
+        href: '/admin/integrations',
+        permissions: PERMISSIONS.SETTINGS_READ,
+      },
+      {
+        icon: Building2,
+        label: 'Organization',
+        href: '/admin/organization',
+        permissions: PERMISSIONS.SETTINGS_READ,
+      },
+      {
+        icon: ClipboardList,
+        label: 'Audit Logs',
+        href: '/admin/audit',
+        permissions: PERMISSIONS.SETTINGS_READ,
+      },
+      {
+        icon: Database,
+        label: 'Data Management',
+        href: '/admin/data-management',
         permissions: PERMISSIONS.SETTINGS_READ,
       },
     ],
@@ -218,7 +271,7 @@ const navSections: NavSection[] = [
 ];
 
 interface MainLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -228,7 +281,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const envBadge = getEnvironmentBadge();
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+  // Collapse all sidebar sections by default, except the one containing the active page
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const section of navSections) {
+      if (section.title) {
+        const hasActiveItem = section.items.some(item =>
+          item.href === '/'
+            ? location.pathname === '/'
+            : location.pathname.startsWith(item.href.split('?')[0])
+        );
+        initial[section.title] = !hasActiveItem; // collapsed = true unless active
+      }
+    }
+    return initial;
+  });
+
+  // Auto-expand the section containing the active route on navigation
+  useEffect(() => {
+    for (const section of navSections) {
+      if (section.title) {
+        const hasActiveItem = section.items.some(item =>
+          item.href === '/'
+            ? location.pathname === '/'
+            : location.pathname.startsWith(item.href.split('?')[0])
+        );
+        if (hasActiveItem) {
+          setCollapsedSections(prev => ({ ...prev, [section.title!]: false }));
+        }
+      }
+    }
+  }, [location.pathname]);
 
   // Get user permissions
   const { 
@@ -381,9 +465,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     }
                     
                     return (
-                      <a
+                      <Link
                         key={item.label}
-                        href={item.href}
+                        to={item.href}
                         className={cn(
                           'group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200',
                           isActive
@@ -404,7 +488,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         {isActive && !badgeValue && (
                           <ChevronRight className="h-4 w-4 text-[#F7941D]" />
                         )}
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>
@@ -480,7 +564,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="p-8 min-h-[calc(100vh-64px)]">{children}</main>
+        <main className="p-8 min-h-[calc(100vh-64px)]">
+          <Suspense fallback={
+            <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+          }>
+            {children || <Outlet />}
+          </Suspense>
+        </main>
       </div>
     </div>
   );

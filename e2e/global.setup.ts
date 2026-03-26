@@ -10,7 +10,7 @@
  */
 
 import { FullConfig } from '@playwright/test';
-import { testConfig } from './playwright.config';
+import { authStatePaths, testConfig } from './playwright.config';
 
 async function globalSetup(config: FullConfig) {
   console.log('\n🚀 E2E Global Setup Starting...\n');
@@ -109,7 +109,7 @@ async function globalSetup(config: FullConfig) {
   const fs = await import('fs/promises');
   const path = await import('path');
   
-  const authDir = path.join(process.cwd(), 'e2e', '.auth');
+  const authDir = authStatePaths.dir;
   
   try {
     await fs.mkdir(authDir, { recursive: true });

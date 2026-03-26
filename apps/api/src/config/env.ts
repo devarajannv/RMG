@@ -20,8 +20,9 @@ const envSchema = z.object({
 
   // Authentication
   JWT_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('4h'),
 
   // Microsoft 365 SSO (Optional)
   MICROSOFT_CLIENT_ID: z.string().optional(),
@@ -60,6 +61,7 @@ const env = parsed.success ? parsed.data : envSchema.parse({
   ...process.env,
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://rmgaas:rmgaas_dev@localhost:5432/rmgaas',
   JWT_SECRET: process.env.JWT_SECRET || 'development-jwt-secret-change-in-production-32chars',
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'development-refresh-secret-change-prod-32chars',
   COOKIE_SECRET: process.env.COOKIE_SECRET || 'development-cookie-secret-change-in-prod-32char',
 });
 
@@ -79,6 +81,7 @@ export const config = {
 
   // JWT
   jwtSecret: env.JWT_SECRET,
+  jwtRefreshSecret: env.JWT_REFRESH_SECRET,
   jwtAccessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
   jwtRefreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
 
@@ -94,7 +97,14 @@ export const config = {
   defaultTenantId: env.DEFAULT_TENANT_ID || '',
 
   // Security
-  corsOrigins: env.CORS_ORIGINS.split(',').map((origin) => origin.trim()),
+  // M-09: Validate CORS origins — strip empty entries, warn for wildcard
+  corsOrigins: (() => {
+    const origins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
+    if (env.NODE_ENV === 'production' && origins.includes('*')) {
+      console.warn('⚠️ CORS wildcard (*) is configured in production — this is insecure');
+    }
+    return origins;
+  })(),
   rateLimitWindowMs: parseInt(env.RATE_LIMIT_WINDOW_MS, 10),
   rateLimitMaxRequests: parseInt(env.RATE_LIMIT_MAX_REQUESTS, 10),
   cookieSecret: env.COOKIE_SECRET,

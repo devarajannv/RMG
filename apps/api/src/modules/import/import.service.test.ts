@@ -40,6 +40,13 @@ NV101,Jane,Smith,jane.smith@company.com,Senior Developer,L4,TECH,BLR,ACTIVE`;
       expect(result.importedRows).toBe(2);
       expect(result.skippedRows).toBe(0);
       expect(result.errors).toHaveLength(0);
+      expect(prisma.resource.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            benchSince: null,
+          }),
+        })
+      );
     });
 
     it('should skip existing resources without updateExisting flag', async () => {
@@ -79,6 +86,13 @@ NV101,Jane,Smith,jane.smith@company.com,Senior Developer,L4,TECH,BLR,ACTIVE`;
       // Assert
       expect(result.importedRows).toBe(2);
       expect(prisma.resource.update).toHaveBeenCalled();
+      expect(prisma.resource.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({
+            benchSince: expect.anything(),
+          }),
+        })
+      );
     });
 
     it('should report errors for rows with missing required fields', async () => {

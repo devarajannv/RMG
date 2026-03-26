@@ -6,6 +6,7 @@
 
 import { Router } from 'express';
 import * as triggerController from './trigger.controller';
+import { webhookInboundLimiter } from '../../middleware/rateLimiter';
 
 const router = Router();
 
@@ -50,6 +51,6 @@ const router = Router();
  *       404:
  *         description: Webhook endpoint not found
  */
-router.post('/:endpointPath', triggerController.receiveInboundWebhook);
+router.post('/:endpointPath', webhookInboundLimiter, triggerController.receiveInboundWebhook);
 
 export default router;

@@ -68,7 +68,14 @@ export const getConversations = async (req: Request, res: Response, next: NextFu
 
 export const getConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const conversation = await agentService.getConversation(req.params.id);
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const conversation = await agentService.getConversation(req.params.id, tenantId, userId);
     if (!conversation) {
       res.status(404).json({ error: 'Conversation not found' });
       return;
@@ -99,21 +106,43 @@ export const createConversation = async (req: Request, res: Response, next: Next
   }
 };
 
-export const deleteConversation = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const deleteConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await agentService.deleteConversation(_req.params.id);
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    await agentService.deleteConversation(req.params.id, tenantId, userId);
     res.status(204).send();
   } catch (error) {
+    if (error instanceof Error && error.message === 'Conversation not found') {
+      res.status(404).json({ code: 'NOT_FOUND', error: error.message });
+      return;
+    }
     next(error);
   }
 };
 
 export const provideFeedback = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
     const data = feedbackSchema.parse(req.body);
-    await agentService.provideFeedback(req.params.messageId, data.feedback, data.note);
+    await agentService.provideFeedback(req.params.messageId, data.feedback, tenantId, userId, data.note);
     res.json({ message: 'Feedback recorded' });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Message not found') {
+      res.status(404).json({ error: error.message });
+      return;
+    }
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: 'Validation error', details: error.errors });
       return;
