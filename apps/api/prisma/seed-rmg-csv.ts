@@ -19,6 +19,7 @@ import {
 } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { roleService } from '../src/modules/roles/role.service';
 
 const prisma = new PrismaClient();
 
@@ -1028,6 +1029,11 @@ async function main() {
   console.log(`   ✓ ${completedAllocationCount} completed`);
   console.log(`   ✓ ${confirmedAllocationCount} confirmed`);
   console.log(`   ✓ ${skippedAllocations} skipped`);
+
+  const pmoRole = await roleService.ensureNewVisionPmoBaseline(tenant.id);
+  if (pmoRole) {
+    console.log('   ✓ Ensured PMO system role for NewVision');
+  }
 
   console.log('✅ CSV seed complete');
   console.log(`   Tenant: ${tenant.name}`);

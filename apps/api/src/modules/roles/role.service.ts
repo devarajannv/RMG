@@ -119,6 +119,19 @@ async function replaceRolePermissions(roleId: string, permissionIds: string[]): 
 }
 
 export const roleService = {
+  async ensureNewVisionPmoBaseline(tenantId: string): Promise<any | null> {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+
+    if (tenant?.slug !== 'newvision') {
+      return null;
+    }
+
+    return this.provisionSystemRole(tenantId, 'PMO');
+  },
+
   // Get all roles for a tenant
   async getRoles(tenantId: string): Promise<any[]> {
     const roles = await prisma.role.findMany({

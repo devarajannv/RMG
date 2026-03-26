@@ -14,6 +14,7 @@ import * as StructureService from './structure.service';
 import * as RolesService from './roles.service';
 import * as PeopleService from './people.service';
 import * as GovernanceService from './governance.service';
+import { roleService } from '../roles/role.service';
 
 // =============================================================================
 // TYPES
@@ -405,6 +406,11 @@ export async function initializeDefaults(
   if (options.delegationRules) {
     const created = await GovernanceService.seedDefaultDelegationRules(tenantId);
     if (created.length > 0) initialized.push(`${created.length} delegation rules`);
+  }
+
+  const pmoRole = await roleService.ensureNewVisionPmoBaseline(tenantId);
+  if (pmoRole) {
+    initialized.push('PMO system role');
   }
   
   logger.info('Defaults initialized', { tenantId, initialized });

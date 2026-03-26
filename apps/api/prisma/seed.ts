@@ -2,6 +2,7 @@ import { PrismaClient, TenantTier, TenantStatus, UserStatus, EmploymentType, Res
 import argon2 from 'argon2';
 
 import { seedRequestBlueprints } from './seed-request-blueprints';
+import { roleService } from '../src/modules/roles/role.service';
 
 const prisma = new PrismaClient();
 
@@ -696,6 +697,11 @@ async function main() {
   console.log(
     `   Seeded ${requestBlueprintSeedResult.packCode} with ${requestBlueprintSeedResult.requestTypeCount} request types and ${requestBlueprintSeedResult.blueprintCount} blueprints`
   );
+
+  const pmoRole = await roleService.ensureNewVisionPmoBaseline(tenant.id);
+  if (pmoRole) {
+    console.log('   Ensured PMO system role for NewVision');
+  }
 
   console.log('✅ Seeding complete!');
   console.log('');

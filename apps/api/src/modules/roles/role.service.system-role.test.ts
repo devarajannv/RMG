@@ -6,6 +6,9 @@ const { mockInvalidateAllUserTokens } = vi.hoisted(() => ({
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
+    tenant: {
+      findUnique: vi.fn(),
+    },
     role: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -50,6 +53,7 @@ function buildStoredPermissions() {
 describe('roleService.provisionSystemRole', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.tenant.findUnique.mockResolvedValue({ slug: 'newvision' });
     mockPrisma.permission.upsert.mockResolvedValue({});
     mockPrisma.permission.findMany.mockResolvedValue(buildStoredPermissions());
   });
@@ -135,5 +139,40 @@ describe('roleService.provisionSystemRole', () => {
     await expect(roleService.provisionSystemRole('tenant-1', 'PMO')).rejects.toThrow(
       'Role name PMO is already in use by a custom role'
     );
+  });
+
+  it('does not auto-provision the PMO baseline for non-newvision tenants', async () => {
+    mockPrisma.tenant.findUnique.mockResolvedValueOnce({ slug: 'other-tenant' });
+
+    await expect(roleService.ensureNewVisionPmoBaseline('tenant-2')).resolves.toBeNull();
+    expect(mockPrisma.role.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('auto-provisions the PMO baseline for the newvision tenant', async () => {
+    mockPrisma.role.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'role-1',
+        name: 'PMO',
+        description: pmoPreset?.description,
+        level: 1,
+        isSystem: true,
+        permissions: [],
+        rolePermissions: buildStoredPermissions().map((permission) => ({
+          granted: true,
+          permission,
+        })),
+      });
+    mockPrisma.role.create.mockResolvedValue({ id: 'role-1' });
+    mockPrisma.rolePermission.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.rolePermission.createMany.mockResolvedValue({ count: pmoPreset?.permissionKeys.length ?? 0 });
+
+    const role = await roleService.ensureNewVisionPmoBaseline('tenant-1');
+
+    expect(mockPrisma.tenant.findUnique).toHaveBeenCalledWith({
+      where: { id: 'tenant-1' },
+      select: { slug: true },
+    });
+    expect(role).toMatchObject({ id: 'role-1', name: 'PMO', isSystem: true });
   });
 });

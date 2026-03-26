@@ -2,6 +2,7 @@ import { PrismaClient, EmploymentType, ResourceStatus, ClientStatus, ClientTier,
 import * as fs from 'fs';
 import * as path from 'path';
 import argon2 from 'argon2';
+import { roleService } from '../src/modules/roles/role.service';
 
 const prisma = new PrismaClient();
 
@@ -825,6 +826,11 @@ async function main() {
     });
   }
   console.log('   ✓ Created 5 currencies\n');
+
+  const pmoRole = await roleService.ensureNewVisionPmoBaseline(tenant.id);
+  if (pmoRole) {
+    console.log('   ✓ Ensured PMO system role for NewVision\n');
+  }
   
   // -------------------------------------------------------------------------
   // Summary
